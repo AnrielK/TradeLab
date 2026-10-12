@@ -184,3 +184,72 @@ final class AgentTests: XCTestCase {
         }
     }
 }
+
+/// Maketa, která odpovídá podle role v systémovém promptu.
+final class RoleTransport: MessagesTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var requests: [MessagesRequest] = []
+
+    func send(_ request: MessagesRequest) async throws -> MessagesResponse {
+        lock.lock(); requests.append(request); lock.unlock()
+        let system = request.system ?? ""
+        if system.contains("Tvoje role: Selhávající") {
+            throw ClaudeAPIError.http(status: 400, type: "invalid_request_error", message: "test")
+        }
+        if system.contains("Tvoje role: Analytik"), request.messages.count == 1 {
+            return MessagesResponse(content: [
+                ["type": "tool_use", "id": "t1", "name": "get_quote", "input": ["symbol": "SPY"]],
+            ], stopReason: "tool_use")
+        }
+        let role = system.components(separatedBy: "Tvoje role: ").last?.components(separatedBy: ".").first ?? "?"
+        return MessagesResponse(content: [Block.text("Report \(role)")], stopReason: "end_turn")
+    }
+}
+
+final class TeamTests: XCTestCase {
+    func testStagesPassReportsForward() async throws {
+        let transport = RoleTransport()
+        let quote = AgentTool(name: "get_quote", description: "", inputSchema: Schema.object([:])) { _ in "{\"price\":1}" }
+        let other = AgentTool(name: "run_backtest", description: "", inputSchema: Schema.object([:])) { _ in "{}" }
+        let preset = TeamPreset(id: "t", name: "Test", icon: "x", summary: "", needsSymbol: true, notePlaceholder: "", stages: [
+            TeamStage([
+                TeamRole(id: "a", name: "Analytik", icon: "", instructions: "", tools: ["get_quote"]),
+                TeamRole(id: "b", name: "Kvant", icon: "", instructions: "", tools: []),
+                TeamRole(id: "f", name: "Selhávající", icon: "", instructions: "", tools: []),
+            ]),
+            TeamStage([TeamRole(id: "c", name: "Předseda", icon: "", instructions: "", tools: [])]),
+        ])
+        let runner = TeamRunner(transport: transport, model: "m", baseSystem: "Base", tools: [quote, other], maxConcurrent: 2)
+        let log = TeamLog()
+        let reports = try await runner.run(preset, task: "Posuď SPY") { log.add($0) }
+
+        XCTAssertEqual(reports["a"], "Report Analytik")
+        XCTAssertEqual(reports["b"], "Report Kvant")
+        XCTAssertNil(reports["f"])
+        XCTAssertEqual(reports["c"], "Report Předseda")
+        XCTAssertEqual(log.failed, ["f"])
+
+        // Analytik dostal jen svůj nástroj, kvant žádný.
+        let analyst = transport.requests.first { $0.system?.contains("Tvoje role: Analytik") == true }
+        XCTAssertEqual(analyst?.tools.map(\.name), ["get_quote"])
+        let quant = transport.requests.first { $0.system?.contains("Tvoje role: Kvant") == true }
+        XCTAssertEqual(quant?.tools.count, 0)
+
+        // Předseda vidí reporty první fáze.
+        let chair = try XCTUnwrap(transport.requests.first { $0.system?.contains("Tvoje role: Předseda") == true })
+        let prompt = chair.messages[0].text
+        XCTAssertTrue(prompt.hasPrefix("Posuď SPY"))
+        XCTAssertTrue(prompt.contains("### Analytik\nReport Analytik"))
+        XCTAssertTrue(prompt.contains("### Kvant\nReport Kvant"))
+        XCTAssertFalse(prompt.contains("Selhávající"))
+    }
+}
+
+final class TeamLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _failed: [String] = []
+    var failed: [String] { lock.lock(); defer { lock.unlock() }; return _failed }
+    func add(_ e: TeamEvent) {
+        if case .roleFailed(let id, _) = e { lock.lock(); _failed.append(id); lock.unlock() }
+    }
+}

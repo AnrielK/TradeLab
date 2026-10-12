@@ -4,12 +4,14 @@ import SwiftUI
 struct TradeLabApp: App {
     @State private var model = AppModel()
     @State private var agent = AgentModel()
+    @State private var team = TeamModel()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
                 .environment(agent)
+                .environment(team)
         }
     }
 }

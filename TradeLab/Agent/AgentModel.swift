@@ -106,6 +106,16 @@ final class AgentModel {
         return nil
     }
 
+    /// Transport a model pro aktuálního poskytovatele (nil = chybí klíč).
+    func connection() -> (transport: MessagesTransport, model: ModelOption)? {
+        guard let key = KeychainStore.read(Self.keyAccount(provider)), !key.isEmpty else { return nil }
+        return (provider.transport(apiKey: key), model)
+    }
+
+    func addUsage(_ usage: Usage) {
+        sessionUsage = sessionUsage + usage
+    }
+
     func send(_ text: String, app: AppModel) {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isRunning else { return }
@@ -247,12 +257,16 @@ struct StrategyProposal: Identifiable {
     let breakevens: [Double]
 
     init?(use: ToolUse, result: ToolResult) {
-        guard let json = try? JSONDecoder().decode(JSONValue.self, from: Data(result.content.utf8)),
+        self.init(id: use.id, input: use.input, output: result.content)
+    }
+
+    init?(id: String, input: JSONValue, output: String) {
+        guard let json = try? JSONDecoder().decode(JSONValue.self, from: Data(output.utf8)),
               let legs = json["legs"]?.arrayValue, !legs.isEmpty else { return nil }
-        id = use.id
-        input = use.input
+        self.id = id
+        self.input = input
         name = json["name"]?.stringValue ?? "Strategie"
-        underlying = json["underlying"]?.stringValue ?? use.input["symbol"]?.stringValue?.uppercased() ?? ""
+        underlying = json["underlying"]?.stringValue ?? input["symbol"]?.stringValue?.uppercased() ?? ""
         self.legs = legs
         netPremium = json["net_premium_usd"]?.doubleValue
         maxProfit = json["max_profit_usd"]

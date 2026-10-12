@@ -1,5 +1,20 @@
 # Změny
 
+## 0.8.0 – 2026-10-12
+
+- **Týmy agentů** v záložce Agent (přepínač Chat / Tým), inspirované „swarm“ presety z Vibe-Trading.
+  Role pracují ve fázích nad nástroji aplikace, každá fáze vidí závěry předchozích, poslední role shrne verdikt.
+  - **Investiční výbor**: technický analytik, analytik opčního trhu a kvant (backtesty) → risk manažer → předseda
+    (Býčí / Neutrální / Medvědí s jistotou, argumenty, hladiny, co sledovat).
+  - **Opční desk**: stratég volatility a analytik směru → strukturér (2–3 strategie z reálného řetězce) →
+    risk manažer (stress test) → head trader (obchodní plán, velikost, výstupy).
+  - **Kontrola pozice**: rozbor strategie z builderu, návrh úprav a doporučení držet / upravit / zavřít.
+  - **Přehled watchlistu**: skener, opční pohled na 3 nejzajímavější tickery a shrnutí trhu.
+- Průběh po rolích (stav, volání nástrojů, rozbalitelné reporty), závěrečný report, karty navržených strategií
+  s tlačítkem Otevřít v Opcích, historie posledních 15 běhů, zastavení a opakování běhu.
+- Volba „Šetřit limity API“ pouští role postupně (bezplatné klíče); delší čekání při 429.
+- Jádro: `TeamRunner`, `TeamPreset`, `TeamStage`, `TeamRole` s testy.
+
 ## 0.7.2 – 2026-10-12
 
 - Pod odpovědí agenta s navrženou strategií je karta s nohami (strike, expirace, mid), kreditem/debetem,

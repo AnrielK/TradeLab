@@ -15,6 +15,7 @@ Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a o
 - **Backtest** – SMA/MACD/RSI/buy & hold na denních datech, metriky, křivka kapitálu vs. SPY, drawdown, obchody.
 - **Agent** – chat s Claude, ChatGPT nebo Gemini (vlastní API klíč v Keychainu), který si sám volá nástroje aplikace:
   ceny, statistiky historie, opční řetězce, ocenění, analýzu strategií z reálných kontraktů a backtest.
+- **Týmy agentů** – investiční výbor, opční desk, kontrola pozice a přehled watchlistu: role ve fázích, závěrečný verdikt.
 - **Kalkulačka** – Black-Scholes cena + Greeks, výpočet implikované volatility z tržní ceny.
 - Bezriziková sazba se načítá z 13týdenních T-bills (`^IRX`).
 
@@ -62,5 +63,5 @@ GitHub Actions při každém pushi na `main` spustí testy a sestaví `TradeLab-
 1. ~~Datová vrstva + opční modul~~
 2. ~~Backtester~~ (vektorový engine, SMA/MACD/RSI, Sharpe, drawdown, porovnání se SPY)
 3. ~~Agent nad Claude API~~ (tool use nad moduly výše)
-4. Multi-agentní týmy (investiční výbor, opční desk) jako konfigurovatelné presety
+4. ~~Multi-agentní týmy~~ (investiční výbor, opční desk, kontrola pozice, přehled watchlistu)
 5. Volitelně: Mac server s Vibe-Trading (Alpha Zoo, Shadow Account)

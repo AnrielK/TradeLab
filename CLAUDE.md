@@ -8,4 +8,5 @@
 - CI: `.github/workflows/build.yml` → testy jádra, pak unsigned IPA artefakt. Chyby jdou do anotací; Claude po pushi kontroluje běh sám přes GitHub REST API (`/actions/runs`, `/check-runs/<job>/annotations`).
 - `TradeLab/TVChart/` je kopie zdrojů z projektu TVChart-iOS (bez `TVChartApp.swift`, `ContentView` → `TVChartScreen(initialSymbol:)`). Při úpravách grafu držet kompatibilitu s původním projektem (přidáno: `indicatorsEnabled`, `priceLines`, `persistsSession` ve `ChartViewModel`, `drawPriceLines` v rendereru); data jdou přes neoficiální websocket TradingView.
 - Agent: `ClaudeAgent` – kanonický formát je Claude Messages API (`anthropic-version: 2023-06-01`, `tool_choice` jen `auto`); `OpenAITransport` (Responses API, `store: false`) a `GeminiTransport` (generateContent v1beta) převádějí tam a zpět, surová data poskytovatele drží skrytý blok `_provider`, nástroje v `TradeLab/Agent/AgentTools.swift`. API klíč jen v Keychainu, nikdy v repu (repo je veřejné).
-- Plán: ~~backtester~~ → ~~agent nad Claude API~~ → multi-agentní presety → volitelný Mac server s Vibe-Trading.
+- Týmy: `TeamRunner` v jádru (fáze postupně, role ve fázi souběžně s limitem), presety v `TradeLab/Agent/TeamPresets.swift` – názvy nástrojů musí odpovídat `AgentToolbox`.
+- Plán: ~~backtester~~ → ~~agent nad Claude API~~ → ~~multi-agentní presety~~ → volitelný Mac server s Vibe-Trading.

@@ -19,7 +19,7 @@ enum JSONPoster {
     }()
 
     static func post(_ url: URL, headers: [String: String], body: JSONValue,
-                     session: URLSession = session, maxRetries: Int = 2) async throws -> JSONValue {
+                     session: URLSession = session, maxRetries: Int = 3) async throws -> JSONValue {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
@@ -37,8 +37,8 @@ enum JSONPoster {
             let error = ClaudeAPIError.from(status: http.statusCode, body: data)
             guard error.isRetryable, attempt < maxRetries else { throw error }
             attempt += 1
-            let retryAfter = http.value(forHTTPHeaderField: "retry-after").flatMap(Double.init) ?? Double(attempt * 2)
-            try await Task.sleep(nanoseconds: UInt64(min(retryAfter, 20) * 1_000_000_000))
+            let retryAfter = http.value(forHTTPHeaderField: "retry-after").flatMap(Double.init) ?? Double(attempt * attempt * 4)
+            try await Task.sleep(nanoseconds: UInt64(min(retryAfter, 30) * 1_000_000_000))
         }
     }
 

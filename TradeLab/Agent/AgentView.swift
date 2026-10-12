@@ -2,6 +2,14 @@ import SwiftUI
 import ClaudeAgent
 import MarketData
 
+enum AgentMode: String, CaseIterable, Identifiable {
+    case chat
+    case team
+
+    var id: String { rawValue }
+    var title: String { self == .chat ? "Chat" : "Tým" }
+}
+
 struct AgentView: View {
     @Environment(AppModel.self) private var app
     @Environment(AgentModel.self) private var agent
@@ -17,8 +25,46 @@ struct AgentView: View {
         "Zhodnoť moji aktuální opční pozici.",
     ]
 
+    @AppStorage("agent.mode") private var mode: AgentMode = .chat
+
     var body: some View {
         NavigationStack {
+            Group {
+                switch mode {
+                case .chat: chat
+                case .team: TeamView(showSettings: $showSettings)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Picker("Režim", selection: $mode) {
+                        ForEach(AgentMode.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+                if mode == .chat {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { confirmClear = true } label: { Image(systemName: "square.and.pencil") }
+                            .disabled(agent.messages.isEmpty)
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSettings = true } label: { Image(systemName: "gearshape") }
+                }
+            }
+            .confirmationDialog("Začít novou konverzaci?", isPresented: $confirmClear, titleVisibility: .visible) {
+                Button("Smazat konverzaci", role: .destructive) { agent.clear() }
+            }
+            .sheet(isPresented: $showSettings) {
+                AgentSettingsView()
+                    .presentationDetents([.medium, .large])
+            }
+        }
+    }
+
+    private var chat: some View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
@@ -63,25 +109,6 @@ struct AgentView: View {
                 .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
             }
             .safeAreaInset(edge: .bottom) { inputBar }
-            .navigationTitle("Agent")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { confirmClear = true } label: { Image(systemName: "square.and.pencil") }
-                        .disabled(agent.messages.isEmpty)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings = true } label: { Image(systemName: "gearshape") }
-                }
-            }
-            .confirmationDialog("Začít novou konverzaci?", isPresented: $confirmClear, titleVisibility: .visible) {
-                Button("Smazat konverzaci", role: .destructive) { agent.clear() }
-            }
-            .sheet(isPresented: $showSettings) {
-                AgentSettingsView()
-                    .presentationDetents([.medium, .large])
-            }
-        }
     }
 
     // MARK: - Části
@@ -209,14 +236,16 @@ private struct MessageView: View {
     }
 }
 
-private struct ToolChip: View {
+struct ToolChip: View {
     let use: ToolUse
     let result: ToolResult?
     let running: Bool
     @State private var expanded = false
 
-    private var title: String {
-        switch use.name {
+    private var title: String { Self.title(for: use.name) }
+
+    static func title(for name: String) -> String {
+        switch name {
         case "get_quote": return "Cena"
         case "search_symbol": return "Hledání tickeru"
         case "get_watchlist": return "Watchlist"
@@ -227,17 +256,19 @@ private struct ToolChip: View {
         case "analyze_strategy": return "Analýza strategie"
         case "get_current_position": return "Aktuální pozice"
         case "run_backtest": return "Backtest"
-        default: return use.name
+        default: return name
         }
     }
 
-    private var detail: String {
+    private var detail: String { Self.detail(for: use.input) }
+
+    static func detail(for input: JSONValue) -> String {
         var parts: [String] = []
-        if let symbol = use.input["symbol"]?.stringValue { parts.append(symbol.uppercased()) }
-        if let expiration = use.input["expiration"]?.stringValue { parts.append(expiration) }
-        if let strategy = use.input["strategy"]?.stringValue { parts.append(strategy) }
-        if let legs = use.input["legs"]?.arrayValue { parts.append("\(legs.count) noh\(legs.count == 1 ? "a" : (legs.count < 5 ? "y" : ""))") }
-        if use.input["apply_to_app"]?.boolValue == true { parts.append("→ aplikace") }
+        if let symbol = input["symbol"]?.stringValue { parts.append(symbol.uppercased()) }
+        if let expiration = input["expiration"]?.stringValue { parts.append(expiration) }
+        if let strategy = input["strategy"]?.stringValue { parts.append(strategy) }
+        if let legs = input["legs"]?.arrayValue { parts.append("\(legs.count) noh\(legs.count == 1 ? "a" : (legs.count < 5 ? "y" : ""))") }
+        if input["apply_to_app"]?.boolValue == true { parts.append("→ aplikace") }
         return parts.joined(separator: " · ")
     }
 
@@ -298,7 +329,7 @@ private struct ToolChip: View {
 
 // MARK: - Návrh strategie
 
-private struct StrategyProposalCard: View {
+struct StrategyProposalCard: View {
     @Environment(AppModel.self) private var app
     let proposal: StrategyProposal
     @State private var isOpening = false
