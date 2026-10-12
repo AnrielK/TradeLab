@@ -10,6 +10,14 @@ public struct FibonacciSwing: Hashable, Sendable {
     public var endDate: Date
     public var endPrice: Double
 
+    public init(direction: Direction, startDate: Date, startPrice: Double, endDate: Date, endPrice: Double) {
+        self.direction = direction
+        self.startDate = startDate
+        self.startPrice = startPrice
+        self.endDate = endDate
+        self.endPrice = endPrice
+    }
+
     public static let retracementRatios = [0.236, 0.382, 0.5, 0.618, 0.786]
     public static let extensionRatios = [1.272, 1.618]
 
