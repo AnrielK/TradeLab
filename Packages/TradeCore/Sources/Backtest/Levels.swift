@@ -25,8 +25,15 @@ public struct TrendLine: Hashable, Sendable {
     /// Hodnota linie na poslední svíčce.
     public var priceNow: Double
     public var strength: Double
+    /// Index první kotvy a sklon na svíčku (pro výpočet hodnoty linie v libovolném baru).
+    public var startIndex: Int = 0
+    public var slopePerBar: Double = 0
 
     public var isRising: Bool { endPrice > startPrice }
+
+    public func value(at index: Int) -> Double {
+        startPrice + slopePerBar * Double(index - startIndex)
+    }
 }
 
 public struct LevelAnalysis: Sendable {
@@ -148,8 +155,9 @@ public enum LevelFinder {
     }
 
     static func bestLines(_ bars: [BacktestBar], pivots: [Pivot], kind: PriceLevel.Kind,
-                          tolerance: Double, max count: Int) -> [TrendLine] {
-        guard pivots.count >= 2, let lastIndex = bars.indices.last else { return [] }
+                          tolerance: Double, max count: Int, lastIndex upTo: Int? = nil) -> [TrendLine] {
+        guard pivots.count >= 2, let last = bars.indices.last else { return [] }
+        let lastIndex = min(upTo ?? last, last)
         var candidates: [(line: TrendLine, score: Double, a: Int, slope: Double)] = []
 
         for i in 0..<(pivots.count - 1) {
@@ -180,7 +188,8 @@ public enum LevelFinder {
                 let line = TrendLine(kind: kind,
                                      startDate: bars[a.index].date, startPrice: a.price,
                                      endDate: bars[b.index].date, endPrice: b.price,
-                                     touches: touches, priceNow: now, strength: 0)
+                                     touches: touches, priceNow: now, strength: 0,
+                                     startIndex: a.index, slopePerBar: slope)
                 candidates.append((line, score, a.index, slope))
             }
         }

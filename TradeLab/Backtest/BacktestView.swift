@@ -11,7 +11,17 @@ enum StrategyKind: String, CaseIterable, Identifiable {
     case breakRetest = "Break & retest"
     case reversal = "Reversal"
     case maBounce = "Odraz od průměru"
+    case levelBounce = "Odraz od S/R"
+    case levelBreakout = "Průraz S/R"
+    case trendlineBounce = "Odraz od trendline"
+    case trendlineBreakout = "Průraz trendline"
+    case swingPullback = "Swing pullback (TradeLab)"
     case hold = "Buy & hold"
+
+    /// Strategie nad supporty, rezistencemi a trendliniemi (sdílené parametry).
+    var isStructure: Bool {
+        [.levelBounce, .levelBreakout, .trendlineBounce, .trendlineBreakout].contains(self)
+    }
 
     var id: String { rawValue }
 
@@ -23,6 +33,11 @@ enum StrategyKind: String, CaseIterable, Identifiable {
         case .breakRetest: return "Průraz rezistence (max. high za N svíček), návrat k prolomené hladině a zavření nad ní. Stop pod hladinou, trailing výstup pod low posledních N/2 svíček."
         case .reversal: return "Po přeprodanosti (RSI) býčí obratová svíčka – zelená a zavření nad high předchozí. Stop pod swing low, výstup při překoupenosti nebo medvědí obratové svíčce."
         case .maBounce: return "V trendu (cena nad pomalým SMA, průměr roste) se cena dotkne průměru a zavře nad ním zelenou svíčkou. Výstup při zavření pod průměrem."
+        case .levelBounce: return "Hladiny ze swingů posledních N svíček (aspoň 2 dotyky). Dotyk supportu a zelené zavření nad ním → long. Cíl na nejbližší rezistenci (jinak R:R), stop při zavření pod supportem."
+        case .levelBreakout: return "Zavření nad rezistencí o toleranci, předchozí zavření pod ní → long. Stop při návratu pod hladinu, cíl na další rezistenci (jinak R:R)."
+        case .trendlineBounce: return "Trendlinie přes swingová minima, kterou zavření neprorazilo. Dotyk linie a zelené zavření nad ní → long. Stop pod linií (posouvá se s ní), cíl R:R."
+        case .trendlineBreakout: return "Zavření nad rezistenční trendlinií (přes swingová maxima) o toleranci → long. Stop při návratu pod linii, cíl R:R."
+        case .swingPullback: return "Vlastní swingová strategie: v trendu (nad SMA 200, EMA 50 roste) pullback do zóny 0,382–0,786 swingu nebo k EMA 20, RSI pod 45 a otáčí, zelená svíčka nad high předchozí. Stop pod minimem pullbacku, cíl na extenzi 1,272, výstup i pod EMA 50."
         case .hold: return "Koupit a držet."
         }
     }
@@ -59,6 +74,11 @@ final class BacktestModel {
     var bounceTrend = 200
     var bounceTolerancePct = 1.0
     var bounceEMA = true
+    var structureLookback = 120
+    var structureTolerancePct = 0.5
+    var rewardRisk = 2.0
+    var pullbackTrend = 200
+    var pullbackSwing = 20
     var fibExit = false
     var fibLookback = 20
     var fibTarget = 1.272
@@ -84,6 +104,16 @@ final class BacktestModel {
         case .maBounce:
             return .maBounce(period: bouncePeriod, trendPeriod: bounceTrend, tolerance: bounceTolerancePct / 100,
                              exponential: bounceEMA)
+        case .levelBounce:
+            return .levelBounce(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
+        case .levelBreakout:
+            return .levelBreakout(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
+        case .trendlineBounce:
+            return .trendlineBounce(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
+        case .trendlineBreakout:
+            return .trendlineBreakout(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
+        case .swingPullback:
+            return .swingPullback(trendPeriod: pullbackTrend, swingLookback: pullbackSwing)
         case .hold: return .buyAndHold
         }
     }
@@ -110,7 +140,10 @@ final class BacktestModel {
             }
             let config = BacktestConfig(strategy: strategy, allowShort: allowShort, costBps: costBps,
                                         riskFreeRate: riskFreeRate, exit: exitRule)
-            result = BacktestEngine.run(bars: bars, config: config)
+            // Strukturní strategie počítají hladiny v každé svíčce – mimo hlavní vlákno.
+            result = await Task.detached(priority: .userInitiated) {
+                BacktestEngine.run(bars: bars, config: config)
+            }.value
             dataLabel = series.label
 
             benchmark = []
@@ -215,6 +248,13 @@ struct BacktestView: View {
                 Stepper("Perioda průměru: \(bt.bouncePeriod)", value: $bt.bouncePeriod, in: 5...200, step: 5)
                 Stepper("Trend SMA: \(bt.bounceTrend)", value: $bt.bounceTrend, in: 20...400, step: 10)
                 Stepper("Tolerance: \(bt.bounceTolerancePct.fixed(2)) %", value: $bt.bounceTolerancePct, in: 0...5, step: 0.25)
+            case .levelBounce, .levelBreakout, .trendlineBounce, .trendlineBreakout:
+                Stepper("Struktura z \(bt.structureLookback) svíček", value: $bt.structureLookback, in: 30...400, step: 10)
+                Stepper("Tolerance: \(bt.structureTolerancePct.fixed(2)) %", value: $bt.structureTolerancePct, in: 0.1...3, step: 0.1)
+                Stepper("Cíl R:R \(bt.rewardRisk.fixed(1))", value: $bt.rewardRisk, in: 0.5...5, step: 0.5)
+            case .swingPullback:
+                Stepper("Trend SMA: \(bt.pullbackTrend)", value: $bt.pullbackTrend, in: 50...300, step: 10)
+                Stepper("Swing z \(bt.pullbackSwing) svíček", value: $bt.pullbackSwing, in: 10...60, step: 5)
             case .hold:
                 EmptyView()
             }

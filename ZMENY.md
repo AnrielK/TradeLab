@@ -1,5 +1,19 @@
 # Změny
 
+## 0.12.0 – 2026-10-12
+
+- Backtest: strategie nad strukturou trhu – hladiny a trendlinie se v každé svíčce skládají jen z potvrzených
+  swingů (pivot je známý až 3 svíčky po vzniku), takže bez pohledu do budoucnosti:
+  - **Odraz od S/R** – dotyk supportu (aspoň 2 swingy) a zelené zavření nad ním; cíl nejbližší rezistence, jinak R:R.
+  - **Průraz S/R** – zavření nad rezistencí o toleranci; stop návrat pod hladinu, cíl další rezistence, jinak R:R.
+  - **Odraz od trendline** – dotyk neproražené support linie a zelené zavření nad ní; stop pod linií, cíl R:R.
+  - **Průraz trendline** – zavření nad rezistenční linií; stop návrat pod linii, cíl R:R.
+  - Všechny zrcadlově i short, parametry: okno struktury, tolerance, R:R.
+- **Swing pullback (TradeLab)** – vlastní swingová strategie: trend (nad SMA 200, rostoucí EMA 50), pullback
+  do zóny 0,382–0,786 swingu nebo k EMA 20, RSI pod 45 a otáčí, zelená svíčka nad high předchozí;
+  stop pod minimem pullbacku, cíl extenze 1,272, výstup i pod EMA 50.
+- Výpočet backtestu běží mimo hlavní vlákno. Agent umí všech pět nových pravidel v `run_backtest`.
+
 ## 0.11.0 – 2026-10-12
 
 - **Fibonacciho retracement v grafu**: `find_levels` vrací poslední výrazný swing s retracementy 0,236–0,786

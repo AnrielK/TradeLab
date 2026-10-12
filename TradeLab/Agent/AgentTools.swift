@@ -169,12 +169,20 @@ enum AgentToolbox {
                 s buy & hold: výnos, CAGR, Sharpe, Sortino, max. drawdown, volatilita, počet obchodů, win rate, expozice. \
                 Zdroj dat a interval (Yahoo 1D, nebo TradingView 1D/1W/4H/1H) určuje nastavení backtestu v aplikaci. \
                 Pravidla: sma_cross, macd_cross, rsi_reversion, break_retest (průraz hladiny z lookback svíček a retest), \
-                reversal (obrat z RSI extrému potvrzený obratovou svíčkou), ma_bounce (odraz od průměru ve směru trendu), buy_and_hold.
+                reversal (obrat z RSI extrému potvrzený obratovou svíčkou), ma_bounce (odraz od průměru ve směru trendu), \
+                level_bounce / level_breakout (odraz od / průraz supportu a rezistence), trendline_bounce / trendline_breakout \
+                (odraz od / průraz trendové linie), swing_pullback (vlastní swingová strategie: pullback ve trendu s potvrzením), buy_and_hold. \
+                Hladiny a linie se v každé svíčce počítají jen z minulých dat.
                 """,
                 inputSchema: Schema.object([
                     "symbol": Schema.string("Ticker"),
                     "strategy": Schema.string("Pravidlo", enum: ["sma_cross", "macd_cross", "rsi_reversion", "break_retest",
-                                                                 "reversal", "ma_bounce", "buy_and_hold"]),
+                                                                 "reversal", "ma_bounce", "level_bounce", "level_breakout",
+                                                                 "trendline_bounce", "trendline_breakout", "swing_pullback",
+                                                                 "buy_and_hold"]),
+                    "structure_lookback": Schema.integer("level_*/trendline_*: hladiny a linie ze swingů N svíček (výchozí 120)"),
+                    "reward_risk": Schema.number("level_*/trendline_*: cíl jako násobek rizika, když chybí další hladina (výchozí 2)"),
+                    "swing_lookback": Schema.integer("swing_pullback: swing z N svíček (výchozí 20)"),
                     "range": Schema.string("Období (výchozí 5y)", enum: HistoryRange.allCases.map(\.rawValue)),
                     "fast": Schema.integer("Rychlá perioda (SMA výchozí 50, MACD 12)"),
                     "slow": Schema.integer("Pomalá perioda (SMA výchozí 200, MACD 26)"),
@@ -184,9 +192,9 @@ enum AgentToolbox {
                     "rsi_upper": Schema.number("Prodej nad RSI (výchozí 70)"),
                     "lookback": Schema.integer("break_retest: hladina z N svíček (výchozí 20)"),
                     "retest_bars": Schema.integer("break_retest: retest do N svíček po průrazu (výchozí 5)"),
-                    "tolerance_pct": Schema.number("break_retest / ma_bounce: tolerance dotyku v % (výchozí 1)"),
+                    "tolerance_pct": Schema.number("tolerance dotyku v % (break_retest, ma_bounce výchozí 1; level_*/trendline_* výchozí 0.5)"),
                     "ma_period": Schema.integer("ma_bounce: perioda průměru (výchozí 20)"),
-                    "trend_period": Schema.integer("ma_bounce: perioda trendového SMA (výchozí 200)"),
+                    "trend_period": Schema.integer("ma_bounce / swing_pullback: perioda trendového SMA (výchozí 200)"),
                     "ema": Schema.boolean("ma_bounce: EMA místo SMA (výchozí true)"),
                     "exit": Schema.string("Výstup: podle strategie, nebo Fibonacci (cíl na extenzi, stop na retracementu swingu)",
                                           enum: ["strategy", "fibonacci"]),
@@ -793,6 +801,19 @@ enum AgentToolbox {
                                  trendPeriod: input["trend_period"]?.intValue ?? 200,
                                  tolerance: (input["tolerance_pct"]?.doubleValue ?? 1) / 100,
                                  exponential: input["ema"]?.boolValue ?? true)
+        case "level_bounce", "level_breakout", "trendline_bounce", "trendline_breakout":
+            let lookback = input["structure_lookback"]?.intValue ?? 120
+            let tolerance = (input["tolerance_pct"]?.doubleValue ?? 0.5) / 100
+            let rr = input["reward_risk"]?.doubleValue ?? 2
+            switch input["strategy"]?.stringValue {
+            case "level_bounce": strategy = .levelBounce(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
+            case "level_breakout": strategy = .levelBreakout(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
+            case "trendline_bounce": strategy = .trendlineBounce(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
+            default: strategy = .trendlineBreakout(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
+            }
+        case "swing_pullback":
+            strategy = .swingPullback(trendPeriod: input["trend_period"]?.intValue ?? 200,
+                                      swingLookback: input["swing_lookback"]?.intValue ?? 20)
         case "buy_and_hold":
             strategy = .buyAndHold
         default:
@@ -810,7 +831,7 @@ enum AgentToolbox {
         let config = BacktestConfig(strategy: strategy, allowShort: input["allow_short"]?.boolValue ?? false,
                                     costBps: input["cost_bps"]?.doubleValue ?? 5, riskFreeRate: model.riskFreeRate,
                                     exit: exit)
-        let result = BacktestEngine.run(bars: bars, config: config)
+        let result = await Task.detached(priority: .userInitiated) { BacktestEngine.run(bars: bars, config: config) }.value
 
         func metrics(_ m: BacktestMetrics) -> JSONValue {
             [

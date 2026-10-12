@@ -13,6 +13,16 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
     case reversal(period: Int, lower: Double, upper: Double)
     /// Odraz od klouzavého průměru ve směru trendu.
     case maBounce(period: Int, trendPeriod: Int, tolerance: Double, exponential: Bool)
+    /// Odraz od supportu / rezistence (hladiny ze swingů posledních `lookback` svíček).
+    case levelBounce(lookback: Int, tolerance: Double, rewardRisk: Double)
+    /// Průraz supportu / rezistence.
+    case levelBreakout(lookback: Int, tolerance: Double, rewardRisk: Double)
+    /// Odraz od trendové linie.
+    case trendlineBounce(lookback: Int, tolerance: Double, rewardRisk: Double)
+    /// Průraz trendové linie.
+    case trendlineBreakout(lookback: Int, tolerance: Double, rewardRisk: Double)
+    /// Vlastní swingová strategie: pullback ve směru trendu s potvrzením.
+    case swingPullback(trendPeriod: Int, swingLookback: Int)
 
     public var name: String {
         switch self {
@@ -25,7 +35,16 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
         case .reversal(let p, let lo, let hi): return "Reversal RSI \(p) (\(Int(lo))/\(Int(hi)))"
         case .maBounce(let p, let t, let tol, let ema):
             return "Odraz od \(ema ? "EMA" : "SMA") \(p) (trend \(t), \(Self.percent(tol)))"
+        case .levelBounce(let n, let tol, let rr): return "Odraz od S/R (\(n), \(Self.percent(tol)), R:R \(Self.ratio(rr)))"
+        case .levelBreakout(let n, let tol, let rr): return "Průraz S/R (\(n), \(Self.percent(tol)), R:R \(Self.ratio(rr)))"
+        case .trendlineBounce(let n, let tol, let rr): return "Odraz od trendline (\(n), \(Self.percent(tol)), R:R \(Self.ratio(rr)))"
+        case .trendlineBreakout(let n, let tol, let rr): return "Průraz trendline (\(n), \(Self.percent(tol)), R:R \(Self.ratio(rr)))"
+        case .swingPullback(let t, let s): return "Swing pullback (trend \(t), swing \(s))"
         }
+    }
+
+    static func ratio(_ x: Double) -> String {
+        x == x.rounded() ? "\(Int(x))" : String(format: "%.1f", x)
     }
 
     static func percent(_ x: Double) -> String {
@@ -36,8 +55,8 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
     /// Strategie, které potřebují celé svíčky (open/high/low), ne jen zavírací ceny.
     public var usesOHLC: Bool {
         switch self {
-        case .breakRetest, .reversal, .maBounce: return true
-        default: return false
+        case .buyAndHold, .smaCross, .macdCross, .rsiReversion: return false
+        default: return true
         }
     }
 
@@ -52,6 +71,16 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
         case .maBounce(let period, let trendPeriod, let tolerance, let exponential):
             return PriceAction.maBounce(bars, period: period, trendPeriod: trendPeriod, tolerance: tolerance,
                                         exponential: exponential, allowShort: allowShort)
+        case .levelBounce(let n, let tol, let rr):
+            return Structure.levelBounce(bars, lookback: n, tolerance: tol, rewardRisk: rr, allowShort: allowShort)
+        case .levelBreakout(let n, let tol, let rr):
+            return Structure.levelBreakout(bars, lookback: n, tolerance: tol, rewardRisk: rr, allowShort: allowShort)
+        case .trendlineBounce(let n, let tol, let rr):
+            return Structure.trendlineBounce(bars, lookback: n, tolerance: tol, rewardRisk: rr, allowShort: allowShort)
+        case .trendlineBreakout(let n, let tol, let rr):
+            return Structure.trendlineBreakout(bars, lookback: n, tolerance: tol, rewardRisk: rr, allowShort: allowShort)
+        case .swingPullback(let t, let s):
+            return Structure.swingPullback(bars, trendPeriod: t, swingLookback: s, allowShort: allowShort)
         default:
             return targets(closes: bars.map(\.close), allowShort: allowShort)
         }
@@ -93,7 +122,8 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
                 return position
             }
 
-        case .breakRetest, .reversal, .maBounce:
+        case .breakRetest, .reversal, .maBounce, .levelBounce, .levelBreakout, .trendlineBounce,
+             .trendlineBreakout, .swingPullback:
             // Potřebují OHLC – ze zavíracích cen se postaví „svíčky“ bez knotů.
             let bars = closes.enumerated().map { i, c in
                 BacktestBar(date: Date(timeIntervalSince1970: Double(i) * 86_400),
