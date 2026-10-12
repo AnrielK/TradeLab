@@ -112,6 +112,12 @@ struct ChainTableView: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture { toggle(date) }
+                        .task(id: date) {
+                            guard store.summaries[date] == nil else { return }
+                            try? await Task.sleep(for: .milliseconds(400))
+                            guard !Task.isCancelled, store.summaries[date] == nil else { return }
+                            await store.chain(for: date, rate: model.riskFreeRate)
+                        }
                     }
                 }
             }
@@ -192,41 +198,51 @@ struct ExpirationHeader: View {
     let isLoading: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
-                .frame(width: 12)
-            Text(date.expiryLabel)
-                .font(.subheadline.weight(.semibold))
-            if let summary, !summary.isMonthly {
-                Text("W")
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.secondary.opacity(0.25), in: RoundedRectangle(cornerRadius: 3))
+                .frame(width: 20, alignment: .leading)
+
+            HStack(spacing: 6) {
+                Text(date.expiryLabel)
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                if !ExpirationCalendar.isMonthly(date) {
+                    Text("W")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.secondary.opacity(0.25), in: RoundedRectangle(cornerRadius: 3))
+                }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             Text("\(Int(OptionChain.daysToExpiry(date).rounded(.down))) d")
                 .font(.subheadline.weight(.bold))
                 .monospacedDigit()
-                .frame(width: 56)
-            Spacer()
-            if let summary, let iv = summary.atmVolatility {
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text("IV \(iv.percent)")
-                    if let move = summary.oneSigmaMove {
-                        Text("±\(move.fixed(2))").foregroundStyle(.secondary)
+                .frame(width: 64, alignment: .trailing)
+
+            Group {
+                if let summary, let iv = summary.atmVolatility {
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text("IV \(iv.percent)")
+                        Text(summary.oneSigmaMove.map { "±" + $0.fixed(2) } ?? " ")
+                            .foregroundStyle(.secondary)
                     }
+                } else if isLoading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Text("–").foregroundStyle(.secondary)
                 }
-                .font(.caption)
-                .monospacedDigit()
-            } else if isLoading {
-                ProgressView().controlSize(.small)
             }
+            .font(.caption)
+            .monospacedDigit()
+            .frame(width: 96, alignment: .trailing)
         }
+        .frame(height: 34)
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
         .background(isExpanded ? Color.accentColor.opacity(0.18) : Color(uiColor: .secondarySystemBackground))
         .overlay(alignment: .bottom) { Divider() }
     }
@@ -305,9 +321,9 @@ struct ChainColumnHeader: View {
         .padding(.vertical, 4)
         .overlay(alignment: .top) {
             HStack {
-                Text("CALLY").padding(.leading, 30)
+                Text("CALLY · Δ / OI").padding(.leading, 30)
                 Spacer()
-                Text("PUTY").padding(.trailing, 30)
+                Text("PUTY · Δ / OI").padding(.trailing, 30)
             }
             .font(.system(size: 8, weight: .bold))
             .foregroundStyle(.tertiary)
@@ -350,6 +366,8 @@ struct StrikeRow: View {
     let strike: Double
     @Environment(AppModel.self) private var model
 
+    private static let rowHeight: CGFloat = 52
+
     var body: some View {
         let call = chain.contract(.call, strike: strike)
         let put = chain.contract(.put, strike: strike)
@@ -359,27 +377,51 @@ struct StrikeRow: View {
 
         HStack(spacing: 0) {
             PositionTag(quantity: callPosition)
-            HStack(spacing: 0) {
-                QuoteCell(value: call?.bid, isSelected: (callPosition ?? 0) < 0, tint: .red) { tap(call, .short) }
-                QuoteCell(value: call?.ask, isSelected: (callPosition ?? 0) > 0, tint: .green) { tap(call, .long) }
-            }
-            .background(strike < spot ? Color.accentColor.opacity(0.08) : Color.clear)
+            side(contract: call, position: callPosition)
+                .background(strike < spot ? Color.accentColor.opacity(0.08) : Color.clear)
 
             Text(strike.strikeLabel)
                 .font(.callout.weight(.semibold))
                 .monospacedDigit()
-                .frame(width: 64, height: 40)
+                .frame(width: 64, height: Self.rowHeight)
                 .background(Color(uiColor: .tertiarySystemBackground))
 
-            HStack(spacing: 0) {
-                QuoteCell(value: put?.bid, isSelected: (putPosition ?? 0) < 0, tint: .red) { tap(put, .short) }
-                QuoteCell(value: put?.ask, isSelected: (putPosition ?? 0) > 0, tint: .green) { tap(put, .long) }
-            }
-            .background(strike > spot ? Color.accentColor.opacity(0.08) : Color.clear)
+            side(contract: put, position: putPosition)
+                .background(strike > spot ? Color.accentColor.opacity(0.08) : Color.clear)
             PositionTag(quantity: putPosition)
         }
-        .frame(height: 40)
+        .frame(height: Self.rowHeight)
         .overlay(alignment: .bottom) { Divider().opacity(0.5) }
+    }
+
+    private func side(contract: OptionContract?, position: Int?) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                QuoteCell(value: contract?.bid, isSelected: (position ?? 0) < 0, tint: .red) { tap(contract, .short) }
+                QuoteCell(value: contract?.ask, isSelected: (position ?? 0) > 0, tint: .green) { tap(contract, .long) }
+            }
+            .frame(height: 34)
+            Text(details(contract))
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .frame(height: 14)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// „Δ 0,62 · OI 12 tis.“
+    private func details(_ contract: OptionContract?) -> String {
+        guard let contract else { return " " }
+        var parts: [String] = []
+        if let greeks = contract.greeks(spot: chain.underlyingPrice, rate: model.riskFreeRate) {
+            parts.append("Δ " + greeks.delta.fixed(2))
+        }
+        if let oi = contract.openInterest {
+            parts.append("OI " + oi.formatted(.number.notation(.compactName)))
+        }
+        return parts.isEmpty ? " " : parts.joined(separator: " · ")
     }
 
     private func tap(_ contract: OptionContract?, _ side: PositionSide) {

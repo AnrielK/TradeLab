@@ -62,9 +62,11 @@ struct PayoffWorkspaceView: View {
             valueAt: { price in
                 (strategy.expiryProfitLoss(atSpot: price, market: market),
                  strategy.profitLoss(atSpot: price, daysElapsed: daysForward, ivShift: ivShift, market: market))
-            }
+            },
+            onDragMarker: { id, price in model.dragLeg(id: id, toPrice: price) },
+            onDragMarkerEnded: { _ in model.finishLegDrag() }
         )
-        .frame(height: 300)
+        .frame(height: 330)
 
         legend
 

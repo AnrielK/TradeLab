@@ -182,6 +182,36 @@ final class AppModel {
         saveStrategy()
     }
 
+    /// Tažení striku v grafu: noha se přichytí na nejbližší dostupný strike.
+    /// Nohy z řetězce se přecení z cache řetězce, ruční nohy teoreticky z Black-Scholes.
+    func dragLeg(id: UUID, toPrice price: Double) {
+        guard let index = strategy.legs.firstIndex(where: { $0.id == id }),
+              strategy.legs[index].instrument != .stock else { return }
+        var leg = strategy.legs[index]
+
+        if let expiration = leg.expiration, let chain = chainStore.chains[expiration] {
+            guard let strike = StrikeLadder.nearest(to: price, in: chain.strikes), strike != leg.strike else { return }
+            leg.strike = strike
+            leg = chain.repriced(leg, rate: riskFreeRate)
+        } else {
+            let reference = strategySpot > 0 ? strategySpot : price
+            let strike = StrikeGrid.round(price, spot: reference)
+            guard strike > 0, strike != leg.strike else { return }
+            leg.strike = strike
+            leg.premium = theoreticalPremium(for: leg)
+            leg.bid = nil
+            leg.ask = nil
+        }
+        // Nedovolit dvě stejné nohy na stejném kontraktu.
+        guard !strategy.legs.contains(where: { $0.id != id && $0.isSameContract(as: leg) && $0.side == leg.side }) else { return }
+        strategy.legs[index] = leg
+        renameStrategy()
+    }
+
+    func finishLegDrag() {
+        saveStrategy()
+    }
+
     /// Posune všechny opční nohy o `steps` expirací (striky přichytí k nejbližším dostupným).
     func shiftExpiration(by steps: Int) async {
         let dates = chainStore.expirations

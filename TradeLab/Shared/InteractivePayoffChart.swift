@@ -10,7 +10,9 @@ struct StrikeMarker: Identifiable, Hashable {
 }
 
 /// Payoff graf: zelená/červená zóna při expiraci, křivka „dnes / za N dní“,
-/// 1σ pásmo, striky nohou a výběr ceny tažením prstu.
+/// 1σ pásmo a striky nohou.
+/// - Tažení mimo strike: ukáže P/L pro konkrétní cenu.
+/// - Tažení za štítek striku (nahoře) nohu posune na jiný strike.
 struct InteractivePayoffChart: View {
     let expiry: [PayoffPoint]
     let current: [PayoffPoint]
@@ -21,10 +23,19 @@ struct InteractivePayoffChart: View {
     var currentLabel: String = "Dnes"
     /// P/L (expirace, aktuální křivka) pro vybranou cenu.
     var valueAt: ((Double) -> (expiry: Double, current: Double))? = nil
+    /// Tažení striku: id nohy a cena pod prstem (aplikace ji přichytí na dostupný strike).
+    var onDragMarker: ((UUID, Double) -> Void)? = nil
+    var onDragMarkerEnded: ((UUID) -> Void)? = nil
 
     @State private var selectedPrice: Double?
+    @State private var draggingMarker: UUID?
+    @State private var gestureActive = false
+
+    /// Rozsah osy X zafixovaný během tažení, aby graf „neujížděl“ pod prstem.
+    @State private var frozenDomain: ClosedRange<Double>?
 
     private var domain: ClosedRange<Double> {
+        if let frozenDomain { return frozenDomain }
         let lower = expiry.first?.spot ?? 0
         let upper = max(expiry.last?.spot ?? 1, lower + 1)
         return lower...upper
@@ -33,33 +44,73 @@ struct InteractivePayoffChart: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             readout
+                .frame(height: 34, alignment: .topLeading)
             chart
+            hint
         }
     }
 
+    // MARK: - Texty mimo graf (nepřekrývají se s grafem)
+
     @ViewBuilder
     private var readout: some View {
-        if let price = selectedPrice, let values = valueAt?(price) {
-            HStack(spacing: 12) {
-                Text(price.usd).font(.caption.weight(.semibold))
-                Text("Exp. \(values.expiry.signedUSDWhole)")
-                    .foregroundStyle(Color.pnl(values.expiry))
-                Text("\(currentLabel) \(values.current.signedUSDWhole)")
-                    .foregroundStyle(Color.pnl(values.current))
-                Text("(\(((price - spot) / spot).signedPercent))")
+        if let id = draggingMarker, let marker = markers.first(where: { $0.id == id }) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Strike \(marker.label): \(marker.strike.strikeLabel)")
+                    .font(.caption.weight(.semibold))
+                Text("Pusť pro přecenění z řetězce")
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
+            }
+        } else if let price = selectedPrice, let values = valueAt?(price) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(price.usd).fontWeight(.semibold)
+                    Text("(\(((price - spot) / spot).signedPercent))").foregroundStyle(.secondary)
+                }
+                HStack(spacing: 12) {
+                    Text("Expirace \(values.expiry.signedUSDWhole)")
+                        .foregroundStyle(Color.pnl(values.expiry))
+                    Text("\(currentLabel) \(values.current.signedUSDWhole)")
+                        .foregroundStyle(Color.pnl(values.current))
+                }
             }
             .font(.caption)
             .monospacedDigit()
         } else {
-            Text("Tažením po grafu zobrazíš P/L pro konkrétní cenu.")
+            Text("Tažením po grafu zobrazíš P/L pro cenu.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
+    @ViewBuilder
+    private var hint: some View {
+        if onDragMarker != nil, !markers.isEmpty {
+            Text("Štítky striků nahoře můžeš tažením posunout.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Graf
+
+    private var visibleExpiry: [PayoffPoint] {
+        let d = domain
+        return expiry.filter { d.contains($0.spot) }
+    }
+
+    private var visibleCurrent: [PayoffPoint] {
+        let d = domain
+        return current.filter { d.contains($0.spot) }
+    }
+
     private var chart: some View {
-        Chart {
+        let expiry = visibleExpiry
+        let current = visibleCurrent
+        let d = domain
+        let breakevens = self.breakevens.filter { d.contains($0) }
+        return Chart {
             ForEach(expiry, id: \.spot) { point in
                 AreaMark(
                     x: .value("Cena", point.spot),
@@ -81,6 +132,15 @@ struct InteractivePayoffChart: View {
                 .foregroundStyle(Color.secondary.opacity(0.6))
                 .lineStyle(StrokeStyle(lineWidth: 1))
 
+            if let band = sigmaBand {
+                RuleMark(x: .value("−1σ", band.lowerBound))
+                    .foregroundStyle(Color.indigo.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                RuleMark(x: .value("+1σ", band.upperBound))
+                    .foregroundStyle(Color.indigo.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            }
+
             ForEach(expiry, id: \.spot) { point in
                 LineMark(
                     x: .value("Cena", point.spot),
@@ -101,38 +161,18 @@ struct InteractivePayoffChart: View {
                 .lineStyle(StrokeStyle(lineWidth: 2))
             }
 
-            if let band = sigmaBand {
-                RuleMark(x: .value("−1σ", band.lowerBound))
-                    .foregroundStyle(Color.indigo.opacity(0.7))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .annotation(position: .top, alignment: .leading) {
-                        Text("1 SD").font(.caption2).foregroundStyle(.indigo)
-                    }
-                RuleMark(x: .value("+1σ", band.upperBound))
-                    .foregroundStyle(Color.indigo.opacity(0.7))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .annotation(position: .top, alignment: .trailing) {
-                        Text("1 SD").font(.caption2).foregroundStyle(.indigo)
-                    }
-            }
-
-            ForEach(markers) { marker in
-                RuleMark(x: .value("Strike", marker.strike))
-                    .foregroundStyle((marker.isLong ? Color.green : Color.red).opacity(0.5))
-                    .lineStyle(StrokeStyle(lineWidth: 1))
-                    .annotation(position: .bottom, spacing: 2) {
-                        Text(marker.label)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(marker.isLong ? Color.green : Color.red, in: RoundedRectangle(cornerRadius: 4))
-                    }
-            }
-
             RuleMark(x: .value("Spot", spot))
                 .foregroundStyle(Color.gray)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
+
+            ForEach(markers) { marker in
+                RuleMark(x: .value("Strike", marker.strike))
+                    .foregroundStyle((marker.isLong ? Color.green : Color.red).opacity(draggingMarker == marker.id ? 0.9 : 0.45))
+                    .lineStyle(StrokeStyle(lineWidth: draggingMarker == marker.id ? 2 : 1))
+                    .annotation(position: .top, spacing: 2) {
+                        MarkerTag(marker: marker, isDragging: draggingMarker == marker.id)
+                    }
+            }
 
             ForEach(breakevens, id: \.self) { be in
                 PointMark(x: .value("Break-even", be), y: .value("P/L", 0.0))
@@ -140,7 +180,7 @@ struct InteractivePayoffChart: View {
                     .symbolSize(30)
             }
 
-            if let price = selectedPrice, let values = valueAt?(price) {
+            if draggingMarker == nil, let price = selectedPrice, let values = valueAt?(price) {
                 RuleMark(x: .value("Výběr", price))
                     .foregroundStyle(Color.primary.opacity(0.35))
                 PointMark(x: .value("Výběr", price), y: .value("P/L", values.expiry))
@@ -155,6 +195,82 @@ struct InteractivePayoffChart: View {
         ])
         .chartLegend(.hidden)
         .chartXScale(domain: domain)
-        .chartXSelection(value: $selectedPrice)
+        .padding(.top, 24) // místo pro štítky striků
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .gesture(dragGesture(proxy: proxy, geometry: geometry))
+            }
+        }
+    }
+
+    private func dragGesture(proxy: ChartProxy, geometry: GeometryProxy) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard let plotAnchor = proxy.plotFrame else { return }
+                let plot = geometry[plotAnchor]
+
+                if !gestureActive {
+                    gestureActive = true
+                    frozenDomain = domain
+                    draggingMarker = hitMarker(at: value.startLocation, proxy: proxy, plot: plot)
+                }
+
+                let x = min(max(value.location.x - plot.minX, 0), plot.width)
+                guard let price = proxy.value(atX: x, as: Double.self) else { return }
+
+                if let id = draggingMarker {
+                    onDragMarker?(id, price)
+                } else {
+                    selectedPrice = min(max(price, domain.lowerBound), domain.upperBound)
+                }
+            }
+            .onEnded { _ in
+                if let id = draggingMarker {
+                    onDragMarkerEnded?(id)
+                }
+                draggingMarker = nil
+                gestureActive = false
+                frozenDomain = nil
+            }
+    }
+
+    /// Štítek striku pod prstem (v horní části grafu, nebo kdekoli blízko čáry striku).
+    private func hitMarker(at location: CGPoint, proxy: ChartProxy, plot: CGRect) -> UUID? {
+        guard onDragMarker != nil else { return nil }
+        let nearTop = location.y < plot.minY + 44
+        let tolerance: CGFloat = nearTop ? 28 : 14
+        var best: (id: UUID, distance: CGFloat)?
+        for marker in markers {
+            guard let position = proxy.position(forX: marker.strike) else { continue }
+            let distance = abs(plot.minX + position - location.x)
+            if distance <= tolerance, distance < (best?.distance ?? .infinity) {
+                best = (marker.id, distance)
+            }
+        }
+        return best?.id
+    }
+}
+
+private struct MarkerTag: View {
+    let marker: StrikeMarker
+    let isDragging: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(marker.label)
+                .font(.caption2.weight(.bold))
+            Text(marker.strike.strikeLabel)
+                .font(.system(size: 9, weight: .semibold))
+                .monospacedDigit()
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(marker.isLong ? Color.green : Color.red, in: RoundedRectangle(cornerRadius: 4))
+        .scaleEffect(isDragging ? 1.15 : 1)
+        .shadow(radius: isDragging ? 3 : 0)
     }
 }

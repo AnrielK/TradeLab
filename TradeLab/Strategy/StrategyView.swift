@@ -146,10 +146,13 @@ struct StrategyView: View {
                 current: current,
                 spot: spot,
                 breakevens: analysis.breakevens,
+                markers: model.strategy.optionLegs.map(marker(for:)),
                 currentLabel: currentLabel,
-                valueAt: valueAt(spot: spot)
+                valueAt: valueAt(spot: spot),
+                onDragMarker: { id, price in model.dragLeg(id: id, toPrice: price) },
+                onDragMarkerEnded: { _ in model.finishLegDrag() }
             )
-                .frame(height: 260)
+                .frame(height: 300)
             HStack(spacing: 16) {
                 LegendDot(color: .blue, text: "Expirace")
                 LegendDot(color: .orange, text: legendText)
@@ -169,6 +172,13 @@ struct StrategyView: View {
                 Slider(value: $ivShiftPoints, in: -30...30, step: 1)
             }
         }
+    }
+
+    private func marker(for leg: StrategyLeg) -> StrikeMarker {
+        let sign = leg.side == .long ? "+" : "−"
+        let type = leg.instrument == .call ? "C" : "P"
+        return StrikeMarker(id: leg.id, strike: leg.strike, label: sign + String(leg.quantity) + type,
+                            isLong: leg.side == .long)
     }
 
     private func valueAt(spot: Double) -> (Double) -> (expiry: Double, current: Double) {

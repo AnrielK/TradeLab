@@ -1,5 +1,12 @@
 # Změny
 
+## 0.2.1 – 2026-10-12
+
+- Přehled expirací v pevných sloupcích (datum, dny, IV/±1σ), souhrn se dotahuje i pro vzdálené expirace.
+- Řetězec ukazuje u každého callu a putu deltu a open interest.
+- Payoff: texty už se nepřekrývají s grafem, štítky striků jsou nahoře a dají se tažením posunout
+  na jiný strike (noha se přecení z řetězce). Funguje i na záložce Strategie.
+
 ## 0.2.0 – 2026-10-12
 
 - Opce ve stylu brokerské tabulky: rozbalovací expirace (dny, týdenní „W“, ATM IV, ±1σ pohyb),
