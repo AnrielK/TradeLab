@@ -110,6 +110,8 @@ struct InteractivePayoffChart: View {
         let current = visibleCurrent
         let d = domain
         let breakevens = self.breakevens.filter { d.contains($0) }
+        let rows = markerRows
+        let tagRows = (rows.values.max() ?? 0) + 1
         return Chart {
             ForEach(expiry, id: \.spot) { point in
                 AreaMark(
@@ -166,10 +168,11 @@ struct InteractivePayoffChart: View {
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
 
             ForEach(markers) { marker in
+                let row = rows[marker.id] ?? 0
                 RuleMark(x: .value("Strike", marker.strike))
                     .foregroundStyle((marker.isLong ? Color.green : Color.red).opacity(draggingMarker == marker.id ? 0.9 : 0.45))
                     .lineStyle(StrokeStyle(lineWidth: draggingMarker == marker.id ? 2 : 1))
-                    .annotation(position: .top, spacing: 2) {
+                    .annotation(position: .top, spacing: 2 + CGFloat(row) * Self.tagRowHeight) {
                         MarkerTag(marker: marker, isDragging: draggingMarker == marker.id)
                     }
             }
@@ -177,7 +180,16 @@ struct InteractivePayoffChart: View {
             ForEach(breakevens, id: \.self) { be in
                 PointMark(x: .value("Break-even", be), y: .value("P/L", 0.0))
                     .foregroundStyle(Color.purple)
-                    .symbolSize(30)
+                    .symbolSize(36)
+                    .annotation(position: .bottom, spacing: 4) {
+                        Text(be.fixed(2))
+                            .font(.system(size: 10, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.purple.opacity(0.85), in: RoundedRectangle(cornerRadius: 3))
+                    }
             }
 
             if draggingMarker == nil, let price = selectedPrice, let values = valueAt?(price) {
@@ -190,12 +202,12 @@ struct InteractivePayoffChart: View {
             }
         }
         .chartForegroundStyleScale([
-            "Zisk": Color.green.opacity(0.22),
-            "Ztráta": Color.red.opacity(0.22),
+            "Zisk": Color.green.opacity(0.10),
+            "Ztráta": Color.red.opacity(0.10),
         ])
         .chartLegend(.hidden)
         .chartXScale(domain: domain)
-        .padding(.top, 24) // místo pro štítky striků
+        .padding(.top, 6 + CGFloat(tagRows) * Self.tagRowHeight) // místo pro štítky striků
         .chartOverlay { proxy in
             GeometryReader { geometry in
                 Rectangle()
@@ -204,6 +216,23 @@ struct InteractivePayoffChart: View {
                     .gesture(dragGesture(proxy: proxy, geometry: geometry))
             }
         }
+    }
+
+    static let tagRowHeight: CGFloat = 30
+
+    /// Štítky striků blízko sebe se rozloží do více řad, aby se nepřekrývaly.
+    private var markerRows: [UUID: Int] {
+        let span = max(domain.upperBound - domain.lowerBound, 1)
+        let threshold = span * 0.13
+        var rows: [UUID: Int] = [:]
+        var lastInRow: [Int: Double] = [:]
+        for marker in markers.sorted(by: { $0.strike < $1.strike }) {
+            var row = 0
+            while let last = lastInRow[row], marker.strike - last < threshold { row += 1 }
+            rows[marker.id] = row
+            lastInRow[row] = marker.strike
+        }
+        return rows
     }
 
     private func dragGesture(proxy: ChartProxy, geometry: GeometryProxy) -> some Gesture {
@@ -240,10 +269,14 @@ struct InteractivePayoffChart: View {
     /// Štítek striku pod prstem (v horní části grafu, nebo kdekoli blízko čáry striku).
     private func hitMarker(at location: CGPoint, proxy: ChartProxy, plot: CGRect) -> UUID? {
         guard onDragMarker != nil else { return nil }
-        let nearTop = location.y < plot.minY + 44
-        let tolerance: CGFloat = nearTop ? 28 : 14
+        let aboveChart = location.y < plot.minY
+        let tolerance: CGFloat = aboveChart ? 28 : 14
+        let rows = markerRows
+        // Nad grafem: řada štítku podle výšky prstu.
+        let touchedRow = aboveChart ? max(Int((plot.minY - 2 - location.y) / Self.tagRowHeight), 0) : nil
         var best: (id: UUID, distance: CGFloat)?
         for marker in markers {
+            if let touchedRow, (rows[marker.id] ?? 0) != touchedRow, rows.values.contains(touchedRow) { continue }
             guard let position = proxy.position(forX: marker.strike) else { continue }
             let distance = abs(plot.minX + position - location.x)
             if distance <= tolerance, distance < (best?.distance ?? .infinity) {

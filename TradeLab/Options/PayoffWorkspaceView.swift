@@ -22,6 +22,7 @@ struct PayoffWorkspaceView: View {
                     content
                 }
                 .padding()
+                .padding(.bottom, 90)
             }
             .onChange(of: model.strategy.nearestExpiryDays) { _, newValue in
                 daysForward = min(daysForward, max(newValue - 1, 0))
@@ -50,6 +51,7 @@ struct PayoffWorkspaceView: View {
             .font(.headline)
 
         statsRow(analysis: analysis, extrinsic: strategy.extrinsicValue(spot: spot))
+        breakevenRow(analysis.breakevens, spot: spot)
 
         InteractivePayoffChart(
             expiry: analysis.expiryCurve,
@@ -73,7 +75,7 @@ struct PayoffWorkspaceView: View {
         if let quote = strategy.netQuote {
             NetQuoteBar(quote: quote)
                 .padding(10)
-                .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                .background(Color(white: 0.13), in: RoundedRectangle(cornerRadius: 10))
         }
 
         controls
@@ -116,6 +118,27 @@ struct PayoffWorkspaceView: View {
             Spacer()
             stat("MAX ZTRÁTA", analysis.maxLoss.map { abs($0).fixed(2) } ?? "∞", color: .red)
         }
+    }
+
+    /// „Break-even 229,76 (+1,5 %)“ – u více bodů všechny.
+    private func breakevenRow(_ breakevens: [Double], spot: Double) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(Color.purple).frame(width: 8, height: 8)
+            Text("Break-even").foregroundStyle(.secondary)
+            if breakevens.isEmpty {
+                Text("–")
+            } else {
+                Text(breakevens.map { breakevenText($0, spot: spot) }.joined(separator: "  ·  "))
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+            }
+        }
+        .font(.subheadline)
+    }
+
+    private func breakevenText(_ value: Double, spot: Double) -> String {
+        let change = spot > 0 ? " (" + ((value - spot) / spot).signedPercent + ")" : ""
+        return value.fixed(2) + change
     }
 
     private func stat(_ title: String, _ value: String, color: Color = .secondary) -> some View {

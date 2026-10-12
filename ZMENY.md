@@ -1,5 +1,14 @@
 # Změny
 
+## 0.2.2 – 2026-10-12
+
+- Vzhled tabulky jako v brokerské aplikaci: záložky TABULKA / PAYOFF, šedá lišta sloupců,
+  modré řádky expirací (měsíční světlejší) s dny ve středovém sloupci, ceny barevně podle denní změny,
+  čára ITM a 1 SD s popisky, vybrané nohy s barevným blokem a rámečkem.
+- Ozubené kolo: zapnutí/vypnutí delty a open interestu v řetězci.
+- Nový tiket: „Koupit/Prodat k otevření … DB/CR @ mid“, bid–mid–ask, nohy BTO/STO, tlačítko Payoff, lze sbalit.
+- Payoff: hodnota break-even v grafu i pod statistikami, průhlednější zóny, štítky blízkých striků ve dvou řadách.
+
 ## 0.2.1 – 2026-10-12
 
 - Přehled expirací v pevných sloupcích (datum, dny, IV/±1σ), souhrn se dotahuje i pro vzdálené expirace.
