@@ -29,15 +29,23 @@ final class StructureTests: XCTestCase {
     }
 
     func testTrendlineBounce() {
-        let closes = (0..<100).map { 100 + 0.5 * Double($0) + 5 * sin(2 * .pi * Double($0) / 20) }
+        let closes: [Double] = (0..<100).map { i in
+            let x = Double(i)
+            let wave: Double = 5 * sin(2 * Double.pi * x / 20)
+            return 100 + 0.5 * x + wave
+        }
         let t = Structure.trendlineBounce(bars(closes), lookback: 120, tolerance: 0.005, rewardRisk: 2, allowShort: false)
         XCTAssertEqual(t.firstIndex(of: 1), 37)
     }
 
     func testTrendlineBreakout() {
-        var closes = (0..<80).map { 150 - 0.5 * Double($0) + 5 * sin(2 * .pi * Double($0) / 20) }
+        var closes: [Double] = (0..<80).map { i in
+            let x = Double(i)
+            let wave: Double = 5 * sin(2 * Double.pi * x / 20)
+            return 150 - 0.5 * x + wave
+        }
         let last = closes[closes.count - 1]
-        closes += (1...6).map { last + 4 * Double($0) }
+        for k in 1...6 { closes.append(last + 4 * Double(k)) }
         let t = Structure.trendlineBreakout(bars(closes), lookback: 120, tolerance: 0.005, rewardRisk: 2, allowShort: false)
         XCTAssertEqual(t.firstIndex(of: 1), 81)
     }
