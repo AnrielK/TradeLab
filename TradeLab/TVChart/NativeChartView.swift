@@ -68,7 +68,9 @@ struct NativeChartView: View {
                 }
 
                 ChartRenderer.drawDrawings(&ctx, geo: geo,
-                                           drawings: vm.drawings.filter(\.visible),
+                                           drawings: vm.drawings.filter {
+                                               $0.visible && AgentDrawingStyle.isVisible($0, resolution: vm.resolution)
+                                           },
                                            selected: vm.selectedDrawing)
 
                 // rozkreslený objekt se ukazuje průběžně

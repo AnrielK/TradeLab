@@ -56,9 +56,10 @@ enum LevelTimeframe: String, CaseIterable {
 /// Zápis hladin a trendlinií od agenta do kreseb grafu TVChart (uložené podle symbolu).
 enum ChartAnnotations {
     static let prefix = "AI · "
-    static let supportColor = "#2ea98c"
-    static let resistanceColor = "#e0566b"
-    static let trendColor = "#4aa8ff"
+    static let supportColor = AgentDrawingStyle.supportHex
+    static let resistanceColor = AgentDrawingStyle.resistanceHex
+    static let supportLineColor = AgentDrawingStyle.supportLineHex
+    static let resistanceLineColor = AgentDrawingStyle.resistanceLineHex
 
     static func key(_ tvSymbol: String) -> String { "drawings::\(tvSymbol)" }
 
@@ -100,7 +101,7 @@ enum ChartAnnotations {
         return Drawing(tool: "ray",
                        points: [DrawPoint(time: start.0.timeIntervalSince1970, price: start.1),
                                 DrawPoint(time: end.0.timeIntervalSince1970, price: end.1)],
-                       colorHex: kind == .support ? supportColor : (kind == .resistance ? resistanceColor : trendColor),
+                       colorHex: kind == .support ? supportLineColor : resistanceLineColor,
                        width: timeframe.lineWidth, dash: timeframe.dash, text: text, locked: true)
     }
 

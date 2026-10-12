@@ -530,3 +530,87 @@ extension Collection {
         indices.contains(index) ? self[index] : nil
     }
 }
+
+// MARK: - Kresby od agenta (text začíná „AI · “)
+
+/// Vzhled a viditelnost čar, které do grafu zakreslil agent.
+struct AgentDrawingStyle {
+    enum Kind { case support, resistance, supportLine, resistanceLine, fib, other }
+
+    var kind: Kind
+    /// Timeframe, ze kterého čára pochází, v minutách (4H = 240, 1D = 1440, 1W = 10080).
+    var minutes: Double?
+    /// Krátký popisek bez poznámky, např. „R 1D 233.42“.
+    var label: String
+
+    static let supportHex = "#5FB3A1"
+    static let resistanceHex = "#E39A6F"
+    static let supportLineHex = "#7FA7D9"
+    static let resistanceLineHex = "#B39DDB"
+    static let lineOpacity = 0.55
+    static let labelOpacity = 0.8
+
+    init?(_ drawing: Drawing) {
+        guard let text = drawing.text, text.hasPrefix("AI") else { return nil }
+        let body = text.hasPrefix("AI · ") ? String(text.dropFirst(5)) : text
+        let main = body.components(separatedBy: " · ").first ?? body
+        let tokens = main.split(separator: " ").map(String.init)
+        label = main
+        minutes = tokens.lazy.compactMap { Self.minutes(forTimeframe: $0) }.first
+        switch tokens.first {
+        case "S": kind = .support
+        case "R": kind = .resistance
+        case "TL": kind = main.contains("support") ? .supportLine : .resistanceLine
+        case "Fib": kind = .fib
+        default: kind = .other
+        }
+    }
+
+    var color: Color {
+        switch kind {
+        case .support: return Color(hex: Self.supportHex)
+        case .resistance: return Color(hex: Self.resistanceHex)
+        case .supportLine: return Color(hex: Self.supportLineHex)
+        case .resistanceLine: return Color(hex: Self.resistanceLineHex)
+        case .fib, .other: return Color(hex: "#9aa7b4")
+        }
+    }
+
+    /// Tloušťka podle timeframe: týdenní nejvýraznější.
+    var width: Double {
+        switch minutes ?? 1440 {
+        case 10_080...: return 1.6
+        case 1_440...: return 1.2
+        default: return 1.0
+        }
+    }
+
+    var dash: [CGFloat] { (minutes ?? 1440) < 1440 ? [6, 5] : [] }
+
+    static func minutes(forTimeframe token: String) -> Double? {
+        switch token {
+        case "4H": return 240
+        case "1D": return 1_440
+        case "1W": return 10_080
+        default: return nil
+        }
+    }
+
+    /// Délka svíčky grafu v minutách („60“, „240“, „1D“, „1W“, „1M“).
+    static func minutes(forResolution resolution: String) -> Double {
+        if let value = Double(resolution) { return value }
+        let number = Double(resolution.dropLast()) ?? 1
+        switch resolution.last {
+        case "D": return number * 1_440
+        case "W": return number * 10_080
+        case "M": return number * 43_200
+        default: return 1_440
+        }
+    }
+
+    /// Na grafu jen čáry z aktuálního nebo vyššího timeframe (na denním grafu ne 4H).
+    static func isVisible(_ drawing: Drawing, resolution: String) -> Bool {
+        guard let style = AgentDrawingStyle(drawing), let minutes = style.minutes else { return true }
+        return minutes >= Self.minutes(forResolution: resolution)
+    }
+}

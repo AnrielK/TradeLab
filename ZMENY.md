@@ -1,5 +1,13 @@
 # Změny
 
+## 0.13.1 – 2026-10-13
+
+- Čáry od agenta v grafu jsou přehlednější: tlumené barvy (support šalvějově zelená, rezistence terakotová,
+  trendlinie světle modrá / levandulová), průhlednost, tloušťka podle timeframe (1W nejsilnější, 4H čárkovaně),
+  krátké popisky („R 1D 233.42“) u pravého okraje; Fibonacci od agenta jemněji.
+- Graf ukazuje jen čáry z aktuálního nebo vyššího timeframe – na denním grafu 1D a 1W, na týdenním jen 1W,
+  na 4H a nižších všechny. Platí i pro už zakreslené čáry.
+
 ## 0.13.0 – 2026-10-13
 
 - **Opční backtest** (Backtest → Obchodovat: Opce): zvolená strategie dává jen směr a opční strategie se vybere

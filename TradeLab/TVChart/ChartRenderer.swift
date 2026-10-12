@@ -480,20 +480,23 @@ enum ChartRenderer {
     }
 
     /// Popisek čáry od agenta (text začíná „AI“), malým písmem nad čarou.
+    /// Krátký popisek čáry od agenta u pravého okraje, nad čarou.
     static func drawLineLabel(_ ctx: inout GraphicsContext, _ d: Drawing, at point: CGPoint, color: Color) {
-        guard let text = d.text, text.hasPrefix("AI") else { return }
-        let label = text.hasPrefix("AI · ") ? String(text.dropFirst(5)) : text
-        ctx.draw(Text(label).font(.system(size: 10, weight: .semibold)).foregroundColor(color.opacity(0.9)),
-                 at: CGPoint(x: point.x, y: point.y - 3), anchor: .bottomLeading)
+        guard let style = AgentDrawingStyle(d) else { return }
+        ctx.draw(Text(style.label).font(.system(size: 9, weight: .medium))
+                    .foregroundColor(style.color.opacity(AgentDrawingStyle.labelOpacity)),
+                 at: CGPoint(x: point.x, y: point.y - 2), anchor: .bottomTrailing)
     }
 
     static func drawOne(_ ctx: inout GraphicsContext, geo: ChartGeometry,
                         drawing d: Drawing, selected: Bool) {
         let pts = d.points.map { CGPoint(x: geo.x(forTime: $0.time), y: geo.y(for: $0.price)) }
         guard !pts.isEmpty else { return }
-        let stroke = StrokeStyle(lineWidth: d.width, lineCap: .round,
-                                 lineJoin: .round, dash: d.dashPattern)
-        let color = d.color
+        // Čáry od agenta: tlumené barvy, průhlednost a tloušťka podle timeframe.
+        let agent = AgentDrawingStyle(d)
+        let stroke = StrokeStyle(lineWidth: agent?.width ?? d.width, lineCap: .round,
+                                 lineJoin: .round, dash: agent?.dash ?? d.dashPattern)
+        let color = agent.map { $0.color.opacity(AgentDrawingStyle.lineOpacity) } ?? d.color
 
         // Vodorovné čáry platí přes celý graf, ty se kreslí vždy. Fibonacci
         // řeší viditelnost sám (hladiny pokračují doprava). Ostatní objekty
@@ -528,7 +531,14 @@ enum ChartRenderer {
                               y: pts[0].y + dir.y / len * 4000)
             var p = Path(); p.move(to: pts[0]); p.addLine(to: far)
             ctx.stroke(p, with: .color(color), style: stroke)
-            drawLineLabel(&ctx, d, at: CGPoint(x: max(pts[1].x, 8), y: pts[1].y), color: color)
+            // Popisek tam, kde paprsek opouští graf vpravo.
+            if dir.x > 0 {
+                let edge = geo.plotWidth - 6
+                let y = pts[0].y + (edge - pts[0].x) * dir.y / dir.x
+                if y > 12, y < geo.candleRect.maxY - 4 {
+                    drawLineLabel(&ctx, d, at: CGPoint(x: edge, y: y), color: color)
+                }
+            }
 
         case .arrow:
             guard pts.count > 1 else { break }
@@ -542,7 +552,7 @@ enum ChartRenderer {
             p.move(to: CGPoint(x: d.tool == DrawToolKind.hray.rawValue ? pts[0].x : 0, y: y))
             p.addLine(to: CGPoint(x: geo.plotWidth, y: y))
             ctx.stroke(p, with: .color(color), style: stroke)
-            drawLineLabel(&ctx, d, at: CGPoint(x: 8, y: y), color: color)
+            drawLineLabel(&ctx, d, at: CGPoint(x: geo.plotWidth - 6, y: y), color: color)
 
         case .vline:
             var p = Path()
@@ -566,7 +576,11 @@ enum ChartRenderer {
 
         case .fib:
             guard d.points.count > 1 else { break }
-            let cfg = d.fib ?? .default
+            var cfg = d.fib ?? .default
+            if agent != nil {
+                cfg.lineOpacity = min(cfg.lineOpacity, 0.5)
+                cfg.backgroundOpacity = min(cfg.backgroundOpacity, 0.03)
+            }
             let anchorLeft = min(pts[0].x, pts[1].x)
             let anchorRight = max(pts[0].x, pts[1].x)
 
