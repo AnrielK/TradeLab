@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct TradeLabApp: App {
     @State private var model = AppModel()
+    @State private var agent = AgentModel()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(agent)
         }
     }
 }
@@ -27,6 +29,9 @@ struct RootView: View {
             BacktestView()
                 .tabItem { Label("Backtest", systemImage: "testtube.2") }
                 .tag(AppTab.backtest)
+            AgentView()
+                .tabItem { Label("Agent", systemImage: "sparkles") }
+                .tag(AppTab.agent)
             CalculatorView()
                 .tabItem { Label("Kalkulačka", systemImage: "function") }
                 .tag(AppTab.calculator)

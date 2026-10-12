@@ -7,6 +7,7 @@ enum AppTab: Hashable {
     case market
     case options
     case backtest
+    case agent
     case calculator
 }
 
@@ -343,6 +344,16 @@ final class AppModel {
         guard !legs.isEmpty else { return }
 
         strategy = OptionStrategy(name: template.displayName, underlying: chain.symbol, legs: legs)
+        strategySpot = spot
+        lastError = nil
+        renameStrategy()
+        saveStrategy()
+    }
+
+    /// Strategie navržená agentem → záložka Opce.
+    func applyAgentStrategy(_ proposed: OptionStrategy, spot: Double) {
+        selectOptionsSymbol(proposed.underlying)
+        strategy = proposed
         strategySpot = spot
         lastError = nil
         renameStrategy()

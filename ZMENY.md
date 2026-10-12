@@ -1,5 +1,17 @@
 # Změny
 
+## 0.7.0 – 2026-10-12
+
+- Nová záložka **Agent**: chat s Claude (Opus 5.5 výchozí, Sonnet 5.5, Haiku 5.5), který si sám volá
+  nástroje aplikace – cena, hledání tickeru, watchlist, statistiky historie (výnosy, volatilita, SMA, RSI, MACD),
+  expirace a opční řetězec (bid/ask, IV, delta, OI), Black-Scholes ocenění, analýza strategie z reálných
+  kontraktů (s volitelným nahráním na záložku Opce), aktuální pozice a backtest.
+- Odpovědi v markdownu (nadpisy, odrážky, tabulky), čipy volání nástrojů s rozbalitelným vstupem/výstupem,
+  zastavení běhu, nová konverzace; konverzace se ukládá v zařízení.
+- API klíč jen v Keychainu iPhonu, nastavení modelu a spotřeba tokenů v relaci.
+- Jádro `ClaudeAgent` v TradeCore: klient Messages API (prompt caching, opakování při 429/529),
+  smyčka tool use s limitem kroků a testy s maketou API.
+
 ## 0.6.0 – 2026-10-12
 
 - Nová záložka **Backtest**: ticker, období 1R–Vše (denní data upravená o dividendy), strategie SMA cross,
