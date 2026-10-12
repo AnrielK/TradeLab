@@ -1544,4 +1544,4 @@ enum Theme {
 }
 
 
-#Preview { ContentView() }
+#Preview { TVChartScreen(initialSymbol: "NVDA") }
