@@ -1,5 +1,10 @@
 # Změny
 
+## 0.1.1 – 2026-10-12
+
+- CI: chyby kompilátoru a testů se převádějí na GitHub anotace (`.github/scripts/annotate.sh`), `actions/checkout@v5`.
+- Test implikované volatility ověřuje zpětné ocenění; σ porovnává jen u opcí s nenulovou vegou.
+
 ## 0.1.0 – 2026-10-12
 
 - Založení projektu (XcodeGen, SwiftUI, iOS 17) a Swift package `TradeCore`.
