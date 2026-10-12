@@ -45,6 +45,11 @@ public struct StrategyLeg: Identifiable, Codable, Hashable, Sendable {
     public var daysToExpiry: Double
     public var impliedVolatility: Double
     public var contractSymbol: String?
+    /// Datum expirace (u nohou z řetězce), slouží k posunu expirace a přecenění.
+    public var expiration: Date?
+    /// Poslední známý bid/ask kontraktu (za 1 akcii).
+    public var bid: Double?
+    public var ask: Double?
 
     public init(
         id: UUID = UUID(),
@@ -55,7 +60,10 @@ public struct StrategyLeg: Identifiable, Codable, Hashable, Sendable {
         premium: Double = 0,
         daysToExpiry: Double = 30,
         impliedVolatility: Double = 0.3,
-        contractSymbol: String? = nil
+        contractSymbol: String? = nil,
+        expiration: Date? = nil,
+        bid: Double? = nil,
+        ask: Double? = nil
     ) {
         self.id = id
         self.instrument = instrument
@@ -66,6 +74,14 @@ public struct StrategyLeg: Identifiable, Codable, Hashable, Sendable {
         self.daysToExpiry = daysToExpiry
         self.impliedVolatility = impliedVolatility
         self.contractSymbol = contractSymbol
+        self.expiration = expiration
+        self.bid = bid
+        self.ask = ask
+    }
+
+    /// Stejný kontrakt (typ, strike, expirace) bez ohledu na směr a množství.
+    public func isSameContract(as other: StrategyLeg) -> Bool {
+        instrument == other.instrument && strike == other.strike && expiration == other.expiration
     }
 
     /// Vstupní cena za 1 akcii (prémie u opce, nákupní cena u akcie).
