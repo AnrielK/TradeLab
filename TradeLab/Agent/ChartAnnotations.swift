@@ -22,6 +22,15 @@ enum LevelTimeframe: String, CaseIterable {
         }
     }
 
+    /// Kolik svíček zpět hledat swing pro Fibonacciho.
+    var fibLookback: Int {
+        switch self {
+        case .week: return 104
+        case .day: return 120
+        case .fourHours: return 120
+        }
+    }
+
     var barCount: Int {
         switch self {
         case .week: return 300
@@ -93,6 +102,27 @@ enum ChartAnnotations {
                                 DrawPoint(time: end.0.timeIntervalSince1970, price: end.1)],
                        colorHex: kind == .support ? supportColor : (kind == .resistance ? resistanceColor : trendColor),
                        width: timeframe.lineWidth, dash: timeframe.dash, text: text, locked: true)
+    }
+
+    /// Fibonacciho retracement: kotva 0 = extrém swingu, 1 = počátek, záporné hladiny = extenze za extrémem.
+    static func fibonacci(_ swing: FibonacciSwing, timeframe: LevelTimeframe, note: String?) -> Drawing {
+        var text = "\(prefix)Fib \(timeframe.rawValue) \(swing.direction == .up ? "růst" : "pokles")"
+        if let note, !note.isEmpty { text += " · \(note)" }
+        let settings = FibSettings(levels: [
+            FibLevelSetting(ratio: -0.618, colorHex: "#b58cff"),
+            FibLevelSetting(ratio: -0.272, colorHex: "#b58cff"),
+            FibLevelSetting(ratio: 0, colorHex: "#9aa7b4"),
+            FibLevelSetting(ratio: 0.236, colorHex: "#e0566b"),
+            FibLevelSetting(ratio: 0.382, colorHex: "#e0a83c"),
+            FibLevelSetting(ratio: 0.5, colorHex: "#5fbf7a"),
+            FibLevelSetting(ratio: 0.618, colorHex: "#2ea98c"),
+            FibLevelSetting(ratio: 0.786, colorHex: "#4aa8ff"),
+            FibLevelSetting(ratio: 1, colorHex: "#9aa7b4"),
+        ], backgroundOpacity: 0.04)
+        return Drawing(tool: "fib",
+                       points: [DrawPoint(time: swing.endDate.timeIntervalSince1970, price: swing.endPrice),
+                                DrawPoint(time: swing.startDate.timeIntervalSince1970, price: swing.startPrice)],
+                       colorHex: "#b58cff", width: 1, dash: 0, text: text, locked: true, fib: settings)
     }
 
     // MARK: - Data

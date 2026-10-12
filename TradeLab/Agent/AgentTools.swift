@@ -110,6 +110,8 @@ enum AgentToolbox {
                 Najde silné horizontální supporty a rezistence (shluky swingových maxim a minim, síla podle počtu dotyků \
                 a čerstvosti) a trendové linie (přes swingová minima/maxima, které zavírací cena neprorazila) na \
                 svíčkách 1W, 1D nebo 4H stejných jako v grafu aplikace (TradingView). Časy jsou v UTC. \
+                Vrací i Fibonacciho swing (nejvyšší high a nejnižší low za poslední období) s retracementy \
+                0,236–0,786 a extenzemi 1,272 a 1,618. \
                 draw: true rovnou zakreslí všechny nalezené (nahradí dřívější kresby agenta v tomto timeframu); \
                 pro výběr jen těch nejdůležitějších použij místo toho draw_on_chart.
                 """,
@@ -124,7 +126,8 @@ enum AgentToolbox {
             AgentTool(
                 name: "draw_on_chart",
                 description: """
-                Zakreslí do grafu tickeru (TradingView graf v aplikaci) vybrané hladiny a trendové linie. \
+                Zakreslí do grafu tickeru (TradingView graf v aplikaci) vybrané hladiny, trendové linie a Fibonacciho \
+                retracementy (z find_levels → fibonacci). \
                 Hladina = vodorovná čára (zelená support, červená rezistence), trendová linie = paprsek přes dva body \
                 (start a end, čas „YYYY-MM-DD HH:mm“ v UTC nebo „YYYY-MM-DD“). Tloušťka podle timeframe (1W nejsilnější, \
                 4H čárkovaně). replace: true (výchozí) nejdřív smaže všechny dřívější kresby agenta u tickeru; \
@@ -147,6 +150,14 @@ enum AgentToolbox {
                         "end_price": Schema.number("Cena druhého bodu"),
                         "label": Schema.string("Krátká poznámka (volitelné)"),
                     ], required: ["kind", "timeframe", "start_time", "start_price", "end_time", "end_price"])),
+                    "fibonacci": Schema.array("Fibonacciho retracementy", items: Schema.object([
+                        "timeframe": Schema.string("Odkud swing je", enum: LevelTimeframe.allCases.map(\.rawValue)),
+                        "start_time": Schema.string("Počátek swingu (low u růstu, high u poklesu)"),
+                        "start_price": Schema.number("Cena počátku"),
+                        "end_time": Schema.string("Extrém swingu (high u růstu, low u poklesu)"),
+                        "end_price": Schema.number("Cena extrému"),
+                        "label": Schema.string("Krátká poznámka (volitelné)"),
+                    ], required: ["timeframe", "start_time", "start_price", "end_time", "end_price"])),
                     "replace": Schema.boolean("Smazat dřívější kresby agenta (výchozí true)"),
                 ], required: ["symbol"])
             ) { input in try await drawOnChart(input, model: model) },
@@ -177,6 +188,11 @@ enum AgentToolbox {
                     "ma_period": Schema.integer("ma_bounce: perioda průměru (výchozí 20)"),
                     "trend_period": Schema.integer("ma_bounce: perioda trendového SMA (výchozí 200)"),
                     "ema": Schema.boolean("ma_bounce: EMA místo SMA (výchozí true)"),
+                    "exit": Schema.string("Výstup: podle strategie, nebo Fibonacci (cíl na extenzi, stop na retracementu swingu)",
+                                          enum: ["strategy", "fibonacci"]),
+                    "fib_lookback": Schema.integer("fibonacci: swing z N svíček před vstupem (výchozí 20)"),
+                    "fib_target": Schema.number("fibonacci: cíl jako extenze swingu, 1 = předchozí extrém (výchozí 1.272)"),
+                    "fib_stop": Schema.number("fibonacci: stop jako retracement swingu, 1 = počátek swingu (výchozí 0.786)"),
                     "allow_short": Schema.boolean("Povolit short místo hotovosti (výchozí false)"),
                     "cost_bps": Schema.number("Náklady v bazických bodech na obchod (výchozí 5)"),
                 ], required: ["symbol", "strategy"])
@@ -641,14 +657,35 @@ enum AgentToolbox {
             ]
         }
 
+        let swing = Fibonacci.lastSwing(series.bars, lookback: timeframe.fibLookback)
+        var fib: JSONValue = .null
+        if let swing {
+            var retracements: [String: JSONValue] = [:]
+            for r in FibonacciSwing.retracementRatios { retracements[String(r)] = num(swing.retracement(r)) }
+            var extensions: [String: JSONValue] = [:]
+            for e in FibonacciSwing.extensionRatios { extensions[String(e)] = num(swing.extensionLevel(e)) }
+            fib = [
+                "direction": .string(swing.direction.rawValue),
+                "start_time": .string(timeFormatter.string(from: swing.startDate)),
+                "start_price": num(swing.startPrice),
+                "end_time": .string(timeFormatter.string(from: swing.endDate)),
+                "end_price": num(swing.endPrice),
+                "retracements": .object(retracements),
+                "extensions": .object(extensions),
+                "current_retracement": num((swing.endPrice - close) / (swing.endPrice - swing.startPrice), 3),
+            ]
+        }
+
         var drawn = 0
         if input["draw"]?.boolValue == true {
-            let drawings = analysis.levels.map {
+            var drawings: [Drawing] = analysis.levels.map {
                 ChartAnnotations.level(price: $0.price, kind: $0.kind, timeframe: timeframe, note: "\($0.touches)×")
-            } + analysis.trendLines.map {
+            }
+            drawings += analysis.trendLines.map {
                 ChartAnnotations.trendLine(kind: $0.kind, timeframe: timeframe, start: ($0.startDate, $0.startPrice),
                                            end: ($0.endDate, $0.endPrice), note: "\($0.touches)×")
             }
+            if let swing { drawings.append(ChartAnnotations.fibonacci(swing, timeframe: timeframe, note: nil)) }
             ChartAnnotations.write(series.tvSymbol, adding: drawings) {
                 ChartAnnotations.timeframe(of: $0) == timeframe.rawValue
             }
@@ -666,6 +703,7 @@ enum AgentToolbox {
             "atr": num(analysis.atr),
             "levels": .array(levels),
             "trendlines": .array(lines),
+            "fibonacci": fib,
             "drawn": .number(Double(drawn)),
         ]
         return output(.object(result))
@@ -697,12 +735,28 @@ enum AgentToolbox {
                                                        end: (end, endPrice), note: line["label"]?.stringValue))
         }
 
+        var fibCount = 0
+        for (i, f) in (input["fibonacci"]?.arrayValue ?? []).enumerated() {
+            guard let start = parseTime(f["start_time"]?.stringValue), let startPrice = f["start_price"]?.doubleValue,
+                  let end = parseTime(f["end_time"]?.stringValue), let endPrice = f["end_price"]?.doubleValue,
+                  startPrice != endPrice else {
+                throw ToolError("Fibonacci \(i + 1): chybí nebo je neplatný start/end.")
+            }
+            let tf = f["timeframe"]?.stringValue.flatMap(LevelTimeframe.init(rawValue:)) ?? .day
+            timeframes.insert(tf.rawValue)
+            let swing = FibonacciSwing(direction: endPrice > startPrice ? .up : .down, startDate: start,
+                                       startPrice: startPrice, endDate: end, endPrice: endPrice)
+            drawings.append(ChartAnnotations.fibonacci(swing, timeframe: tf, note: f["label"]?.stringValue))
+            fibCount += 1
+        }
+
         let replace = input["replace"]?.boolValue ?? true
         ChartAnnotations.write(tvSymbol, adding: drawings) { _ in replace }
         let result: [String: JSONValue] = [
             "symbol": .string(tvSymbol),
             "drawn_levels": .number(Double(input["levels"]?.arrayValue?.count ?? 0)),
             "drawn_trendlines": .number(Double(input["trendlines"]?.arrayValue?.count ?? 0)),
+            "drawn_fibonacci": .number(Double(fibCount)),
             "timeframes": .array(timeframes.sorted().map { .string($0) }),
             "replaced_previous": .bool(replace),
             "note": "Kresby jsou v grafu tickeru (detail na záložce Trh i plný graf), uživatel je vidí v seznamu objektů.",
@@ -748,8 +802,14 @@ enum AgentToolbox {
         let series = try await BacktestData.load(symbol: s, range: range, client: model.client)
         let bars = series.bars
         guard bars.count > 30 else { throw ToolError("Málo dat pro backtest (\(bars.count) svíček).") }
+        let exit: ExitRule = input["exit"]?.stringValue == "fibonacci"
+            ? .fibonacci(lookback: input["fib_lookback"]?.intValue ?? 20,
+                         target: input["fib_target"]?.doubleValue ?? 1.272,
+                         stop: input["fib_stop"]?.doubleValue ?? 0.786)
+            : .strategy
         let config = BacktestConfig(strategy: strategy, allowShort: input["allow_short"]?.boolValue ?? false,
-                                    costBps: input["cost_bps"]?.doubleValue ?? 5, riskFreeRate: model.riskFreeRate)
+                                    costBps: input["cost_bps"]?.doubleValue ?? 5, riskFreeRate: model.riskFreeRate,
+                                    exit: exit)
         let result = BacktestEngine.run(bars: bars, config: config)
 
         func metrics(_ m: BacktestMetrics) -> JSONValue {
@@ -778,7 +838,7 @@ enum AgentToolbox {
         }
         let summary: [String: JSONValue] = [
             "symbol": .string(s),
-            "rule": .string(strategy.name),
+            "rule": .string(config.title),
             "data": .string(series.label),
             "from": .string(day(bars[0].date)),
             "to": .string(day(bars[bars.count - 1].date)),

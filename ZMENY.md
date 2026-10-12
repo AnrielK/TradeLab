@@ -1,5 +1,15 @@
 # Změny
 
+## 0.11.0 – 2026-10-12
+
+- **Fibonacciho retracement v grafu**: `find_levels` vrací poslední výrazný swing s retracementy 0,236–0,786
+  a extenzemi 1,272 / 1,618 (a jak hluboko je cena v pullbacku); `draw_on_chart` ho zakreslí jako Fib objekt
+  (0 = extrém, 1 = počátek swingu, extenze fialově za extrémem). Popisky extenzí v grafu ukazují 127,2 % a 161,8 %.
+- **Fibonacciho výstup v backtestu** pro všechny strategie: při vstupu se vezme swing z N svíček, cíl na extenzi
+  (1,0 / 1,272 / 1,618 / 2,0), stop na retracementu (0,5 / 0,618 / 0,786 / 1,0); výstup na zavření, nebo dřív
+  podle strategie; nový vstup až po novém signálu. Umí ho i agent v `run_backtest` (`exit: fibonacci`).
+- Jádro: `Fibonacci.lastSwing`, `Fibonacci.applyExit`, `ExitRule` v `BacktestConfig` s testy.
+
 ## 0.10.0 – 2026-10-12
 
 - Agent kreslí do grafu **supporty, rezistence a trendové linie** z 1W, 1D a 4H:

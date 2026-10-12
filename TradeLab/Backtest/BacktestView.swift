@@ -59,6 +59,10 @@ final class BacktestModel {
     var bounceTrend = 200
     var bounceTolerancePct = 1.0
     var bounceEMA = true
+    var fibExit = false
+    var fibLookback = 20
+    var fibTarget = 1.272
+    var fibStop = 0.786
     var allowShort = false
     var costBps = 5.0
     var compareSPY = true
@@ -84,6 +88,10 @@ final class BacktestModel {
         }
     }
 
+    var exitRule: ExitRule {
+        fibExit ? .fibonacci(lookback: fibLookback, target: fibTarget, stop: fibStop) : .strategy
+    }
+
     func run(client: YahooFinanceClient, riskFreeRate: Double) async {
         let ticker = symbol.trimmingCharacters(in: .whitespaces).uppercased()
         guard !ticker.isEmpty else { return }
@@ -101,7 +109,7 @@ final class BacktestModel {
                 return
             }
             let config = BacktestConfig(strategy: strategy, allowShort: allowShort, costBps: costBps,
-                                        riskFreeRate: riskFreeRate)
+                                        riskFreeRate: riskFreeRate, exit: exitRule)
             result = BacktestEngine.run(bars: bars, config: config)
             dataLabel = series.label
 
@@ -214,6 +222,26 @@ struct BacktestView: View {
             if bt.kind != .hold {
                 Toggle("Povolit short", isOn: $bt.allowShort)
             }
+
+            Toggle("Fibonacciho výstup", isOn: $bt.fibExit.animation())
+            if bt.fibExit {
+                Stepper("Swing z \(bt.fibLookback) svíček", value: $bt.fibLookback, in: 5...200, step: 5)
+                Picker("Cíl (extenze)", selection: $bt.fibTarget) {
+                    Text("1.0 – předchozí extrém").tag(1.0)
+                    Text("1.272").tag(1.272)
+                    Text("1.618").tag(1.618)
+                    Text("2.0").tag(2.0)
+                }
+                Picker("Stop (retracement)", selection: $bt.fibStop) {
+                    Text("0.5").tag(0.5)
+                    Text("0.618").tag(0.618)
+                    Text("0.786").tag(0.786)
+                    Text("1.0 – počátek swingu").tag(1.0)
+                }
+                Text("Při vstupu se vezme swing (nejvyšší high a nejnižší low) z posledních svíček. Obchod skončí na zavření nad cílem nebo pod stopem – nebo dřív, když vystoupí strategie. Po výstupu se znovu vstupuje až po novém signálu.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Stepper("Náklady: \(bt.costBps.fixed(0)) bp / obchod", value: $bt.costBps, in: 0...50, step: 1)
             Toggle("Srovnat se SPY", isOn: $bt.compareSPY)
 
@@ -291,6 +319,10 @@ struct BacktestView: View {
             .monospacedDigit()
         } header: {
             Text("Metriky")
+        } footer: {
+            if result.config.exit != .strategy {
+                Text(result.config.title)
+            }
         }
     }
 

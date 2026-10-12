@@ -300,7 +300,8 @@ struct FibLevelSetting: Codable, Hashable, Identifiable {
     var colorHex: String
 
     var id: Double { ratio }
-    var percentText: String { String(format: "%.2f%%", ratio * 100) }
+    /// Záporné hladiny jsou extenze za kotvou 0 (−0,272 → 127,2 %).
+    var percentText: String { String(format: "%.2f%%", (ratio < 0 ? 1 - ratio : ratio) * 100) }
 }
 
 /// Nastavení Fibonacciho objektu — hladiny, jejich vzhled a podbarvení.

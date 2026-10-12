@@ -276,6 +276,7 @@ struct ToolChip: View {
         if let timeframe = input["timeframe"]?.stringValue { parts.append(timeframe) }
         if let levels = input["levels"]?.arrayValue { parts.append("\(levels.count) hl.") }
         if let lines = input["trendlines"]?.arrayValue { parts.append("\(lines.count) TL") }
+        if let fibs = input["fibonacci"]?.arrayValue, !fibs.isEmpty { parts.append("Fib") }
         if let legs = input["legs"]?.arrayValue { parts.append("\(legs.count) noh\(legs.count == 1 ? "a" : (legs.count < 5 ? "y" : ""))") }
         if input["apply_to_app"]?.boolValue == true { parts.append("→ aplikace") }
         return parts.joined(separator: " · ")
@@ -356,6 +357,9 @@ struct ChartDrawingCard: View {
                 }
                 if info.trendLines > 0 {
                     Label("\(info.trendLines) trendlinií", systemImage: "line.diagonal")
+                }
+                if info.fibs > 0 {
+                    Label("Fibonacci", systemImage: "square.stack.3d.down.right")
                 }
                 if !info.timeframes.isEmpty {
                     Text(info.timeframes.joined(separator: " · ")).foregroundStyle(.secondary)

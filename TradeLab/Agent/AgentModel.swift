@@ -251,7 +251,7 @@ final class AgentModel {
         - Než navrhneš opční strategii, ověř expirace a striky přes get_option_expirations / get_option_chain a návrh přepočítej přes analyze_strategy.
         - Data pocházejí z neoficiálního Yahoo Finance a mohou být zpožděná; mimo obchodní hodiny bývají opční kotace zastaralé. Pokud to ovlivňuje závěr, zmiň to.
         - Jde o výzkum a vzdělávání, ne o investiční doporučení. U návrhů vždy uveď hlavní rizika: max. ztrátu, likviditu (spread bid/ask, open interest) a co by musel trh udělat.
-        - Supporty, rezistence a trendové linie zjišťuj přes find_levels pro každý požadovaný timeframe. Do grafu vyber jen ty nejsilnější (zhruba 3–4 hladiny a 1–2 trendlinie na timeframe, blízké hladiny z různých timeframů slouč) a zakresli je jedním voláním draw_on_chart. Pod odpovědí se pak ukáže karta „Otevřít graf“.
+        - Supporty, rezistence, trendové linie a Fibonacciho swing zjišťuj přes find_levels pro každý požadovaný timeframe. Do grafu vyber jen ty nejsilnější (zhruba 3–4 hladiny a 1–2 trendlinie na timeframe, blízké hladiny z různých timeframů slouč; Fibonacciho retracement přidej, když o něj uživatel stojí nebo když je cena v pullbacku) a zakresli je jedním voláním draw_on_chart. Pod odpovědí se pak ukáže karta „Otevřít graf“.
         - Když nástroj vrátí chybu, uprav vstup (jiný strike, expiraci, ticker) a zkus to znovu.
         - Pod odpovědí s analyze_strategy aplikace sama ukáže kartu „Otevřít v Opcích“, takže apply_to_app nastav na true jen tehdy, když uživatel výslovně chce strategii nahrát hned.
         - Odpovídej česky, stručně a věcně. Formátuj v markdownu: krátké odstavce, odrážky, případně malá tabulka. Čísla piš s jednotkami (USD, %, dny).
@@ -297,6 +297,7 @@ struct ChartDrawingInfo: Identifiable {
     let tvSymbol: String
     let levels: Int
     let trendLines: Int
+    let fibs: Int
     let timeframes: [String]
 
     init?(use: ToolUse, result: ToolResult) {
@@ -308,14 +309,16 @@ struct ChartDrawingInfo: Identifiable {
         if use.name == "draw_on_chart" {
             levels = json["drawn_levels"]?.intValue ?? 0
             trendLines = json["drawn_trendlines"]?.intValue ?? 0
+            fibs = json["drawn_fibonacci"]?.intValue ?? 0
             timeframes = json["timeframes"]?.arrayValue?.compactMap(\.stringValue) ?? []
         } else {
             guard (json["drawn"]?.intValue ?? 0) > 0 else { return nil }
             levels = json["levels"]?.arrayValue?.count ?? 0
             trendLines = json["trendlines"]?.arrayValue?.count ?? 0
+            fibs = json["fibonacci"]?.objectValue == nil ? 0 : 1
             timeframes = json["timeframe"]?.stringValue.map { [$0] } ?? []
         }
-        guard levels + trendLines > 0 else { return nil }
+        guard levels + trendLines + fibs > 0 else { return nil }
     }
 
     /// Rozlišení grafu při otevření – nejkratší zakreslený timeframe.

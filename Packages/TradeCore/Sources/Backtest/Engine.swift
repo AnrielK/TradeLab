@@ -17,15 +17,22 @@ public struct BacktestBar: Hashable, Sendable {
 }
 
 public struct BacktestConfig: Hashable, Sendable {
+    /// Název strategie včetně výstupu.
+    public var title: String {
+        exit == .strategy ? strategy.name : "\(strategy.name) + \(exit.name)"
+    }
+
     public var strategy: BacktestStrategy
     public var allowShort: Bool
     /// Poplatky a skluz v bazických bodech z objemu obchodu (5 = 0,05 %).
     public var costBps: Double
     public var riskFreeRate: Double
     public var initialCapital: Double
+    public var exit: ExitRule
 
     public init(strategy: BacktestStrategy, allowShort: Bool = false, costBps: Double = 5,
-                riskFreeRate: Double = 0.04, initialCapital: Double = 10_000) {
+                riskFreeRate: Double = 0.04, initialCapital: Double = 10_000, exit: ExitRule = .strategy) {
+        self.exit = exit
         self.strategy = strategy
         self.allowShort = allowShort
         self.costBps = costBps
@@ -84,7 +91,10 @@ public enum BacktestEngine {
     /// Signál se vyhodnotí na zavírací ceně baru `i` a obchod proběhne
     /// za otevírací cenu baru `i + 1` – žádný pohled do budoucnosti.
     public static func run(bars: [BacktestBar], config: BacktestConfig) -> BacktestResult {
-        let targets = config.strategy.targets(bars: bars, allowShort: config.allowShort)
+        var targets = config.strategy.targets(bars: bars, allowShort: config.allowShort)
+        if case .fibonacci(let lookback, let target, let stop) = config.exit {
+            targets = Fibonacci.applyExit(bars, targets: targets, lookback: lookback, target: target, stop: stop)
+        }
         let simulation = simulate(bars: bars, targets: targets, costBps: config.costBps,
                                   initialCapital: config.initialCapital)
         let metrics = Self.metrics(equity: simulation.equity, trades: simulation.trades,
