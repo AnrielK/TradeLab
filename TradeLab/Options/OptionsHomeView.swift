@@ -46,6 +46,10 @@ struct OptionsHomeView: View {
             .task(id: model.optionsSymbol) {
                 await model.chainStore.load(symbol: model.optionsSymbol, rate: model.riskFreeRate)
             }
+            .onAppear { if model.requestedExpiration != nil { mode = .table } }
+            .onChange(of: model.requestedExpiration) { _, date in
+                if date != nil { mode = .table }
+            }
         }
     }
 

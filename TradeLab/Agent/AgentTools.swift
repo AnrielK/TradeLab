@@ -386,6 +386,17 @@ enum AgentToolbox {
     }
 
     static func analyzeStrategy(_ input: JSONValue, model: AppModel) async throws -> String {
+        let (strategy, spot) = try await buildStrategy(input, model: model)
+        var result = describe(strategy, spot: spot, rate: model.riskFreeRate)
+        if input["apply_to_app"]?.boolValue == true {
+            model.openAgentStrategy(strategy, spot: spot, switchTab: false)
+            result["applied_to_app"] = true
+        }
+        return output(.object(result))
+    }
+
+    /// Strategie z reálných kontraktů podle vstupu `analyze_strategy` (aktuální kotace).
+    static func buildStrategy(_ input: JSONValue, model: AppModel) async throws -> (OptionStrategy, Double) {
         let s = try symbol(input)
         guard let legInputs = input["legs"]?.arrayValue, !legInputs.isEmpty else { throw ToolError("Chybí legs.") }
         guard legInputs.count <= 8 else { throw ToolError("Maximálně 8 nohou.") }
@@ -437,12 +448,7 @@ enum AgentToolbox {
         guard let spot else { throw ToolError("Nepodařilo se zjistit cenu podkladu.") }
         let strategy = OptionStrategy(name: StrategyClassifier.name(for: OptionStrategy(underlying: s, legs: legs)),
                                       underlying: s, legs: legs)
-        var result = describe(strategy, spot: spot, rate: rate)
-        if input["apply_to_app"]?.boolValue == true {
-            model.applyAgentStrategy(strategy, spot: spot)
-            result["applied_to_app"] = true
-        }
-        return output(.object(result))
+        return (strategy, spot)
     }
 
     static func currentPosition(model: AppModel) async -> String {

@@ -1,5 +1,6 @@
 import SwiftUI
 import ClaudeAgent
+import MarketData
 
 struct AgentView: View {
     @Environment(AppModel.self) private var app
@@ -27,8 +28,12 @@ struct AgentView: View {
                         if agent.messages.isEmpty {
                             emptyState
                         }
-                        ForEach(agent.messages) { message in
+                        let results = agent.toolResults
+                        ForEach(Array(agent.messages.enumerated()), id: \.element.id) { index, message in
                             MessageView(message: message)
+                            if let proposal = agent.proposal(endingAt: index, results: results) {
+                                StrategyProposalCard(proposal: proposal)
+                            }
                         }
                         if agent.isRunning, agent.runningToolIDs.isEmpty {
                             HStack(spacing: 8) {
@@ -287,6 +292,143 @@ private struct ToolChip: View {
                 .foregroundStyle(result.isError ? .red : .green)
         } else {
             Image(systemName: "wrench.and.screwdriver").foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Návrh strategie
+
+private struct StrategyProposalCard: View {
+    @Environment(AppModel.self) private var app
+    let proposal: StrategyProposal
+    @State private var isOpening = false
+    @State private var error: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Label(proposal.name, systemImage: "square.stack.3d.up.fill")
+                    .font(.headline)
+                Spacer()
+                Text(proposal.underlying)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(proposal.legs.enumerated()), id: \.offset) { _, leg in
+                    legRow(leg)
+                }
+            }
+
+            HStack(spacing: 16) {
+                if let premium = proposal.netPremium {
+                    metric(premium >= 0 ? "Debet" : "Kredit", abs(premium).usdWhole,
+                           color: premium >= 0 ? .primary : ChainTheme.long)
+                }
+                if let maxLoss = proposal.maxLoss {
+                    metric("Max. ztráta", value(maxLoss), color: ChainTheme.short)
+                }
+                if let maxProfit = proposal.maxProfit {
+                    metric("Max. zisk", value(maxProfit), color: ChainTheme.long)
+                }
+                if !proposal.breakevens.isEmpty {
+                    metric("BE", proposal.breakevens.map { $0.fixed(2) }.joined(separator: " / "), color: .purple)
+                }
+            }
+
+            Button {
+                open()
+            } label: {
+                HStack {
+                    if isOpening { ProgressView().controlSize(.small) }
+                    Label("Otevřít v Opcích", systemImage: "arrow.up.forward.app")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .disabled(isOpening)
+
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red)
+            } else {
+                Text("Nahraje nohy s aktuálními kotacemi do builderu a rozbalí expiraci v řetězci.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor.opacity(0.35)))
+    }
+
+    private func legRow(_ leg: JSONValue) -> some View {
+        let isLong = leg["side"]?.stringValue == "long"
+        let type = leg["type"]?.stringValue ?? ""
+        let quantity = leg["quantity"]?.intValue ?? 1
+        let label: String
+        switch type {
+        case "call": label = "CALL"
+        case "put": label = "PUT"
+        default: label = "AKCIE"
+        }
+        return HStack(spacing: 8) {
+            Text("\(isLong ? "+" : "−")\(quantity)")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(minWidth: 30)
+                .padding(.vertical, 2)
+                .background(isLong ? ChainTheme.long : ChainTheme.short, in: Capsule())
+            Text(label).font(.caption.weight(.semibold)).frame(width: 44, alignment: .leading)
+            if type == "stock" {
+                Text(leg["entry_price"]?.doubleValue.map { $0.fixed(2) } ?? "")
+            } else {
+                Text(leg["strike"]?.doubleValue.map { $0.strikeLabel } ?? "").fontWeight(.semibold)
+                Text(expirationLabel(leg["expiration"]?.stringValue)).foregroundStyle(.secondary)
+                Spacer()
+                if let mid = leg["mid"]?.doubleValue {
+                    Text("mid \(mid.fixed(2))").foregroundStyle(.secondary)
+                }
+            }
+        }
+        .font(.footnote)
+        .monospacedDigit()
+    }
+
+    private func metric(_ title: String, _ value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title).font(.caption2).foregroundStyle(.secondary)
+            Text(value).font(.footnote.weight(.semibold)).foregroundStyle(color).monospacedDigit()
+        }
+    }
+
+    private func value(_ v: JSONValue) -> String {
+        if let d = v.doubleValue { return d.usdWhole }
+        return v.stringValue ?? "–"
+    }
+
+    private func expirationLabel(_ day: String?) -> String {
+        guard let day, let date = AgentToolbox.dayFormatter.date(from: day) else { return day ?? "" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "cs_CZ")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "d. M. yyyy"
+        let days = Int(OptionChain.daysToExpiry(date).rounded())
+        return "\(f.string(from: date)) · \(days) d"
+    }
+
+    private func open() {
+        isOpening = true
+        error = nil
+        Task {
+            defer { isOpening = false }
+            do {
+                let (strategy, spot) = try await AgentToolbox.buildStrategy(proposal.input, model: app)
+                app.openAgentStrategy(strategy, spot: spot)
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 }

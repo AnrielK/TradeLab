@@ -79,6 +79,33 @@ final class AgentModel {
         return map
     }
 
+    /// Strategie navržená v tahu agenta, který končí zprávou `index`
+    /// (poslední úspěšné `analyze_strategy` od posledního dotazu uživatele).
+    func proposal(endingAt index: Int, results: [String: ToolResult]) -> StrategyProposal? {
+        guard messages.indices.contains(index), messages[index].role == .assistant else { return nil }
+        if index == messages.count - 1 {
+            if isRunning { return nil }
+        } else {
+            let next = messages[index + 1]
+            if next.role == .user, !next.toolResults.isEmpty { return nil }
+        }
+        var i = index
+        while i >= 0 {
+            let message = messages[i]
+            if message.role == .user, message.toolResults.isEmpty { break }
+            if message.role == .assistant {
+                for use in message.toolUses.reversed() where use.name == "analyze_strategy" {
+                    if let result = results[use.id], !result.isError,
+                       let proposal = StrategyProposal(use: use, result: result) {
+                        return proposal
+                    }
+                }
+            }
+            i -= 1
+        }
+        return nil
+    }
+
     func send(_ text: String, app: AppModel) {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isRunning else { return }
@@ -201,8 +228,35 @@ final class AgentModel {
         - Data pocházejí z neoficiálního Yahoo Finance a mohou být zpožděná; mimo obchodní hodiny bývají opční kotace zastaralé. Pokud to ovlivňuje závěr, zmiň to.
         - Jde o výzkum a vzdělávání, ne o investiční doporučení. U návrhů vždy uveď hlavní rizika: max. ztrátu, likviditu (spread bid/ask, open interest) a co by musel trh udělat.
         - Když nástroj vrátí chybu, uprav vstup (jiný strike, expiraci, ticker) a zkus to znovu.
-        - apply_to_app nastav na true jen tehdy, když uživatel výslovně chce strategii nahrát do aplikace.
+        - Pod odpovědí s analyze_strategy aplikace sama ukáže kartu „Otevřít v Opcích“, takže apply_to_app nastav na true jen tehdy, když uživatel výslovně chce strategii nahrát hned.
         - Odpovídej česky, stručně a věcně. Formátuj v markdownu: krátké odstavce, odrážky, případně malá tabulka. Čísla piš s jednotkami (USD, %, dny).
         """
+    }
+}
+
+/// Strategie z výsledku `analyze_strategy` pro kartu pod odpovědí agenta.
+struct StrategyProposal: Identifiable {
+    let id: String
+    let input: JSONValue
+    let name: String
+    let underlying: String
+    let legs: [JSONValue]
+    let netPremium: Double?
+    let maxProfit: JSONValue?
+    let maxLoss: JSONValue?
+    let breakevens: [Double]
+
+    init?(use: ToolUse, result: ToolResult) {
+        guard let json = try? JSONDecoder().decode(JSONValue.self, from: Data(result.content.utf8)),
+              let legs = json["legs"]?.arrayValue, !legs.isEmpty else { return nil }
+        id = use.id
+        input = use.input
+        name = json["name"]?.stringValue ?? "Strategie"
+        underlying = json["underlying"]?.stringValue ?? use.input["symbol"]?.stringValue?.uppercased() ?? ""
+        self.legs = legs
+        netPremium = json["net_premium_usd"]?.doubleValue
+        maxProfit = json["max_profit_usd"]
+        maxLoss = json["max_loss_usd"]
+        breakevens = json["breakevens"]?.arrayValue?.compactMap(\.doubleValue) ?? []
     }
 }

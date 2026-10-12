@@ -8,6 +8,8 @@ struct ChainTableView: View {
     @Binding var mode: OptionsMode
     @Environment(AppModel.self) private var model
     @State private var expanded: Date?
+    /// Expirace, na kterou se má tabulka posunout (po otevření strategie z agenta).
+    @State private var scrollTarget: Date?
     @State private var strikesAround = 8
     @AppStorage("chain.showDelta") private var showDelta = true
     @AppStorage("chain.showOI") private var showOpenInterest = true
@@ -17,6 +19,7 @@ struct ChainTableView: View {
     var body: some View {
         VStack(spacing: 0) {
             ChainColumnHeader()
+            ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                     ForEach(store.expirations, id: \.self) { date in
@@ -32,6 +35,7 @@ struct ChainTableView: View {
                                 isLoading: store.loading.contains(date),
                                 legCount: legCount(for: date)
                             )
+                            .id(date)
                             .contentShape(Rectangle())
                             .onTapGesture { toggle(date) }
                             .task(id: date) {
@@ -47,6 +51,11 @@ struct ChainTableView: View {
             }
             .refreshable { await store.refresh(rate: model.riskFreeRate) }
             .scrollEdgeEffectStyle(.soft, for: .top)
+            .onAppear { consumeRequestedExpiration() }
+            .onChange(of: model.requestedExpiration) { consumeRequestedExpiration() }
+            .onChange(of: scrollTarget) { _, target in scroll(to: target, proxy: proxy) }
+            .onChange(of: store.expirations) { scroll(to: scrollTarget, proxy: proxy) }
+            }
         }
         .background(ChainTheme.row)
         .overlay {
@@ -72,7 +81,9 @@ struct ChainTableView: View {
             }
         }
         .onChange(of: store.expirations) { _, dates in
-            if expanded == nil || !dates.contains(expanded!) {
+            if let target = scrollTarget, dates.contains(target) {
+                expanded = target
+            } else if expanded == nil || !dates.contains(expanded!) {
                 expanded = defaultExpiration(in: dates)
             }
         }
@@ -82,6 +93,22 @@ struct ChainTableView: View {
         }
         .onChange(of: expanded) { _, newValue in
             model.focusedExpiration = newValue
+        }
+    }
+
+    private func consumeRequestedExpiration() {
+        guard let date = model.requestedExpiration else { return }
+        model.requestedExpiration = nil
+        expanded = date
+        scrollTarget = date
+    }
+
+    private func scroll(to target: Date?, proxy: ScrollViewProxy) {
+        guard let target, store.expirations.contains(target) else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            withAnimation(.smooth) { proxy.scrollTo(target, anchor: .top) }
+            scrollTarget = nil
         }
     }
 

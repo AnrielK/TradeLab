@@ -350,14 +350,19 @@ final class AppModel {
         saveStrategy()
     }
 
-    /// Strategie navržená agentem → záložka Opce.
-    func applyAgentStrategy(_ proposed: OptionStrategy, spot: Double) {
+    /// Expirace, kterou má tabulka řetězce rozbalit (požadavek z agenta).
+    var requestedExpiration: Date? = nil
+
+    /// Strategie navržená agentem → builder na záložce Opce, rozbalená expirace první opční nohy.
+    func openAgentStrategy(_ proposed: OptionStrategy, spot: Double, switchTab: Bool = true) {
         selectOptionsSymbol(proposed.underlying)
         strategy = proposed
         strategySpot = spot
         lastError = nil
         renameStrategy()
         saveStrategy()
+        requestedExpiration = proposed.optionLegs.compactMap(\.expiration).min()
+        if switchTab { selectedTab = .options }
     }
 
     func refreshStrategySpot() async {

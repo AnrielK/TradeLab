@@ -1,5 +1,11 @@
 # Změny
 
+## 0.7.2 – 2026-10-12
+
+- Pod odpovědí agenta s navrženou strategií je karta s nohami (strike, expirace, mid), kreditem/debetem,
+  max. ztrátou a ziskem a break-evenem. Tlačítko **Otevřít v Opcích** nahraje strategii s aktuálními kotacemi
+  do builderu, přepne na záložku Opce, rozbalí expiraci první nohy a posune na ni tabulku.
+
 ## 0.7.1 – 2026-10-12
 
 - Agent umí kromě Claude i **ChatGPT** (OpenAI Responses API: GPT-6.1 Sol, GPT-6 Astra, GPT-6 Luna)
