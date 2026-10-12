@@ -8,11 +8,14 @@ let package = Package(
         .library(name: "OptionsMath", targets: ["OptionsMath"]),
         .library(name: "MarketData", targets: ["MarketData"]),
         .library(name: "Backtest", targets: ["Backtest"]),
+        .library(name: "ClaudeAgent", targets: ["ClaudeAgent"]),
     ],
     targets: [
         .target(name: "OptionsMath"),
         .target(name: "MarketData", dependencies: ["OptionsMath"]),
         .target(name: "Backtest"),
+        .target(name: "ClaudeAgent"),
+        .testTarget(name: "ClaudeAgentTests", dependencies: ["ClaudeAgent"]),
         .testTarget(name: "BacktestTests", dependencies: ["Backtest"]),
         .testTarget(name: "OptionsMathTests", dependencies: ["OptionsMath"]),
         .testTarget(
