@@ -81,9 +81,48 @@ struct OptionsHomeView: View {
 }
 
 
+extension ModeTabs {
+    /// Šablony strategií – staví se z reálného řetězce rozbalené (nebo ~30denní) expirace.
+    var strategyMenu: some View {
+        Menu {
+            Section(model.templateExpiration.map { "Expirace " + $0.chainLabel } ?? "Načti řetězec") {
+                ForEach(StrategyTemplate.allCases) { template in
+                    Button {
+                        isApplying = true
+                        Task {
+                            await model.applyTemplate(template)
+                            isApplying = false
+                        }
+                    } label: {
+                        Text(template.displayName)
+                        Text(template.summary)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if isApplying {
+                    ProgressView().controlSize(.mini)
+                }
+                Text(model.strategy.optionLegs.isEmpty ? "Strategie" : model.strategy.name)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down").font(.caption2.weight(.bold))
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color(white: 0.25), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .disabled(model.templateExpiration == nil)
+    }
+}
+
 /// Záložky „TABULKA / PAYOFF“ s podtržením jako v brokerské aplikaci.
 struct ModeTabs: View {
     @Binding var mode: OptionsMode
+    @Environment(AppModel.self) private var model
+    @State private var isApplying = false
     @AppStorage("chain.showDelta") private var showDelta = true
     @AppStorage("chain.showOI") private var showOpenInterest = true
 
@@ -106,6 +145,8 @@ struct ModeTabs: View {
                 .buttonStyle(.plain)
             }
             Spacer()
+            strategyMenu
+                .padding(.bottom, 8)
             if mode == .table {
                 Menu {
                     Toggle("Delta", isOn: $showDelta)

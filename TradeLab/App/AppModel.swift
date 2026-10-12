@@ -6,7 +6,6 @@ import OptionsMath
 enum AppTab: Hashable {
     case market
     case options
-    case strategy
     case calculator
 }
 
@@ -45,7 +44,9 @@ final class AppModel {
         watchlist = defaults.stringArray(forKey: Self.watchlistKey) ?? ["SPY", "QQQ", "AAPL", "NVDA", "MSFT", "TSLA"]
         optionsSymbol = defaults.string(forKey: Self.optionsSymbolKey) ?? "AAPL"
         if let data = defaults.data(forKey: Self.strategyKey),
-           let saved = try? JSONDecoder().decode(OptionStrategy.self, from: data) {
+           let saved = try? JSONDecoder().decode(OptionStrategy.self, from: data),
+           saved.optionLegs.allSatisfy({ $0.expiration != nil }) {
+            // Nohy bez expirace (starší teoretické šablony) se nenačítají – nejdou přecenit z řetězce.
             strategy = saved
         } else {
             strategy = OptionStrategy(underlying: "AAPL")
@@ -111,9 +112,27 @@ final class AppModel {
     // MARK: - Opce
 
     func openOptions(for symbol: String) {
-        optionsSymbol = symbol.uppercased()
-        UserDefaults.standard.set(optionsSymbol, forKey: Self.optionsSymbolKey)
+        selectOptionsSymbol(symbol)
         selectedTab = .options
+    }
+
+    /// Ticker pro záložku Opce (např. po otevření detailu na záložce Trh) bez přepnutí záložky.
+    func selectOptionsSymbol(_ symbol: String) {
+        let s = symbol.uppercased()
+        guard !s.isEmpty, s != optionsSymbol else { return }
+        optionsSymbol = s
+        UserDefaults.standard.set(s, forKey: Self.optionsSymbolKey)
+    }
+
+    /// Expirace rozbalená v tabulce – šablony strategií se staví na ní.
+    var focusedExpiration: Date? = nil
+
+    /// Expirace pro šablonu: rozbalená v tabulce, jinak nejbližší ke ~30 dnům.
+    var templateExpiration: Date? {
+        if let focusedExpiration, chainStore.expirations.contains(focusedExpiration) { return focusedExpiration }
+        return chainStore.expirations.min {
+            abs(OptionChain.daysToExpiry($0) - 30) < abs(OptionChain.daysToExpiry($1) - 30)
+        }
     }
 
     // MARK: - Tiket z opčního řetězce
@@ -255,22 +274,54 @@ final class AppModel {
 
     // MARK: - Strategie
 
+    /// Šablona z reálného řetězce: striky se přichytí k existujícím kontraktům vybrané expirace
+    /// a ceny (bid/ask/mid, IV) se vezmou z trhu.
     func applyTemplate(_ template: StrategyTemplate) async {
-        let symbol = (strategy.underlying.isEmpty ? optionsSymbol : strategy.underlying).uppercased()
-        var volatility = 0.3
-        do {
-            let chart = try await client.chart(symbol: symbol, range: .sixMonths)
-            strategySpot = chart.quote.price
-            if let realized = Volatility.realized(closes: chart.bars.map(\.close), window: 60) {
-                volatility = realized
-            }
-            lastError = nil
-        } catch {
-            lastError = "Nepodařilo se načíst cenu \(symbol): \(error.localizedDescription)"
+        guard let expiration = templateExpiration,
+              let chain = await chainStore.chain(for: expiration, rate: riskFreeRate) else {
+            lastError = "Nejdřív načti opční řetězec."
+            return
         }
-        guard strategySpot > 0 else { return }
-        strategy = template.build(underlying: symbol, spot: strategySpot, daysToExpiry: 30,
-                                  volatility: volatility, market: market)
+        let spot = chain.underlyingPrice
+        let volatility = chainStore.summaries[expiration]?.atmVolatility ?? 0.3
+        let theoretical = template.build(underlying: chain.symbol, spot: spot,
+                                         daysToExpiry: OptionChain.daysToExpiry(expiration),
+                                         volatility: volatility, market: market)
+
+        var legs: [StrategyLeg] = []
+        // Striky se přiřazují v pořadí od nejnižšího, aby se dvě různé nohy nesmrskly na jeden strike.
+        let ordered = theoretical.legs.enumerated().sorted { $0.element.strike < $1.element.strike }
+        var assigned: [Int: StrategyLeg] = [:]
+        var previousTheoretical: Double?
+        var previousStrike: Double?
+        for (index, leg) in ordered {
+            guard let type = leg.instrument.optionType else {
+                var stock = leg
+                stock.strike = spot
+                assigned[index] = stock
+                continue
+            }
+            let available = chain.contracts(type).map(\.strike).sorted()
+            guard var strike = StrikeLadder.nearest(to: leg.strike, in: available) else { continue }
+            // Původně různé striky musí zůstat různé.
+            if let prevT = previousTheoretical, let prevS = previousStrike, leg.strike > prevT, strike <= prevS,
+               let next = available.first(where: { $0 > prevS }) {
+                strike = next
+            }
+            previousTheoretical = leg.strike
+            previousStrike = strike
+            guard let contract = chain.contract(type, strike: strike) else { continue }
+            assigned[index] = chain.leg(for: contract, side: leg.side, quantity: leg.quantity, rate: riskFreeRate)
+        }
+        for index in theoretical.legs.indices {
+            if let leg = assigned[index] { legs.append(leg) }
+        }
+        guard !legs.isEmpty else { return }
+
+        strategy = OptionStrategy(name: template.displayName, underlying: chain.symbol, legs: legs)
+        strategySpot = spot
+        lastError = nil
+        renameStrategy()
         saveStrategy()
     }
 
@@ -293,6 +344,7 @@ final class AppModel {
 
     func deleteLeg(id: UUID) {
         strategy.legs.removeAll { $0.id == id }
+        renameStrategy()
         saveStrategy()
     }
 

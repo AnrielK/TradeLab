@@ -84,7 +84,16 @@ struct PayoffWorkspaceView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Nohy").font(.subheadline.weight(.semibold))
             ForEach(strategy.legs) { leg in
-                LegRow(leg: leg)
+                HStack {
+                    LegRow(leg: leg)
+                    Button {
+                        model.deleteLeg(id: leg.id)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         if !model.canAdjustFromChain {

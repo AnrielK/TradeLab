@@ -29,7 +29,8 @@ struct ChainTableView: View {
                                 date: date,
                                 summary: store.summaries[date],
                                 isExpanded: expanded == date,
-                                isLoading: store.loading.contains(date)
+                                isLoading: store.loading.contains(date),
+                                legCount: legCount(for: date)
                             )
                             .contentShape(Rectangle())
                             .onTapGesture { toggle(date) }
@@ -76,7 +77,17 @@ struct ChainTableView: View {
         }
         .onAppear {
             if expanded == nil { expanded = defaultExpiration(in: store.expirations) }
+            model.focusedExpiration = expanded
         }
+        .onChange(of: expanded) { _, newValue in
+            model.focusedExpiration = newValue
+        }
+    }
+
+    /// Počet nohou tiketu v dané expiraci (pro zvýraznění v přehledu).
+    private func legCount(for date: Date) -> Int {
+        guard model.strategy.underlying.uppercased() == store.symbol.uppercased() else { return 0 }
+        return model.strategy.optionLegs.filter { $0.expiration == date }.count
     }
 
     private var ticketVisible: Bool {
@@ -167,13 +178,14 @@ struct ExpirationHeader: View {
     let summary: ExpirationSummary?
     let isExpanded: Bool
     let isLoading: Bool
+    var legCount: Int = 0
 
     var body: some View {
         let monthly = ExpirationCalendar.isMonthly(date)
         HStack(spacing: 0) {
             HStack(spacing: 6) {
                 Text(date.chainLabel)
-                    .font(.system(size: 14, weight: isExpanded ? .semibold : .regular))
+                    .font(.system(size: 13, weight: isExpanded || legCount > 0 ? .semibold : .regular))
                     .monospacedDigit()
                 if !monthly {
                     Text("W")
@@ -181,6 +193,15 @@ struct ExpirationHeader: View {
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
                         .background(ChainTheme.badge, in: RoundedRectangle(cornerRadius: 4))
+                }
+                if legCount > 0 {
+                    // Expirace s vybranými nohami.
+                    Text("\(legCount)")
+                        .font(.system(size: 11, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(.black)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(ChainTheme.itm, in: Circle())
                 }
                 Spacer(minLength: 4)
                 if isExpanded {
@@ -192,7 +213,7 @@ struct ExpirationHeader: View {
             .frame(maxWidth: .infinity)
 
             Text("\(Int(OptionChain.daysToExpiry(date).rounded(.down)))d")
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 13, weight: .bold))
                 .monospacedDigit()
                 .frame(width: 64)
                 .frame(maxHeight: .infinity)
@@ -210,8 +231,13 @@ struct ExpirationHeader: View {
             .frame(maxWidth: .infinity)
         }
         .foregroundStyle(.white)
-        .frame(height: 38)
+        .frame(height: 32)
         .background(monthly ? ChainTheme.monthly : ChainTheme.weekly)
+        .overlay(alignment: .leading) {
+            if legCount > 0 {
+                Rectangle().fill(ChainTheme.itm).frame(width: 4)
+            }
+        }
         .overlay(alignment: .bottom) {
             Rectangle().fill(ChainTheme.separator).frame(height: 1)
         }
@@ -226,7 +252,7 @@ struct ExpirationHeader: View {
                     Text("(±\(move.fixed(2)))").foregroundStyle(Color(white: 0.75))
                 }
             }
-            .font(.system(size: 12))
+            .font(.system(size: 11))
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.8)
@@ -320,14 +346,14 @@ struct ChainLine: View {
                         HStack {
                             Text("▲ ITM").offset(y: -9)
                             Spacer()
-                            Text(spot.fixed(2))
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(ChainTheme.itm, in: Capsule())
-                                .foregroundStyle(.black)
-                            Spacer()
                             Text("ITM ▼").offset(y: 9)
                         }
+                        // Značka aktuální ceny na pravém okraji sloupce striků.
+                        Circle()
+                            .stroke(ChainTheme.short, lineWidth: 2.5)
+                            .frame(width: 13, height: 13)
+                            .offset(x: StrikeRuler.markerOffset)
+                            .accessibilityLabel("Spot \(spot.fixed(2))")
                         .font(.system(size: 10, weight: .bold))
                         .monospacedDigit()
                         .foregroundStyle(ChainTheme.itm)
@@ -384,9 +410,11 @@ struct StrikeRow: View {
                 .font(.system(size: 14, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
+                .padding(.trailing, 6)
                 .frame(width: Self.strikeWidth)
                 .frame(maxHeight: .infinity)
                 .background(ChainTheme.strikeColumn)
+                .overlay(alignment: .trailing) { StrikeRuler() }
 
             side(contract: put, position: putPosition, inTheMoney: strike > spot, edge: .trailing)
         }
@@ -497,5 +525,30 @@ struct PositionBlock: View {
             .frame(width: 28)
             .frame(maxHeight: .infinity)
             .background(quantity > 0 ? ChainTheme.long : ChainTheme.short)
+    }
+}
+
+/// Stupnice (čárky) na pravém okraji sloupce striků.
+struct StrikeRuler: View {
+    /// Vodorovný posun značky spotu od středu řádku (pravý okraj sloupce striků).
+    static let markerOffset: CGFloat = 32 - 4
+
+    var body: some View {
+        Canvas { context, size in
+            let step: CGFloat = 4
+            var y: CGFloat = 2
+            var index = 0
+            while y < size.height {
+                let length: CGFloat = index % 5 == 0 ? 7 : 4
+                var path = Path()
+                path.move(to: CGPoint(x: size.width - length, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(path, with: .color(Color(white: 0.38)), lineWidth: 0.8)
+                y += step
+                index += 1
+            }
+        }
+        .frame(width: 8)
+        .allowsHitTesting(false)
     }
 }

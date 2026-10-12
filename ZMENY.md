@@ -1,5 +1,15 @@
 # Změny
 
+## 0.3.0 – 2026-10-12
+
+- Záložka Strategie zrušena, šablony jsou v Opcích (tlačítko „Strategie ▾“). Staví se z reálného řetězce
+  rozbalené expirace (jinak ~30 dní): striky existujících kontraktů, ceny bid/ask/mid a IV z trhu.
+- Staré uložené nohy bez expirace se při spuštění zahodí.
+- Otevření tickeru na záložce Trh ho rovnou nastaví i pro Opce.
+- Expirace s vybranými nohami jsou v přehledu zvýrazněné (žlutý proužek a počet nohou).
+- Nižší řádky expirací, stupnice ve sloupci striků a značka aktuální ceny na čáře ITM.
+- V payoffu jde nohu odebrat křížkem.
+
 ## 0.2.3 – 2026-10-12
 
 - Kompaktnější tabulka: nižší řádky expirací i striků, menší písmo, IV a ±1σ na jednom řádku.

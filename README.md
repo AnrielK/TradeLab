@@ -8,7 +8,7 @@ Osobní iOS aplikace (SwiftUI, iOS 17+) pro průzkum US akcií a opcí. Inspirov
 - **Trh** – sledované tickery, vyhledávání, graf ceny (1M–5R), výnos, max. propad, historická volatilita 20D/60D.
 - **Opce** – opční řetězec z Yahoo (expirace, cally/puty, bid/ask, IV a delta dopočtené z mid ceny, OI).
   Klepnutím na kontrakt se přidá do strategie jako long/short noha.
-- **Strategie** – payoff builder: šablony (spready, straddle, strangle, iron condor, butterfly, covered call…),
+- **Strategie** (v záložce Opce) – šablony (spready, straddle, strangle, iron condor, butterfly, covered call…) postavené z reálného řetězce,
   graf P/L při expiraci i „dnes / za N dní“ s posunem IV, max. zisk/ztráta, break-even,
   pravděpodobnost zisku, Greeks celé pozice.
 - **Kalkulačka** – Black-Scholes cena + Greeks, výpočet implikované volatility z tržní ceny.

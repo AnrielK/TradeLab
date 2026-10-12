@@ -70,6 +70,7 @@ struct SymbolDetailView: View {
         .navigationTitle(symbol)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: range) { await load() }
+        .onAppear { model.selectOptionsSymbol(symbol) }
         .refreshable {
             await model.client.clearCache()
             await load()

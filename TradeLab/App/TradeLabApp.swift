@@ -24,9 +24,6 @@ struct RootView: View {
             OptionsHomeView()
                 .tabItem { Label("Opce", systemImage: "list.bullet.rectangle") }
                 .tag(AppTab.options)
-            StrategyView()
-                .tabItem { Label("Strategie", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
-                .tag(AppTab.strategy)
             CalculatorView()
                 .tabItem { Label("Kalkulačka", systemImage: "function") }
                 .tag(AppTab.calculator)
