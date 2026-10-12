@@ -1,0 +1,17 @@
+# Xcode (projekt generuje XcodeGen)
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+build/
+Payload/
+*.ipa
+xcodebuild.log
+TradeLab/Info.plist
+
+# SwiftPM
+.build/
+.swiftpm/
+Packages/TradeCore/.build/
+Package.resolved
+
+.DS_Store

@@ -1,0 +1,80 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    name: Testy jádra (TradeCore)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Swift test
+        run: swift test --package-path Packages/TradeCore
+
+  ios-build:
+    name: iOS build (unsigned IPA)
+    needs: core-tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Nainstalovat XcodeGen
+        run: brew install xcodegen
+
+      - name: Vygenerovat Xcode projekt
+        run: xcodegen generate
+
+      - name: Build (Release, bez podpisu)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TradeLab.xcodeproj \
+            -scheme TradeLab \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee xcodebuild.log
+
+      - name: Zabalit IPA
+        run: |
+          APP=build/Build/Products/Release-iphoneos/TradeLab.app
+          test -d "$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qr TradeLab-unsigned.ipa Payload
+          ls -lh TradeLab-unsigned.ipa
+
+      - name: Nahrát IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TradeLab-unsigned-ipa
+          path: TradeLab-unsigned.ipa
+
+      - name: Nahrát log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          if-no-files-found: ignore
