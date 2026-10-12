@@ -26,6 +26,7 @@ Packages/TradeCore/         Swift package (testovatelný bez simulátoru)
   Sources/MarketData/       Yahoo Finance klient (chart, search, options + crumb), parser, modely
   Tests/                    unit testy + JSON fixtures
 .github/workflows/build.yml CI: swift test → xcodebuild → unsigned IPA artefakt
+CLAUDE.md                   konvence projektu pro další sezení
 ```
 
 ## Build
