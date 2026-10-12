@@ -7,6 +7,12 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
     case smaCross(fast: Int, slow: Int)
     case macdCross(fast: Int, slow: Int, signal: Int)
     case rsiReversion(period: Int, lower: Double, upper: Double)
+    /// Průraz hladiny a její retest (tolerance jako zlomek, 0.01 = 1 %).
+    case breakRetest(lookback: Int, retestBars: Int, tolerance: Double)
+    /// Obrat z přeprodanosti/překoupenosti potvrzený obratovou svíčkou.
+    case reversal(period: Int, lower: Double, upper: Double)
+    /// Odraz od klouzavého průměru ve směru trendu.
+    case maBounce(period: Int, trendPeriod: Int, tolerance: Double, exponential: Bool)
 
     public var name: String {
         switch self {
@@ -14,6 +20,40 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
         case .smaCross(let f, let s): return "SMA \(f)/\(s)"
         case .macdCross(let f, let s, let g): return "MACD \(f)/\(s)/\(g)"
         case .rsiReversion(let p, let lo, let hi): return "RSI \(p) (\(Int(lo))/\(Int(hi)))"
+        case .breakRetest(let n, let r, let tol):
+            return "Break & retest \(n) (retest \(r), \(Self.percent(tol)))"
+        case .reversal(let p, let lo, let hi): return "Reversal RSI \(p) (\(Int(lo))/\(Int(hi)))"
+        case .maBounce(let p, let t, let tol, let ema):
+            return "Odraz od \(ema ? "EMA" : "SMA") \(p) (trend \(t), \(Self.percent(tol)))"
+        }
+    }
+
+    static func percent(_ x: Double) -> String {
+        let value = x * 100
+        return value == value.rounded() ? "\(Int(value)) %" : String(format: "%.1f %%", value)
+    }
+
+    /// Strategie, které potřebují celé svíčky (open/high/low), ne jen zavírací ceny.
+    public var usesOHLC: Bool {
+        switch self {
+        case .breakRetest, .reversal, .maBounce: return true
+        default: return false
+        }
+    }
+
+    /// Cílová pozice po zavření každého baru ze svíček.
+    public func targets(bars: [BacktestBar], allowShort: Bool) -> [Int] {
+        switch self {
+        case .breakRetest(let lookback, let retestBars, let tolerance):
+            return PriceAction.breakRetest(bars, lookback: lookback, retestBars: retestBars,
+                                           tolerance: tolerance, allowShort: allowShort)
+        case .reversal(let period, let lower, let upper):
+            return PriceAction.reversal(bars, period: period, lower: lower, upper: upper, allowShort: allowShort)
+        case .maBounce(let period, let trendPeriod, let tolerance, let exponential):
+            return PriceAction.maBounce(bars, period: period, trendPeriod: trendPeriod, tolerance: tolerance,
+                                        exponential: exponential, allowShort: allowShort)
+        default:
+            return targets(closes: bars.map(\.close), allowShort: allowShort)
         }
     }
 
@@ -52,6 +92,15 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
                 }
                 return position
             }
+
+        case .breakRetest, .reversal, .maBounce:
+            // Potřebují OHLC – ze zavíracích cen se postaví „svíčky“ bez knotů.
+            let bars = closes.enumerated().map { i, c in
+                BacktestBar(date: Date(timeIntervalSince1970: Double(i) * 86_400),
+                            open: i > 0 ? closes[i - 1] : c, high: max(c, i > 0 ? closes[i - 1] : c),
+                            low: min(c, i > 0 ? closes[i - 1] : c), close: c)
+            }
+            return targets(bars: bars, allowShort: allowShort)
         }
     }
 }

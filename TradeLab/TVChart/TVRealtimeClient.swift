@@ -217,7 +217,7 @@ final class TVRealtimeClient: NSObject {
         }
     }
 
-    static func splitFrames(_ raw: String) -> [String] {
+    nonisolated static func splitFrames(_ raw: String) -> [String] {
         var out: [String] = []
         var rest = Substring(raw)
         while let open = rest.range(of: "~m~") {
@@ -273,7 +273,7 @@ final class TVRealtimeClient: NSObject {
     }
 
     /// Vytáhne bary z `{"m":"du"|"timescale_update","p":[session,{"sds_1":{"s":[{"v":[t,o,h,l,c,v]}]}}]}`
-    static func extractBars(from packet: [String: Any]) -> [Bar] {
+    nonisolated static func extractBars(from packet: [String: Any]) -> [Bar] {
         guard let p = packet["p"] as? [Any], p.count >= 2,
               let payload = p[1] as? [String: Any],
               let series = payload["sds_1"] as? [String: Any],

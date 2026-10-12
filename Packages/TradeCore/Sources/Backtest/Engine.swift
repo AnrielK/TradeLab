@@ -84,8 +84,7 @@ public enum BacktestEngine {
     /// Signál se vyhodnotí na zavírací ceně baru `i` a obchod proběhne
     /// za otevírací cenu baru `i + 1` – žádný pohled do budoucnosti.
     public static func run(bars: [BacktestBar], config: BacktestConfig) -> BacktestResult {
-        let closes = bars.map(\.close)
-        let targets = config.strategy.targets(closes: closes, allowShort: config.allowShort)
+        let targets = config.strategy.targets(bars: bars, allowShort: config.allowShort)
         let simulation = simulate(bars: bars, targets: targets, costBps: config.costBps,
                                   initialCapital: config.initialCapital)
         let metrics = Self.metrics(equity: simulation.equity, trades: simulation.trades,

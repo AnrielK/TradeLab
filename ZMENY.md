@@ -1,5 +1,20 @@
 # Změny
 
+## 0.9.0 – 2026-10-12
+
+- Backtest: nové price action strategie
+  - **Break & retest** – průraz rezistence (max. high za N svíček), retest prolomené hladiny do M svíček
+    s tolerancí a zavření nad ní; stop pod hladinou, trailing výstup pod low posledních N/2 svíček.
+  - **Reversal** – po přeprodanosti RSI býčí obratová svíčka (zelená, zavření nad high předchozí);
+    stop pod swing low, výstup při překoupenosti nebo medvědí obratové svíčce.
+  - **Odraz od klouzavého průměru** – v trendu (nad pomalým SMA, rostoucí průměr) dotyk EMA/SMA a zavření nad ní;
+    výstup při zavření pod průměrem.
+  - Všechny umí i zrcadlový short. Engine teď předává strategiím celé svíčky (OHLC).
+- Nastavení dat backtestu: **Yahoo** (denní, upraveno o dividendy) nebo **TradingView** s intervalem 1D / 1W / 4H / 1H
+  (jednorázové stažení přes websocket TradingView, úprava o dividendy, když ji server povolí, jinak splity).
+  Platí i pro srovnání se SPY a pro backtesty agenta a týmů.
+- Agent: `run_backtest` umí break_retest, reversal a ma_bounce a ve výsledku uvádí zdroj dat.
+
 ## 0.8.0 – 2026-10-12
 
 - **Týmy agentů** v záložce Agent (přepínač Chat / Tým), inspirované „swarm“ presety z Vibe-Trading.
