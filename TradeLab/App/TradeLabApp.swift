@@ -28,6 +28,7 @@ struct RootView: View {
                 .tabItem { Label("Kalkulačka", systemImage: "function") }
                 .tag(AppTab.calculator)
         }
+        .tabBarMinimizeBehavior(.onScrollDown)
         .task { await model.refreshRiskFreeRate() }
     }
 }

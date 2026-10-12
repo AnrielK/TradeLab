@@ -320,7 +320,8 @@ private struct MarkerTag: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 5)
         .padding(.vertical, 2)
-        .background(marker.isLong ? Color.green : Color.red, in: RoundedRectangle(cornerRadius: 4))
+        .glassEffect(.regular.tint((marker.isLong ? Color.green : Color.red).opacity(0.8)).interactive(),
+                     in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .scaleEffect(isDragging ? 1.15 : 1)
         .shadow(radius: isDragging ? 3 : 0)
     }

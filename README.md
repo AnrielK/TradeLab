@@ -1,6 +1,6 @@
 # TradeLab
 
-Osobní iOS aplikace (SwiftUI, iOS 17+) pro průzkum US akcií a opcí. Inspirováno projektem
+Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a opcí. Inspirováno projektem
 [Vibe-Trading](https://github.com/HKUDS/Vibe-Trading) – tahle verze běží čistě na iPhonu, bez serveru.
 
 ## Co umí (v0.1)

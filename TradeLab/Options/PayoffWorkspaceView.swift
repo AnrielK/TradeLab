@@ -75,7 +75,7 @@ struct PayoffWorkspaceView: View {
         if let quote = strategy.netQuote {
             NetQuoteBar(quote: quote)
                 .padding(10)
-                .background(Color(white: 0.13), in: RoundedRectangle(cornerRadius: 10))
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
 
         controls
@@ -223,7 +223,8 @@ struct PayoffWorkspaceView: View {
             Slider(value: $ivShiftPoints, in: -30...30, step: 1)
             HStack {
                 Spacer()
-                Button("Obnovit ceny") { run { await model.repriceStrategy() } }
+                Button("Obnovit ceny", systemImage: "arrow.clockwise") { run { await model.repriceStrategy() } }
+                    .buttonStyle(.glass)
                     .font(.caption2)
                     .disabled(!model.canAdjustFromChain || isBusy)
             }
@@ -263,10 +264,10 @@ struct ControlBox: View {
                     Image(systemName: right.icon).frame(width: 30, height: 24)
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.glass)
         }
         .padding(8)
         .frame(maxWidth: .infinity)
-        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }

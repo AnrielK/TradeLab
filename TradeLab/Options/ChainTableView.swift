@@ -46,6 +46,7 @@ struct ChainTableView: View {
                 .padding(.bottom, bottomPadding)
             }
             .refreshable { await store.refresh(rate: model.riskFreeRate) }
+            .scrollEdgeEffectStyle(.soft, for: .top)
         }
         .background(ChainTheme.row)
         .overlay {

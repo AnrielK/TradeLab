@@ -1,5 +1,12 @@
 # Změny
 
+## 0.4.0 – 2026-10-12
+
+- Liquid Glass (iOS 26+, minimální verze zvýšena z iOS 17): tiket, přepínač Tabulka/Payoff, tlačítko Strategie
+  a nastavení, panely a tlačítka payoffu, štítky striků v grafu, tlačítka v detailu a kalkulačce.
+- Tab bar se při scrollování dolů zmenší, měkký okraj scrollu pod hlavičkou tabulky.
+- Datové tabulky zůstávají neprůhledné kvůli čitelnosti.
+
 ## 0.3.2 – 2026-10-12
 
 - Tažení nohy v tabulce jako v tastytrade: noha se přesouvá živě (rámeček, tiket i ceny sledují prst),

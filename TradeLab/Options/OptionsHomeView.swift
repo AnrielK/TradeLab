@@ -96,56 +96,41 @@ struct StrategyMenuButton: View {
                 Image(systemName: "chevron.down").font(.caption2.weight(.bold))
             }
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Color(white: 0.25), in: RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 4)
+            // Pozadí dodá toolbar (Liquid Glass).
         }
         .disabled(model.templateExpiration == nil)
     }
 }
 
-/// Záložky „TABULKA / PAYOFF“ s podtržením jako v brokerské aplikaci.
+/// Přepínač TABULKA / PAYOFF – nativní segmentový ovladač (v iOS 26 Liquid Glass) a nastavení sloupců.
 struct ModeTabs: View {
     @Binding var mode: OptionsMode
     @AppStorage("chain.showDelta") private var showDelta = true
     @AppStorage("chain.showOI") private var showOpenInterest = true
 
     var body: some View {
-        HStack(spacing: 28) {
-            ForEach(OptionsMode.allCases) { item in
-                Button {
-                    mode = item
-                } label: {
-                    VStack(spacing: 6) {
-                        Text(item.rawValue.uppercased())
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(mode == item ? Color.primary : Color.secondary)
-                        Rectangle()
-                            .fill(mode == item ? Color.primary : Color.clear)
-                            .frame(height: 3)
-                    }
-                    .fixedSize()
+        HStack(spacing: 10) {
+            Picker("Režim", selection: $mode.animation(.smooth)) {
+                ForEach(OptionsMode.allCases) { item in
+                    Text(item.rawValue.uppercased()).tag(item)
                 }
-                .buttonStyle(.plain)
             }
-            Spacer()
-            if mode == .table {
-                Menu {
-                    Toggle("Delta", isOn: $showDelta)
-                    Toggle("Open interest", isOn: $showOpenInterest)
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.title3)
-                        .foregroundStyle(Color.secondary)
-                }
-                .padding(.bottom, 8)
+            .pickerStyle(.segmented)
+
+            Menu {
+                Toggle("Delta", isOn: $showDelta)
+                Toggle("Open interest", isOn: $showOpenInterest)
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 36, height: 36)
+                    .glassEffect(.regular.interactive(), in: Circle())
             }
+            .opacity(mode == .table ? 1 : 0)
+            .disabled(mode != .table)
         }
         .padding(.horizontal)
-        .padding(.top, 4)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Color.secondary.opacity(0.25)).frame(height: 1)
-        }
+        .padding(.vertical, 6)
     }
 }

@@ -34,8 +34,8 @@ struct TicketBar: View {
                     Image(systemName: collapsed ? "chevron.up" : "chevron.down")
                         .font(.footnote.weight(.bold))
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .contentShape(Rectangle())
             }
@@ -47,11 +47,10 @@ struct TicketBar: View {
                         model.clearStrategy()
                     } label: {
                         Image(systemName: "trash")
-                            .font(.title3)
-                            .foregroundStyle(Color(white: 0.85))
-                            .frame(width: 44, height: 44)
-                            .background(Color(white: 0.22), in: RoundedRectangle(cornerRadius: 8))
+                            .font(.body)
+                            .frame(width: 28, height: 28)
                     }
+                    .buttonStyle(.glass)
                     if let quote {
                         NetQuoteBar(quote: quote)
                     } else {
@@ -64,33 +63,27 @@ struct TicketBar: View {
                 .padding(.horizontal, 14)
                 .padding(.bottom, 10)
 
-                HStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        ForEach(strategy.legs) { leg in
-                            TicketLegRow(leg: leg)
-                        }
+                VStack(spacing: 0) {
+                    ForEach(strategy.legs) { leg in
+                        TicketLegRow(leg: leg)
                     }
-                    Button(action: onAnalyze) {
-                        VStack(spacing: 4) {
-                            Image(systemName: "chart.xyaxis.line")
-                            Text("Payoff")
-                                .underline()
-                        }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 84)
-                        .frame(maxHeight: .infinity)
-                        .background(ChainTheme.action)
-                    }
-                    .buttonStyle(.plain)
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(.horizontal, 10)
+
+                Button(action: onAnalyze) {
+                    Label("Payoff a úpravy", systemImage: "chart.xyaxis.line")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 2)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(ChainTheme.action)
+                .padding(10)
             }
         }
-        .background(Color(white: 0.13))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
-        .padding(.horizontal, 8)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .padding(.horizontal, 10)
         .padding(.bottom, 4)
     }
 }
@@ -110,10 +103,10 @@ struct NetQuoteBar: View {
                 Text("Ask")
             }
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Color(white: 0.75))
+            .foregroundStyle(.secondary)
 
             ZStack {
-                Rectangle().fill(Color(white: 0.35)).frame(height: 2)
+                Capsule().fill(Color.secondary.opacity(0.5)).frame(height: 2)
                 HStack {
                     dot
                     Spacer()
@@ -133,11 +126,11 @@ struct NetQuoteBar: View {
             .font(.system(size: 15))
             .monospacedDigit()
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
     }
 
     private var dot: some View {
-        Circle().fill(Color.white).frame(width: 6, height: 6)
+        Circle().fill(Color.primary).frame(width: 6, height: 6)
     }
 }
 
@@ -159,8 +152,8 @@ struct TicketLegRow: View {
             column("Strike", leg.instrument == .stock ? leg.strike.fixed(2) : leg.strike.strikeLabel)
             column("Typ", typeLabel)
         }
-        .frame(height: 46)
-        .background(Color(white: 0.17))
+        .frame(height: 42)
+        .background(Color.black.opacity(0.25))
         .overlay(alignment: .bottom) {
             Rectangle().fill(ChainTheme.separator).frame(height: 1)
         }

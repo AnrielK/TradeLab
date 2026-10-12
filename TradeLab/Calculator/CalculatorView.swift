@@ -38,6 +38,7 @@ struct CalculatorView: View {
                     Button("Použít aktuální sazbu \(model.riskFreeRate.percent)") {
                         ratePercent = model.riskFreeRate * 100
                     }
+                    .buttonStyle(.glass)
                 }
 
                 resultSection
@@ -82,6 +83,7 @@ struct CalculatorView: View {
                     Button("Použít jako volatilitu") {
                         volatilityPercent = (iv * 1000).rounded() / 10
                     }
+                    .buttonStyle(.glass)
                 } else {
                     Text("Cena je mimo arbitrážní meze – IV nelze spočítat.")
                         .foregroundStyle(.red)

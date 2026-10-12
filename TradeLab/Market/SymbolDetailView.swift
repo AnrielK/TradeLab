@@ -58,7 +58,10 @@ struct SymbolDetailView: View {
                     model.openOptions(for: symbol)
                 } label: {
                     Label("Opční řetězec", systemImage: "list.bullet.rectangle")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.glassProminent)
+                .listRowBackground(Color.clear)
             }
 
             if let errorMessage {
