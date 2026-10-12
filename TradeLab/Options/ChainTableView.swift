@@ -343,27 +343,29 @@ struct ChainLine: View {
                 case .inTheMoney(let spot):
                     ZStack {
                         Rectangle().fill(ChainTheme.itm).frame(height: 1)
-                        HStack(alignment: .bottom) {
+                        HStack {
+                            // Cally: ITM nad čarou, puty: ITM pod čarou.
                             HStack(spacing: 1) {
                                 Image(systemName: "arrowtriangle.up.fill")
                                 Text("ITM")
                             }
+                            .offset(y: -6)
                             Spacer()
                             HStack(spacing: 1) {
                                 Text("ITM")
                                 Image(systemName: "arrowtriangle.down.fill")
                             }
+                            .offset(y: 6)
                         }
                         .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(ChainTheme.itm)
                         .padding(.horizontal, 4)
-                        .offset(y: -6)
                         // Kapka aktuální ceny na pravém okraji sloupce striků (špička míří ke striku).
                         Image(systemName: "drop")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(ChainTheme.short)
                             .rotationEffect(.degrees(-90))
-                            .offset(x: StrikeRuler.markerOffset + 2)
+                            .offset(x: StrikeRuler.markerOffset + 7)
                             .accessibilityLabel("Spot \(spot.fixed(2))")
                     }
                 case .sigma:
@@ -405,7 +407,15 @@ struct StrikeRow: View {
     private var showsDetails: Bool { showDelta || showOpenInterest }
 
     @State private var dragOffset: CGSize = .zero
-    @State private var draggingType: OptionType?
+    /// Tažená noha – blok zůstává v původním řádku a jede s prstem, noha se přesouvá živě.
+    @State private var dragGhost: DragGhost?
+
+    private struct DragGhost {
+        let legID: UUID
+        let originType: OptionType
+    }
+
+    private var draggingType: OptionType? { dragGhost?.originType }
     private var rowHeight: CGFloat { showsDetails ? 42 : 34 }
 
     var body: some View {
@@ -481,19 +491,40 @@ struct StrikeRow: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(inTheMoney ? ChainTheme.rowInTheMoney : ChainTheme.row)
         .overlay(alignment: edge == .leading ? .leading : .trailing) {
-            if let position, let contract {
-                draggableBlock(quantity: position, type: contract.type)
+            if let info = blockInfo(side: edge == .leading ? .call : .put, position: position, contract: contract) {
+                draggableBlock(quantity: info.quantity, legID: info.legID, type: edge == .leading ? .call : .put)
             }
         }
     }
 
+    /// Co zobrazit v bloku: taženou nohu (v původním řádku) nebo nohu, která tu leží.
+    private func blockInfo(side type: OptionType, position: Int?, contract: OptionContract?) -> (quantity: Int, legID: UUID)? {
+        if let ghost = dragGhost, ghost.originType == type {
+            guard let leg = model.strategy.legs.first(where: { $0.id == ghost.legID }) else { return nil }
+            return (leg.side == .long ? leg.quantity : -leg.quantity, leg.id)
+        }
+        guard let position, let contract, let leg = model.leg(for: contract, expiration: chain.expiration),
+              leg.id != model.draggingLegID else { return nil }
+        return (position, leg.id)
+    }
+
     // MARK: - Tažení nohy (nahoru/dolů = strike, do strany = call ↔ put)
 
-    private func draggableBlock(quantity: Int, type: OptionType) -> some View {
+    private func draggableBlock(quantity: Int, legID: UUID, type: OptionType) -> some View {
         let isDragging = draggingType == type
+        let deleting = isDragging && inDeleteZone(type)
         return PositionBlock(quantity: quantity)
             .overlay(alignment: type == .call ? .trailing : .leading) {
-                if isDragging, let target = dragTarget(from: type) {
+                if deleting {
+                    Text("Smazat")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(ChainTheme.short, in: Capsule())
+                        .fixedSize()
+                        .offset(x: type == .call ? 52 : -52)
+                } else if isDragging, let target = dragTarget(from: type) {
                     Text("\(target.strike.strikeLabel) \(target.type == .call ? "C" : "P")")
                         .font(.system(size: 11, weight: .bold))
                         .monospacedDigit()
@@ -505,22 +536,39 @@ struct StrikeRow: View {
                         .offset(x: type == .call ? 48 : -48)
                 }
             }
+            .opacity(deleting ? 0.5 : 1)
             .scaleEffect(isDragging ? 1.12 : 1)
             .shadow(color: .black.opacity(isDragging ? 0.6 : 0), radius: 6)
             .offset(isDragging ? dragOffset : .zero)
             .highPriorityGesture(
                 DragGesture(minimumDistance: 3)
                     .onChanged { value in
-                        draggingType = type
+                        if dragGhost == nil {
+                            dragGhost = DragGhost(legID: legID, originType: type)
+                            model.draggingLegID = legID
+                        }
                         dragOffset = value.translation
+                        guard !inDeleteZone(type),
+                              let target = dragTarget(from: type),
+                              let destination = chain.contract(target.type, strike: target.strike) else { return }
+                        // Noha se přesouvá živě – tiket i rámeček sledují prst.
+                        model.moveLeg(id: legID, to: destination, chain: chain)
                     }
-                    .onEnded { value in
-                        dragOffset = value.translation
-                        commitDrag(from: type)
-                        draggingType = nil
+                    .onEnded { _ in
+                        if inDeleteZone(type) {
+                            model.deleteLeg(id: legID)
+                        }
+                        dragGhost = nil
                         dragOffset = .zero
+                        model.draggingLegID = nil
+                        model.saveStrategy()
                     }
             )
+    }
+
+    /// Tažení ven ze strany tabulky (call doleva, put doprava) nohu smaže.
+    private func inDeleteZone(_ type: OptionType) -> Bool {
+        type == .call ? dragOffset.width < -50 : dragOffset.width > 50
     }
 
     /// Cílový kontrakt podle posunu prstu: řádky = striky, přes polovinu = druhý typ.
@@ -533,15 +581,6 @@ struct StrikeRow: View {
         let steps = Int((dragOffset.height / rowHeight).rounded())
         let target = min(max(index + steps, 0), strikes.count - 1)
         return (strikes[target], targetType)
-    }
-
-    private func commitDrag(from type: OptionType) {
-        guard let target = dragTarget(from: type),
-              let original = chain.contract(type, strike: strike),
-              let leg = model.leg(for: original, expiration: chain.expiration),
-              let destination = chain.contract(target.type, strike: target.strike),
-              destination.id != original.id else { return }
-        model.moveLeg(id: leg.id, to: destination, chain: chain)
     }
 
     private func details(_ contract: OptionContract?) -> (delta: String, openInterest: String) {

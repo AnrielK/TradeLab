@@ -172,6 +172,9 @@ final class AppModel {
         return leg.side == .long ? leg.quantity : -leg.quantity
     }
 
+    /// Noha, kterou uživatel právě táhne v tabulce.
+    var draggingLegID: UUID? = nil
+
     func leg(for contract: OptionContract, expiration: Date) -> StrategyLeg? {
         let instrument: LegInstrument = contract.type == .call ? .call : .put
         return strategy.legs.first {
@@ -185,6 +188,7 @@ final class AppModel {
         let old = strategy.legs[index]
         var moved = chain.leg(for: contract, side: old.side, quantity: old.quantity, rate: riskFreeRate)
         moved.id = old.id
+        guard !old.isSameContract(as: moved) else { return }
         guard !strategy.legs.contains(where: { $0.id != id && $0.isSameContract(as: moved) }) else { return }
         strategy.legs[index] = moved
         renameStrategy()

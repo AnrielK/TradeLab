@@ -1,5 +1,11 @@
 # Změny
 
+## 0.3.2 – 2026-10-12
+
+- Tažení nohy v tabulce jako v tastytrade: noha se přesouvá živě (rámeček, tiket i ceny sledují prst),
+  přes střed na call ↔ put, vytažením ven ze strany tabulky se noha smaže.
+- ITM u putů pod čarou, kapka spotu špičkou na stupnici.
+
 ## 0.3.1 – 2026-10-12
 
 - Vybranou nohu v tabulce jde táhnout za barevný blok: nahoru/dolů na jiný strike, do strany přes střed na call ↔ put
