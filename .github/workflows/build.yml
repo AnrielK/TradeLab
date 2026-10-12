@@ -15,21 +15,27 @@ jobs:
     name: Testy jádra (TradeCore)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
       - name: Swift test
-        run: swift test --package-path Packages/TradeCore
+        run: |
+          set -o pipefail
+          swift test --package-path Packages/TradeCore 2>&1 | tee swift-test.log
+
+      - name: Chyby jako anotace
+        if: failure()
+        run: .github/scripts/annotate.sh swift-test.log
 
   ios-build:
     name: iOS build (unsigned IPA)
     needs: core-tests
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -55,6 +61,10 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             build 2>&1 | tee xcodebuild.log
+
+      - name: Chyby jako anotace
+        if: failure()
+        run: .github/scripts/annotate.sh xcodebuild.log
 
       - name: Zabalit IPA
         run: |
