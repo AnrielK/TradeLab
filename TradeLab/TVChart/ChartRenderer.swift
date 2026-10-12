@@ -479,6 +479,14 @@ enum ChartRenderer {
         }
     }
 
+    /// Popisek čáry od agenta (text začíná „AI“), malým písmem nad čarou.
+    static func drawLineLabel(_ ctx: inout GraphicsContext, _ d: Drawing, at point: CGPoint, color: Color) {
+        guard let text = d.text, text.hasPrefix("AI") else { return }
+        let label = text.hasPrefix("AI · ") ? String(text.dropFirst(5)) : text
+        ctx.draw(Text(label).font(.system(size: 10, weight: .semibold)).foregroundColor(color.opacity(0.9)),
+                 at: CGPoint(x: point.x, y: point.y - 3), anchor: .bottomLeading)
+    }
+
     static func drawOne(_ ctx: inout GraphicsContext, geo: ChartGeometry,
                         drawing d: Drawing, selected: Bool) {
         let pts = d.points.map { CGPoint(x: geo.x(forTime: $0.time), y: geo.y(for: $0.price)) }
@@ -494,7 +502,8 @@ enum ChartRenderer {
         if kind != .hline, kind != .hray, kind != .fib {
             let minX = pts.map(\.x).min() ?? 0
             let maxX = pts.map(\.x).max() ?? 0
-            if maxX < 0 || minX > geo.plotWidth { return }
+            // Paprsek pokračuje doprava, takže je vidět i se starými kotvami.
+            if (maxX < 0 && kind != .ray) || minX > geo.plotWidth { return }
         }
 
         switch kind {
@@ -519,6 +528,7 @@ enum ChartRenderer {
                               y: pts[0].y + dir.y / len * 4000)
             var p = Path(); p.move(to: pts[0]); p.addLine(to: far)
             ctx.stroke(p, with: .color(color), style: stroke)
+            drawLineLabel(&ctx, d, at: CGPoint(x: max(pts[1].x, 8), y: pts[1].y), color: color)
 
         case .arrow:
             guard pts.count > 1 else { break }
@@ -532,6 +542,7 @@ enum ChartRenderer {
             p.move(to: CGPoint(x: d.tool == DrawToolKind.hray.rawValue ? pts[0].x : 0, y: y))
             p.addLine(to: CGPoint(x: geo.plotWidth, y: y))
             ctx.stroke(p, with: .color(color), style: stroke)
+            drawLineLabel(&ctx, d, at: CGPoint(x: 8, y: y), color: color)
 
         case .vline:
             var p = Path()

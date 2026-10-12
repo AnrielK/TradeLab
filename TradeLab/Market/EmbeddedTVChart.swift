@@ -130,6 +130,9 @@ struct EmbeddedTVChart: View {
         }
         .onChange(of: priceLines) { _, lines in vm.priceLines = lines }
         .onChange(of: chartKind) { _, kind in vm.setChartKind(kind) }
+        .onReceive(NotificationCenter.default.publisher(for: .chartDrawingsChanged)) { _ in
+            vm.reloadDrawingsFromStorage()
+        }
         .onChange(of: spanRaw) { _, _ in apply(span, reconnect: true) }
         .onChange(of: showFullScreen) { _, shown in
             // Plný graf má vlastní spojení – vložený mezitím odpojíme.

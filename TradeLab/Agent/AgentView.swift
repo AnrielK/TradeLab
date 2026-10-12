@@ -23,6 +23,7 @@ struct AgentView: View {
         "Navrhni bull put spread na SPY s expirací kolem 30 dní a spočítej riziko.",
         "Backtest SMA 50/200 na QQQ za 10 let proti buy & hold.",
         "Zhodnoť moji aktuální opční pozici.",
+        "Zakresli do grafu NVDA silné supporty, rezistence a trendlinie z 1W, 1D a 4H.",
     ]
 
     @AppStorage("agent.mode") private var mode: AgentMode = .chat
@@ -77,6 +78,9 @@ struct AgentView: View {
                         let results = agent.toolResults
                         ForEach(Array(agent.messages.enumerated()), id: \.element.id) { index, message in
                             MessageView(message: message)
+                            if let drawing = agent.chartDrawing(endingAt: index, results: results) {
+                                ChartDrawingCard(info: drawing)
+                            }
                             if let proposal = agent.proposal(endingAt: index, results: results) {
                                 StrategyProposalCard(proposal: proposal)
                             }
@@ -256,6 +260,8 @@ struct ToolChip: View {
         case "analyze_strategy": return "Analýza strategie"
         case "get_current_position": return "Aktuální pozice"
         case "run_backtest": return "Backtest"
+        case "find_levels": return "Hladiny"
+        case "draw_on_chart": return "Kreslení do grafu"
         default: return name
         }
     }
@@ -267,6 +273,9 @@ struct ToolChip: View {
         if let symbol = input["symbol"]?.stringValue { parts.append(symbol.uppercased()) }
         if let expiration = input["expiration"]?.stringValue { parts.append(expiration) }
         if let strategy = input["strategy"]?.stringValue { parts.append(strategy) }
+        if let timeframe = input["timeframe"]?.stringValue { parts.append(timeframe) }
+        if let levels = input["levels"]?.arrayValue { parts.append("\(levels.count) hl.") }
+        if let lines = input["trendlines"]?.arrayValue { parts.append("\(lines.count) TL") }
         if let legs = input["legs"]?.arrayValue { parts.append("\(legs.count) noh\(legs.count == 1 ? "a" : (legs.count < 5 ? "y" : ""))") }
         if input["apply_to_app"]?.boolValue == true { parts.append("→ aplikace") }
         return parts.joined(separator: " · ")
@@ -323,6 +332,55 @@ struct ToolChip: View {
                 .foregroundStyle(result.isError ? .red : .green)
         } else {
             Image(systemName: "wrench.and.screwdriver").foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Kresby v grafu
+
+struct ChartDrawingCard: View {
+    let info: ChartDrawingInfo
+    @State private var showChart = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Label("Zakresleno do grafu", systemImage: "chart.line.text.clipboard")
+                    .font(.headline)
+                Spacer()
+                Text(info.tvSymbol).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 14) {
+                if info.levels > 0 {
+                    Label("\(info.levels) hladin", systemImage: "line.horizontal.3")
+                }
+                if info.trendLines > 0 {
+                    Label("\(info.trendLines) trendlinií", systemImage: "line.diagonal")
+                }
+                if !info.timeframes.isEmpty {
+                    Text(info.timeframes.joined(separator: " · ")).foregroundStyle(.secondary)
+                }
+            }
+            .font(.footnote)
+
+            Button {
+                showChart = true
+            } label: {
+                Label("Otevřít graf", systemImage: "arrow.up.left.and.arrow.down.right")
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+
+            Text("Zelená = support, červená = rezistence. Týdenní čáry jsou nejsilnější, 4H čárkované. Kresby najdeš i v seznamu objektů grafu a v detailu tickeru.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor.opacity(0.35)))
+        .fullScreenCover(isPresented: $showChart) {
+            TVChartScreen(initialSymbol: info.tvSymbol, initialResolution: info.resolution)
         }
     }
 }

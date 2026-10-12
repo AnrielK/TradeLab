@@ -759,6 +759,14 @@ final class ChartViewModel {
     /// platit napříč všemi rozlišeními.
     private var drawingsKey: String { "drawings::\(symbol)" }
 
+    /// Znovu načte kresby z úložiště (agent je mezitím mohl změnit).
+    func reloadDrawingsFromStorage() {
+        guard hasRestored,
+              let data = UserDefaults.standard.data(forKey: drawingsKey),
+              let saved = try? JSONDecoder().decode([Drawing].self, from: data) else { return }
+        drawings = saved
+    }
+
     func saveDrawings() {
         guard hasRestored else { return }
         guard let data = try? JSONEncoder().encode(drawings) else { return }

@@ -1,5 +1,18 @@
 # Změny
 
+## 0.10.0 – 2026-10-12
+
+- Agent kreslí do grafu **supporty, rezistence a trendové linie** z 1W, 1D a 4H:
+  - nástroj `find_levels` najde silné hladiny (shluky swingových maxim/minim, síla podle počtu dotyků a čerstvosti)
+    a trendové linie přes swingy, které zavírací cena neprorazila – na stejných svíčkách TradingView jako graf;
+  - nástroj `draw_on_chart` zakreslí vybrané: zelená support, červená rezistence, trendlinie jako paprsek,
+    týdenní nejsilnější, 4H čárkovaně, s popiskem; dřívější kresby agenta nahradí, uživatelovy nechá;
+  - pod odpovědí karta **Otevřít graf** (plný TVChart na timeframu kreseb). Kresby jsou i v detailu tickeru
+    a v seznamu objektů grafu (zamčené, jdou skrýt nebo smazat).
+- Technický analytik a analytik směru v týmech používají `find_levels`.
+- Graf: paprsky zůstávají vidět i se starými kotvami, popisky čar od agenta.
+- Jádro: `LevelFinder` (pivoty, ATR, shlukování hladin, trendové linie) s testy.
+
 ## 0.9.0 – 2026-10-12
 
 - Backtest: nové price action strategie

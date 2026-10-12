@@ -22,9 +22,10 @@ enum TeamPresets {
                     id: "technical", name: "Technický analytik", icon: "chart.line.uptrend.xyaxis",
                     instructions: """
                     Posuď trend a momentum: cena vůči SMA 20/50/200, RSI, MACD, výnosy 1M–1R, 52týdenní maximum a minimum \
-                    jako orientační hladiny, realizovaná volatilita. Závěr: býčí / neutrální / medvědí technický obraz a proč.
+                    jako orientační hladiny, realizovaná volatilita. Silné supporty, rezistence a trendové linie zjisti \
+                    přes find_levels (1W a 1D). Závěr: býčí / neutrální / medvědí technický obraz a proč.
                     """,
-                    tools: ["get_quote", "get_price_history"]),
+                    tools: ["get_quote", "get_price_history", "find_levels"]),
                 TeamRole(
                     id: "options", name: "Analytik opčního trhu", icon: "waveform.path.ecg",
                     instructions: """
@@ -87,7 +88,7 @@ enum TeamPresets {
                     Urči směrový sklon a klíčové hladiny (SMA, 52týdenní extrémy, RSI, MACD) a jak velký pohyb je \
                     realistický do 30–45 dní. Zohledni názor uživatele, pokud ho uvedl.
                     """,
-                    tools: ["get_quote", "get_price_history"], maxTurns: 6),
+                    tools: ["get_quote", "get_price_history", "find_levels"], maxTurns: 6),
             ]),
             TeamStage([
                 TeamRole(

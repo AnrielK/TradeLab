@@ -25,6 +25,8 @@ struct WheelSelection: Equatable {
 struct TVChartScreen: View {
     /// Ticker z TradeLabu (např. „NVDA“); burzu doplní `SymbolResolver`.
     var initialSymbol: String? = nil
+    /// Interval při otevření (např. „1D“, „1W“, „240“) – jinak poslední použitý.
+    var initialResolution: String? = nil
 
     @State private var vm = ChartViewModel()
     @State private var wheel: WheelSelection?
@@ -69,7 +71,11 @@ struct TVChartScreen: View {
                     vm.symbol = initialSymbol.uppercased()
                 }
             }
+            if let initialResolution { vm.resolution = initialResolution }
             vm.connect()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .chartDrawingsChanged)) { _ in
+            vm.reloadDrawingsFromStorage()
         }
         .onDisappear {
             vm.saveDrawings()

@@ -105,6 +105,53 @@ enum AgentToolbox {
             ) { _ in await currentPosition(model: model) },
 
             AgentTool(
+                name: "find_levels",
+                description: """
+                Najde silné horizontální supporty a rezistence (shluky swingových maxim a minim, síla podle počtu dotyků \
+                a čerstvosti) a trendové linie (přes swingová minima/maxima, které zavírací cena neprorazila) na \
+                svíčkách 1W, 1D nebo 4H stejných jako v grafu aplikace (TradingView). Časy jsou v UTC. \
+                draw: true rovnou zakreslí všechny nalezené (nahradí dřívější kresby agenta v tomto timeframu); \
+                pro výběr jen těch nejdůležitějších použij místo toho draw_on_chart.
+                """,
+                inputSchema: Schema.object([
+                    "symbol": Schema.string("Ticker"),
+                    "timeframe": Schema.string("Časový rámec", enum: LevelTimeframe.allCases.map(\.rawValue)),
+                    "max_levels": Schema.integer("Max. počet horizontálních hladin (výchozí 6)"),
+                    "draw": Schema.boolean("Zakreslit vše nalezené do grafu (výchozí false)"),
+                ], required: ["symbol", "timeframe"])
+            ) { input in try await findLevels(input, model: model) },
+
+            AgentTool(
+                name: "draw_on_chart",
+                description: """
+                Zakreslí do grafu tickeru (TradingView graf v aplikaci) vybrané hladiny a trendové linie. \
+                Hladina = vodorovná čára (zelená support, červená rezistence), trendová linie = paprsek přes dva body \
+                (start a end, čas „YYYY-MM-DD HH:mm“ v UTC nebo „YYYY-MM-DD“). Tloušťka podle timeframe (1W nejsilnější, \
+                4H čárkovaně). replace: true (výchozí) nejdřív smaže všechny dřívější kresby agenta u tickeru; \
+                prázdné seznamy s replace: true kresby agenta jen smažou. Uživatelovy vlastní kresby zůstanou.
+                """,
+                inputSchema: Schema.object([
+                    "symbol": Schema.string("Ticker"),
+                    "levels": Schema.array("Horizontální hladiny", items: Schema.object([
+                        "price": Schema.number("Cena"),
+                        "kind": Schema.string("support nebo resistance", enum: ["support", "resistance"]),
+                        "timeframe": Schema.string("Odkud hladina je", enum: LevelTimeframe.allCases.map(\.rawValue)),
+                        "label": Schema.string("Krátká poznámka (volitelné), např. „3 dotyky“"),
+                    ], required: ["price", "kind", "timeframe"])),
+                    "trendlines": Schema.array("Trendové linie", items: Schema.object([
+                        "kind": Schema.string("support nebo resistance", enum: ["support", "resistance"]),
+                        "timeframe": Schema.string("Odkud linie je", enum: LevelTimeframe.allCases.map(\.rawValue)),
+                        "start_time": Schema.string("Čas prvního bodu"),
+                        "start_price": Schema.number("Cena prvního bodu"),
+                        "end_time": Schema.string("Čas druhého bodu"),
+                        "end_price": Schema.number("Cena druhého bodu"),
+                        "label": Schema.string("Krátká poznámka (volitelné)"),
+                    ], required: ["kind", "timeframe", "start_time", "start_price", "end_time", "end_price"])),
+                    "replace": Schema.boolean("Smazat dřívější kresby agenta (výchozí true)"),
+                ], required: ["symbol"])
+            ) { input in try await drawOnChart(input, model: model) },
+
+            AgentTool(
                 name: "run_backtest",
                 description: """
                 Backtest pravidla (signál ze zavírací ceny svíčky, obchod za otevírací cenu další svíčky) a srovnání \
@@ -537,6 +584,130 @@ enum AgentToolbox {
             result["net_quote_per_spread"] = ["natural": num(q.natural), "mid": num(q.mid), "opposite": num(q.opposite)]
         }
         return result
+    }
+
+    // MARK: - Hladiny a graf
+
+    static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f
+    }()
+
+    static func parseTime(_ text: String?) -> Date? {
+        guard let text = text?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return nil }
+        let normalized = text.replacingOccurrences(of: "T", with: " ").replacingOccurrences(of: "Z", with: "")
+        if let date = timeFormatter.date(from: String(normalized.prefix(16))) { return date }
+        return dayFormatter.date(from: String(normalized.prefix(10)))
+    }
+
+    static func findLevels(_ input: JSONValue, model: AppModel) async throws -> String {
+        let s = try symbol(input)
+        guard let timeframe = input["timeframe"]?.stringValue.flatMap(LevelTimeframe.init(rawValue:)) else {
+            throw ToolError("timeframe musí být 1W, 1D nebo 4H.")
+        }
+        let series = try await ChartAnnotations.bars(symbol: s, timeframe: timeframe, client: model.client)
+        guard series.bars.count > 30 else { throw ToolError("Málo svíček (\(series.bars.count)).") }
+        let maxLevels = min(max(input["max_levels"]?.intValue ?? 6, 1), 12)
+        let analysis = LevelFinder.analyze(series.bars, window: timeframe.pivotWindow, maxLevels: maxLevels)
+        let close = analysis.lastClose
+
+        let levels: [JSONValue] = analysis.levels.map { level in
+            [
+                "price": num(level.price),
+                "kind": .string(level.kind.rawValue),
+                "touches": .number(Double(level.touches)),
+                "strength": num(level.strength),
+                "first_touch": .string(timeFormatter.string(from: level.firstTouch)),
+                "last_touch": .string(timeFormatter.string(from: level.lastTouch)),
+                "distance_pct": pct(level.price / close - 1),
+            ]
+        }
+        let lines: [JSONValue] = analysis.trendLines.map { line in
+            [
+                "kind": .string(line.kind.rawValue),
+                "direction": .string(line.isRising ? "rising" : "falling"),
+                "start_time": .string(timeFormatter.string(from: line.startDate)),
+                "start_price": num(line.startPrice),
+                "end_time": .string(timeFormatter.string(from: line.endDate)),
+                "end_price": num(line.endPrice),
+                "price_now": num(line.priceNow),
+                "touches": .number(Double(line.touches)),
+                "strength": num(line.strength),
+                "distance_pct": pct(line.priceNow / close - 1),
+            ]
+        }
+
+        var drawn = 0
+        if input["draw"]?.boolValue == true {
+            let drawings = analysis.levels.map {
+                ChartAnnotations.level(price: $0.price, kind: $0.kind, timeframe: timeframe, note: "\($0.touches)×")
+            } + analysis.trendLines.map {
+                ChartAnnotations.trendLine(kind: $0.kind, timeframe: timeframe, start: ($0.startDate, $0.startPrice),
+                                           end: ($0.endDate, $0.endPrice), note: "\($0.touches)×")
+            }
+            ChartAnnotations.write(series.tvSymbol, adding: drawings) {
+                ChartAnnotations.timeframe(of: $0) == timeframe.rawValue
+            }
+            drawn = drawings.count
+        }
+
+        let result: [String: JSONValue] = [
+            "symbol": .string(series.tvSymbol),
+            "timeframe": .string(timeframe.rawValue),
+            "source": .string(series.source),
+            "bars": .number(Double(series.bars.count)),
+            "from": .string(timeFormatter.string(from: series.bars[0].date)),
+            "to": .string(timeFormatter.string(from: series.bars[series.bars.count - 1].date)),
+            "last_close": num(close),
+            "atr": num(analysis.atr),
+            "levels": .array(levels),
+            "trendlines": .array(lines),
+            "drawn": .number(Double(drawn)),
+        ]
+        return output(.object(result))
+    }
+
+    static func drawOnChart(_ input: JSONValue, model: AppModel) async throws -> String {
+        let s = try symbol(input)
+        guard let tvSymbol = await SymbolResolver.shared.resolve(s) else { throw ToolError("Ticker \(s) na TradingView nenalezen.") }
+        var drawings: [Drawing] = []
+        var timeframes = Set<String>()
+
+        for (i, level) in (input["levels"]?.arrayValue ?? []).enumerated() {
+            guard let price = level["price"]?.doubleValue, price > 0 else { throw ToolError("Hladina \(i + 1): chybí price.") }
+            let kind: PriceLevel.Kind = level["kind"]?.stringValue == "resistance" ? .resistance : .support
+            let tf = level["timeframe"]?.stringValue.flatMap(LevelTimeframe.init(rawValue:)) ?? .day
+            timeframes.insert(tf.rawValue)
+            drawings.append(ChartAnnotations.level(price: price, kind: kind, timeframe: tf, note: level["label"]?.stringValue))
+        }
+        for (i, line) in (input["trendlines"]?.arrayValue ?? []).enumerated() {
+            guard let start = parseTime(line["start_time"]?.stringValue), let startPrice = line["start_price"]?.doubleValue,
+                  let end = parseTime(line["end_time"]?.stringValue), let endPrice = line["end_price"]?.doubleValue else {
+                throw ToolError("Trendlinie \(i + 1): chybí nebo je neplatný start/end (čas YYYY-MM-DD HH:mm).")
+            }
+            guard end > start else { throw ToolError("Trendlinie \(i + 1): end_time musí být po start_time.") }
+            let kind: PriceLevel.Kind = line["kind"]?.stringValue == "resistance" ? .resistance : .support
+            let tf = line["timeframe"]?.stringValue.flatMap(LevelTimeframe.init(rawValue:)) ?? .day
+            timeframes.insert(tf.rawValue)
+            drawings.append(ChartAnnotations.trendLine(kind: kind, timeframe: tf, start: (start, startPrice),
+                                                       end: (end, endPrice), note: line["label"]?.stringValue))
+        }
+
+        let replace = input["replace"]?.boolValue ?? true
+        ChartAnnotations.write(tvSymbol, adding: drawings) { _ in replace }
+        let result: [String: JSONValue] = [
+            "symbol": .string(tvSymbol),
+            "drawn_levels": .number(Double(input["levels"]?.arrayValue?.count ?? 0)),
+            "drawn_trendlines": .number(Double(input["trendlines"]?.arrayValue?.count ?? 0)),
+            "timeframes": .array(timeframes.sorted().map { .string($0) }),
+            "replaced_previous": .bool(replace),
+            "note": "Kresby jsou v grafu tickeru (detail na záložce Trh i plný graf), uživatel je vidí v seznamu objektů.",
+        ]
+        return output(.object(result))
     }
 
     // MARK: - Backtest

@@ -110,9 +110,15 @@ enum TVHistory {
         var bars: [Bar]
     }
 
-    static func fetch(symbol rawSymbol: String, resolution: String, count: Int) async throws -> Result {
+    /// - Parameter preferDividends: ceny upravené o dividendy (backtest); `false` = jen splity jako v grafu.
+    static func fetch(symbol rawSymbol: String, resolution: String, count: Int,
+                      preferDividends: Bool = true) async throws -> Result {
         guard let symbol = await SymbolResolver.shared.resolve(rawSymbol) else {
             throw TVError.symbolNotFound(rawSymbol)
+        }
+        guard preferDividends else {
+            let bars = try await load(symbol: symbol, resolution: resolution, count: count, adjustment: "splits")
+            return Result(symbol: symbol, adjustment: "splits", bars: bars)
         }
         do {
             let bars = try await load(symbol: symbol, resolution: resolution, count: count, adjustment: "dividends")
