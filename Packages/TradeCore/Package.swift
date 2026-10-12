@@ -7,10 +7,13 @@ let package = Package(
     products: [
         .library(name: "OptionsMath", targets: ["OptionsMath"]),
         .library(name: "MarketData", targets: ["MarketData"]),
+        .library(name: "Backtest", targets: ["Backtest"]),
     ],
     targets: [
         .target(name: "OptionsMath"),
         .target(name: "MarketData", dependencies: ["OptionsMath"]),
+        .target(name: "Backtest"),
+        .testTarget(name: "BacktestTests", dependencies: ["Backtest"]),
         .testTarget(name: "OptionsMathTests", dependencies: ["OptionsMath"]),
         .testTarget(
             name: "MarketDataTests",
