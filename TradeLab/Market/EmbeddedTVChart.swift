@@ -16,12 +16,13 @@ enum DetailChartSpan: String, CaseIterable, Identifiable {
     /// Interval svíček pro dané období.
     var resolution: String {
         switch self {
-        case .day: return "5"
-        case .fiveDays: return "15"
-        case .month: return "60"
-        case .threeMonths, .yearToDate: return "1D"
-        case .year, .fiveYears: return "1W"
-        case .all: return "1M"
+        case .day: return "15"
+        case .fiveDays: return "120"
+        case .month: return "240"
+        case .threeMonths: return "1D"
+        case .yearToDate, .year: return "1W"
+        case .fiveYears: return "1M"
+        case .all: return "3M"
         }
     }
 
@@ -41,13 +42,10 @@ enum DetailChartSpan: String, CaseIterable, Identifiable {
 
     var historyBars: Int {
         switch self {
-        case .day, .fiveDays: return 300
-        case .month: return 400
-        case .threeMonths: return 200
-        case .yearToDate: return 300
-        case .year: return 120
-        case .fiveYears: return 300
-        case .all: return 400
+        case .day: return 300
+        case .fiveDays, .month, .threeMonths: return 200
+        case .yearToDate, .year, .fiveYears: return 150
+        case .all: return 250
         }
     }
 }
@@ -70,6 +68,7 @@ struct EmbeddedTVChart: View {
         let vm = ChartViewModel()
         vm.indicatorsEnabled = false
         vm.persistsSession = false
+        vm.showsLegend = false
         return vm
     }
 

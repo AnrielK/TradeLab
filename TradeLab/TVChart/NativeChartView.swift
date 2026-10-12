@@ -130,7 +130,9 @@ struct NativeChartView: View {
         // Bez tohohle SwiftUI animuje každý mezikrok změny velikosti zvlášť
         // a otáčení působí pomalu.
         .animation(nil, value: canvasSize)
-        .overlay(alignment: .topLeading) { legend }
+        .overlay(alignment: .topLeading) {
+            if vm.showsLegend { legend }
+        }
         .alert("Text", isPresented: $textPrompt) {
             TextField("Popisek", text: $textInput)
             Button("Přidat") { commitText() }

@@ -1,5 +1,10 @@
 # Změny
 
+## 0.13.2 – 2026-10-13
+
+- Graf v detailu tickeru je čistý: bez hlavičky s tickerem, změnou, OHLC a stavem připojení.
+- Svíčky podle období: 1D → 15 min, 5D → 2H, 1M → 4H, 3M → 1D, YTD a 1Y → 1W, 5Y → 1M, Vše → 3M.
+
 ## 0.13.1 – 2026-10-13
 
 - Čáry od agenta v grafu jsou přehlednější: tlumené barvy (support šalvějově zelená, rezistence terakotová,

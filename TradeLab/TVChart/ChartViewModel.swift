@@ -28,6 +28,8 @@ final class ChartViewModel {
     }
     /// Vodorovné čáry dodané zvenku (striky a break-even opční pozice).
     var priceLines: [ChartPriceLine] = []
+    /// Hlavička s tickerem, změnou, OHLC a stavem (vložený graf ji skrývá).
+    var showsLegend = true
     /// Zapisovat symbol/interval/historii do UserDefaults? Vložený graf nemá
     /// přepisovat poslední stav celoobrazovkového grafu.
     var persistsSession = true
