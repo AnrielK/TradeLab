@@ -54,7 +54,15 @@ final class BlackScholesTests: XCTestCase {
                     let price = BlackScholes.price(type, p)
                     guard price > 1e-4 else { continue }
                     let iv = try XCTUnwrap(ImpliedVolatility.solve(type, price: price, spot: 100, strike: strike, years: 0.25, rate: 0.04))
-                    XCTAssertEqual(iv, vol, accuracy: 1e-4, "\(type) K=\(strike) σ=\(vol)")
+                    // Zpětné ocenění musí sedět vždy.
+                    var repriced = p
+                    repriced.volatility = iv
+                    XCTAssertEqual(BlackScholes.price(type, repriced), price, accuracy: 1e-6, "\(type) K=\(strike) σ=\(vol)")
+                    // Samotná σ je určená jen tam, kde cena na volatilitu reaguje
+                    // (hluboko ITM opce s nízkou σ mají vegu prakticky nulovou).
+                    if BlackScholes.greeks(type, p).vega > 0.01 {
+                        XCTAssertEqual(iv, vol, accuracy: 1e-4, "\(type) K=\(strike) σ=\(vol)")
+                    }
                 }
             }
         }
