@@ -12,6 +12,7 @@ Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a o
   graf P/L při expiraci i „dnes / za N dní“ s posunem IV, max. zisk/ztráta, break-even,
   pravděpodobnost zisku, Greeks celé pozice.
 - **Graf TradingView** – převzatý TVChart (real-time data, indikátory, kreslení) na celou obrazovku.
+- **Backtest** – SMA/MACD/RSI/buy & hold na denních datech, metriky, křivka kapitálu vs. SPY, drawdown, obchody.
 - **Kalkulačka** – Black-Scholes cena + Greeks, výpočet implikované volatility z tržní ceny.
 - Bezriziková sazba se načítá z 13týdenních T-bills (`^IRX`).
 
@@ -57,7 +58,7 @@ GitHub Actions při každém pushi na `main` spustí testy a sestaví `TradeLab-
 ## Plán
 
 1. ~~Datová vrstva + opční modul~~
-2. Backtester (vektorový engine, SMA/MACD/RSI, Sharpe, drawdown, porovnání se SPY)
+2. ~~Backtester~~ (vektorový engine, SMA/MACD/RSI, Sharpe, drawdown, porovnání se SPY)
 3. Agent nad Claude API (tool use nad moduly výše)
 4. Multi-agentní týmy (investiční výbor, opční desk) jako konfigurovatelné presety
 5. Volitelně: Mac server s Vibe-Trading (Alpha Zoo, Shadow Account)

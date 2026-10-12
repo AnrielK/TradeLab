@@ -37,14 +37,23 @@ public actor YahooFinanceClient {
     // MARK: - Veřejné API
 
     public func chart(symbol: String, range: ChartRange) async throws -> ChartData {
-        let key = "\(symbol.uppercased())|\(range.rawValue)"
+        try await chart(symbol: symbol, range: range.rawValue, interval: range.interval)
+    }
+
+    /// Denní historie pro backtest (1 rok až celá historie).
+    public func dailyHistory(symbol: String, range: HistoryRange) async throws -> ChartData {
+        try await chart(symbol: symbol, range: range.rawValue, interval: "1d")
+    }
+
+    func chart(symbol: String, range: String, interval: String) async throws -> ChartData {
+        let key = "\(symbol.uppercased())|\(range)|\(interval)"
         if let cached = chartCache[key], Date().timeIntervalSince(cached.stamp) < cacheTTL {
             return cached.value
         }
         var components = URLComponents(string: "https://query1.finance.yahoo.com/v8/finance/chart/\(Self.encodePath(symbol))")!
         components.queryItems = [
-            URLQueryItem(name: "range", value: range.rawValue),
-            URLQueryItem(name: "interval", value: range.interval),
+            URLQueryItem(name: "range", value: range),
+            URLQueryItem(name: "interval", value: interval),
             URLQueryItem(name: "includeAdjustedClose", value: "true"),
         ]
         let data = try await get(components.url!)

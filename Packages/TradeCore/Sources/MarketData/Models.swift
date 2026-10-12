@@ -93,6 +93,27 @@ public enum ChartRange: String, CaseIterable, Identifiable, Sendable {
     public static var chartable: [ChartRange] { [.oneMonth, .threeMonths, .sixMonths, .oneYear, .twoYears, .fiveYears] }
 }
 
+/// Délka denní historie (Yahoo `range`).
+public enum HistoryRange: String, CaseIterable, Identifiable, Sendable {
+    case oneYear = "1y"
+    case twoYears = "2y"
+    case fiveYears = "5y"
+    case tenYears = "10y"
+    case max = "max"
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .oneYear: return "1R"
+        case .twoYears: return "2R"
+        case .fiveYears: return "5R"
+        case .tenYears: return "10R"
+        case .max: return "Vše"
+        }
+    }
+}
+
 public struct SymbolMatch: Identifiable, Hashable, Sendable {
     public var symbol: String
     public var name: String?

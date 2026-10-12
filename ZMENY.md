@@ -1,5 +1,15 @@
 # Změny
 
+## 0.6.0 – 2026-10-12
+
+- Nová záložka **Backtest**: ticker, období 1R–Vše (denní data upravená o dividendy), strategie SMA cross,
+  MACD cross, RSI mean-reversion a buy & hold, volitelný short a náklady v bp.
+- Výsledky: metriky strategie vs. buy & hold (výnos, CAGR, max. drawdown, Sharpe, Sortino, volatilita, Calmar,
+  expozice, obchody, win rate), křivka kapitálu se srovnáním se SPY, drawdown a seznam obchodů.
+- Jádro `Backtest` v TradeCore: indikátory (SMA, EMA, RSI, MACD), strategie, engine bez look-ahead biasu
+  (signál na close, obchod na open dalšího dne), metriky; testy proti referenčním hodnotám.
+- `YahooFinanceClient.dailyHistory(symbol:range:)`.
+
 ## 0.5.2 – 2026-10-12
 
 - Vložený graf v detailu má období jako aplikace TradingView: 1D (5m), 5D (15m), 1M (1H), 3M a YTD (1D),

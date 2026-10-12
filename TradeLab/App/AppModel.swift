@@ -6,6 +6,7 @@ import OptionsMath
 enum AppTab: Hashable {
     case market
     case options
+    case backtest
     case calculator
 }
 
