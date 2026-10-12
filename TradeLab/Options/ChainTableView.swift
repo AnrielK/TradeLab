@@ -438,6 +438,11 @@ struct StrikeRow: View {
                 .frame(maxHeight: .infinity)
                 .background(ChainTheme.strikeColumn)
                 .overlay(alignment: .trailing) { StrikeRuler() }
+                .highPriorityGesture(
+                    legDrag(legID: strikeDragTarget(call: call, callPosition: callPosition, put: put, putPosition: putPosition)?.legID ?? Self.noLeg,
+                            type: strikeDragTarget(call: call, callPosition: callPosition, put: put, putPosition: putPosition)?.type ?? .call),
+                    isEnabled: strikeDragTarget(call: call, callPosition: callPosition, put: put, putPosition: putPosition) != nil
+                )
 
             side(contract: put, position: putPosition, inTheMoney: strike > spot, edge: .trailing)
         }
@@ -496,6 +501,20 @@ struct StrikeRow: View {
                 draggableBlock(quantity: info.quantity, legID: info.legID, type: edge == .leading ? .call : .put)
             }
         }
+        .highPriorityGesture(
+            legDrag(legID: blockInfo(side: edge == .leading ? .call : .put, position: position, contract: contract)?.legID ?? Self.noLeg,
+                    type: edge == .leading ? .call : .put),
+            isEnabled: blockInfo(side: edge == .leading ? .call : .put, position: position, contract: contract) != nil
+        )
+    }
+
+    private static let noLeg = UUID()
+
+    /// Strike patří do rámečku vybrané nohy – táhne se call, jinak put.
+    private func strikeDragTarget(call: OptionContract?, callPosition: Int?, put: OptionContract?, putPosition: Int?) -> (legID: UUID, type: OptionType)? {
+        if let info = blockInfo(side: .call, position: callPosition, contract: call) { return (info.legID, .call) }
+        if let info = blockInfo(side: .put, position: putPosition, contract: put) { return (info.legID, .put) }
+        return nil
     }
 
     /// Co zobrazit v bloku: taženou nohu (v původním řádku) nebo nohu, která tu leží.
@@ -541,30 +560,32 @@ struct StrikeRow: View {
             .scaleEffect(isDragging ? 1.12 : 1)
             .shadow(color: .black.opacity(isDragging ? 0.6 : 0), radius: 6)
             .offset(isDragging ? dragOffset : .zero)
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 3)
-                    .onChanged { value in
-                        if dragGhost == nil {
-                            dragGhost = DragGhost(legID: legID, originType: type)
-                            model.draggingLegID = legID
-                        }
-                        dragOffset = value.translation
-                        guard !inDeleteZone(type),
-                              let target = dragTarget(from: type),
-                              let destination = chain.contract(target.type, strike: target.strike) else { return }
-                        // Noha se přesouvá živě – tiket i rámeček sledují prst.
-                        model.moveLeg(id: legID, to: destination, chain: chain)
-                    }
-                    .onEnded { _ in
-                        if inDeleteZone(type) {
-                            model.deleteLeg(id: legID)
-                        }
-                        dragGhost = nil
-                        dragOffset = .zero
-                        model.draggingLegID = nil
-                        model.saveStrategy()
-                    }
-            )
+    }
+
+    /// Tažení vybrané nohy – funguje za celé označené pole (strana i strike), ne jen za blok s počtem.
+    private func legDrag(legID: UUID, type: OptionType) -> some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onChanged { value in
+                if dragGhost == nil {
+                    dragGhost = DragGhost(legID: legID, originType: type)
+                    model.draggingLegID = legID
+                }
+                dragOffset = value.translation
+                guard !inDeleteZone(type),
+                      let target = dragTarget(from: type),
+                      let destination = chain.contract(target.type, strike: target.strike) else { return }
+                // Noha se přesouvá živě – tiket i rámeček sledují prst.
+                model.moveLeg(id: legID, to: destination, chain: chain)
+            }
+            .onEnded { _ in
+                if inDeleteZone(type) {
+                    model.deleteLeg(id: legID)
+                }
+                dragGhost = nil
+                dragOffset = .zero
+                model.draggingLegID = nil
+                model.saveStrategy()
+            }
     }
 
     /// Tažení ven ze strany tabulky (call doleva, put doprava) nohu smaže.

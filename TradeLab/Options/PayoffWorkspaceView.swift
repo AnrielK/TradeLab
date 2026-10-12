@@ -84,6 +84,7 @@ struct PayoffWorkspaceView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Nohy").font(.subheadline.weight(.semibold))
             ForEach(strategy.legs) { leg in
+                let color = leg.side == .long ? ChainTheme.long : ChainTheme.short
                 HStack {
                     LegRow(leg: leg)
                     Button {
@@ -93,6 +94,13 @@ struct PayoffWorkspaceView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(color, lineWidth: 1.5)
                 }
             }
         }

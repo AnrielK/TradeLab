@@ -124,9 +124,11 @@ struct ModeTabs: View {
             } label: {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 36, height: 36)
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    .frame(width: 22, height: 22)
             }
+            // Jedno kulaté skleněné pozadí těsně kolem ikony.
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
             .opacity(mode == .table ? 1 : 0)
             .disabled(mode != .table)
         }

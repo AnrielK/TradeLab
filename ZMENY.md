@@ -1,5 +1,11 @@
 # Změny
 
+## 0.4.1 – 2026-10-12
+
+- Vybranou nohu v tabulce jde táhnout za celé označené pole (strana i strike), ne jen za blok s počtem.
+- Tlačítko nastavení sloupců má jedno kulaté skleněné pozadí těsně kolem ikony.
+- V Payoffu jsou nohy v barevných rámečcích (zelená long, červená short).
+
 ## 0.4.0 – 2026-10-12
 
 - Liquid Glass (iOS 26+, minimální verze zvýšena z iOS 17): tiket, přepínač Tabulka/Payoff, tlačítko Strategie
