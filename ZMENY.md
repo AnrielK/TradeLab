@@ -1,5 +1,12 @@
 # Změny
 
+## 0.13.3 – 2026-10-13
+
+- Graf v detailu tickeru se vždy otevře na YTD.
+- Záložka Opce: po příchodu jsou všechny expirace zabalené (výjimkou je otevření strategie z agenta).
+- Šablony strategií vybírají jen striky s open interest ≥ 1 000 (když takové v expiraci nejsou, použijí se všechny);
+  agent dostal stejné pravidlo.
+
 ## 0.13.2 – 2026-10-13
 
 - Graf v detailu tickeru je čistý: bez hlavičky s tickerem, změnou, OHLC a stavem připojení.

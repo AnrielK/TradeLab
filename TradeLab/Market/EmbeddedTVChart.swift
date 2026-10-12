@@ -60,9 +60,10 @@ struct EmbeddedTVChart: View {
     @State private var vm = EmbeddedTVChart.makeViewModel()
     @State private var showFullScreen = false
     @AppStorage("detail.chartKind") private var chartKind = "Candlestick"
-    @AppStorage("detail.span") private var spanRaw = DetailChartSpan.year.rawValue
+    /// Graf se pokaždé otevře na YTD.
+    @State private var spanRaw = DetailChartSpan.yearToDate.rawValue
 
-    private var span: DetailChartSpan { DetailChartSpan(rawValue: spanRaw) ?? .year }
+    private var span: DetailChartSpan { DetailChartSpan(rawValue: spanRaw) ?? .yearToDate }
 
     private static func makeViewModel() -> ChartViewModel {
         let vm = ChartViewModel()

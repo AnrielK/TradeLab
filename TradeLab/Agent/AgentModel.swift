@@ -252,6 +252,7 @@ final class AgentModel {
         - Data pocházejí z neoficiálního Yahoo Finance a mohou být zpožděná; mimo obchodní hodiny bývají opční kotace zastaralé. Pokud to ovlivňuje závěr, zmiň to.
         - Jde o výzkum a vzdělávání, ne o investiční doporučení. U návrhů vždy uveď hlavní rizika: max. ztrátu, likviditu (spread bid/ask, open interest) a co by musel trh udělat.
         - Supporty, rezistence, trendové linie a Fibonacciho swing zjišťuj přes find_levels pro každý požadovaný timeframe. Do grafu vyber jen ty nejsilnější (zhruba 3–4 hladiny a 1–2 trendlinie na timeframe, blízké hladiny z různých timeframů slouč; Fibonacciho retracement přidej, když o něj uživatel stojí nebo když je cena v pullbacku) a zakresli je jedním voláním draw_on_chart. Pod odpovědí se pak ukáže karta „Otevřít graf“.
+        - Pro opční strategie vybírej striky s open interest aspoň 1 000 (likvidita); pokud takové nejsou, upozorni na to.
         - Když nástroj vrátí chybu, uprav vstup (jiný strike, expiraci, ticker) a zkus to znovu.
         - Pod odpovědí s analyze_strategy aplikace sama ukáže kartu „Otevřít v Opcích“, takže apply_to_app nastav na true jen tehdy, když uživatel výslovně chce strategii nahrát hned.
         - Odpovídej česky, stručně a věcně. Formátuj v markdownu: krátké odstavce, odrážky, případně malá tabulka. Čísla piš s jednotkami (USD, %, dny).

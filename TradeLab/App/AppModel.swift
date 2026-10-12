@@ -36,6 +36,8 @@ final class AppModel {
     var lastError: String? = nil
 
     private static let watchlistKey = "watchlist"
+    /// Minimální open interest striků, které vybírají šablony strategií.
+    static let minTemplateOpenInterest = 1_000
     private static let strategyKey = "strategy"
     private static let spotKey = "strategySpot"
     private static let optionsSymbolKey = "optionsSymbol"
@@ -326,7 +328,10 @@ final class AppModel {
                 assigned[index] = stock
                 continue
             }
-            let available = chain.contracts(type).map(\.strike).sorted()
+            // Jen likvidní striky (open interest ≥ 1 000); když žádný není, všechny.
+            let contracts = chain.contracts(type)
+            let liquid = contracts.filter { ($0.openInterest ?? 0) >= Self.minTemplateOpenInterest }
+            let available = (liquid.isEmpty ? contracts : liquid).map(\.strike).sorted()
             guard var strike = StrikeLadder.nearest(to: leg.strike, in: available) else { continue }
             // Původně různé striky musí zůstat různé.
             if let prevT = previousTheoretical, let prevS = previousStrike, leg.strike > prevT, strike <= prevS,

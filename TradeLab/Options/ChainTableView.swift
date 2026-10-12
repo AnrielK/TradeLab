@@ -83,12 +83,13 @@ struct ChainTableView: View {
         .onChange(of: store.expirations) { _, dates in
             if let target = scrollTarget, dates.contains(target) {
                 expanded = target
-            } else if expanded == nil || !dates.contains(expanded!) {
-                expanded = defaultExpiration(in: dates)
+            } else if let current = expanded, !dates.contains(current) {
+                expanded = nil
             }
         }
         .onAppear {
-            if expanded == nil { expanded = defaultExpiration(in: store.expirations) }
+            // Po příchodu na záložku jsou všechny expirace zabalené (kromě požadavku z agenta).
+            if model.requestedExpiration == nil, scrollTarget == nil { expanded = nil }
             model.focusedExpiration = expanded
         }
         .onChange(of: expanded) { _, newValue in
