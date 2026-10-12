@@ -172,6 +172,25 @@ final class AppModel {
         return leg.side == .long ? leg.quantity : -leg.quantity
     }
 
+    func leg(for contract: OptionContract, expiration: Date) -> StrategyLeg? {
+        let instrument: LegInstrument = contract.type == .call ? .call : .put
+        return strategy.legs.first {
+            $0.instrument == instrument && $0.strike == contract.strike && $0.expiration == expiration
+        }
+    }
+
+    /// Přesune nohu na jiný kontrakt téže expirace (tažení v tabulce).
+    func moveLeg(id: UUID, to contract: OptionContract, chain: OptionChain) {
+        guard let index = strategy.legs.firstIndex(where: { $0.id == id }) else { return }
+        let old = strategy.legs[index]
+        var moved = chain.leg(for: contract, side: old.side, quantity: old.quantity, rate: riskFreeRate)
+        moved.id = old.id
+        guard !strategy.legs.contains(where: { $0.id != id && $0.isSameContract(as: moved) }) else { return }
+        strategy.legs[index] = moved
+        renameStrategy()
+        saveStrategy()
+    }
+
     /// Lze strategii posouvat po řetězci (všechny opční nohy mají expiraci z řetězce)?
     var canAdjustFromChain: Bool {
         let options = strategy.optionLegs

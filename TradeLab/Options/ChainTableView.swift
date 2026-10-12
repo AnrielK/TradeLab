@@ -157,7 +157,7 @@ struct ChainColumnHeader: View {
             label("BID (PRODEJ)")
             label("ASK (NÁKUP)")
         }
-        .font(.system(size: 11, weight: .semibold))
+        .font(.system(size: 10, weight: .semibold))
         .foregroundStyle(Color(white: 0.85))
         .frame(height: 34)
         .background(ChainTheme.headerBar)
@@ -185,7 +185,7 @@ struct ExpirationHeader: View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
                 Text(date.chainLabel)
-                    .font(.system(size: 13, weight: isExpanded || legCount > 0 ? .semibold : .regular))
+                    .font(.system(size: 12, weight: isExpanded || legCount > 0 ? .semibold : .regular))
                     .monospacedDigit()
                 if !monthly {
                     Text("W")
@@ -213,7 +213,7 @@ struct ExpirationHeader: View {
             .frame(maxWidth: .infinity)
 
             Text("\(Int(OptionChain.daysToExpiry(date).rounded(.down)))d")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .monospacedDigit()
                 .frame(width: 64)
                 .frame(maxHeight: .infinity)
@@ -342,22 +342,29 @@ struct ChainLine: View {
                 switch kind {
                 case .inTheMoney(let spot):
                     ZStack {
-                        Rectangle().fill(ChainTheme.itm).frame(height: 1.5)
-                        HStack {
-                            Text("▲ ITM").offset(y: -9)
+                        Rectangle().fill(ChainTheme.itm).frame(height: 1)
+                        HStack(alignment: .bottom) {
+                            HStack(spacing: 1) {
+                                Image(systemName: "arrowtriangle.up.fill")
+                                Text("ITM")
+                            }
                             Spacer()
-                            Text("ITM ▼").offset(y: 9)
+                            HStack(spacing: 1) {
+                                Text("ITM")
+                                Image(systemName: "arrowtriangle.down.fill")
+                            }
                         }
-                        // Značka aktuální ceny na pravém okraji sloupce striků.
-                        Circle()
-                            .stroke(ChainTheme.short, lineWidth: 2.5)
-                            .frame(width: 13, height: 13)
-                            .offset(x: StrikeRuler.markerOffset)
-                            .accessibilityLabel("Spot \(spot.fixed(2))")
-                        .font(.system(size: 10, weight: .bold))
-                        .monospacedDigit()
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(ChainTheme.itm)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 4)
+                        .offset(y: -6)
+                        // Kapka aktuální ceny na pravém okraji sloupce striků (špička míří ke striku).
+                        Image(systemName: "drop")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(ChainTheme.short)
+                            .rotationEffect(.degrees(-90))
+                            .offset(x: StrikeRuler.markerOffset + 2)
+                            .accessibilityLabel("Spot \(spot.fixed(2))")
                     }
                 case .sigma:
                     ZStack(alignment: .leading) {
@@ -393,7 +400,12 @@ struct StrikeRow: View {
     @Environment(AppModel.self) private var model
 
     private static let strikeWidth: CGFloat = 64
+    /// Vodorovný posun prstu, od kterého se noha přepne call ↔ put.
+    private static let flipThreshold: CGFloat = 110
     private var showsDetails: Bool { showDelta || showOpenInterest }
+
+    @State private var dragOffset: CGSize = .zero
+    @State private var draggingType: OptionType?
     private var rowHeight: CGFloat { showsDetails ? 42 : 34 }
 
     var body: some View {
@@ -407,7 +419,7 @@ struct StrikeRow: View {
             side(contract: call, position: callPosition, inTheMoney: strike < spot, edge: .leading)
 
             Text(strike.strikeLabel)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
                 .padding(.trailing, 6)
@@ -442,6 +454,7 @@ struct StrikeRow: View {
             }
             .allowsHitTesting(false)
         }
+        .zIndex(draggingType == nil ? 0 : 10)
     }
 
     private func side(contract: OptionContract?, position: Int?, inTheMoney: Bool, edge: HorizontalEdge) -> some View {
@@ -458,7 +471,7 @@ struct StrikeRow: View {
                     Text(detail.delta).frame(maxWidth: .infinity)
                     Text(detail.openInterest).frame(maxWidth: .infinity)
                 }
-                .font(.system(size: 10))
+                .font(.system(size: 9))
                 .foregroundStyle(Color(white: 0.55))
                 .monospacedDigit()
                 .lineLimit(1)
@@ -468,10 +481,67 @@ struct StrikeRow: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(inTheMoney ? ChainTheme.rowInTheMoney : ChainTheme.row)
         .overlay(alignment: edge == .leading ? .leading : .trailing) {
-            if let position {
-                PositionBlock(quantity: position)
+            if let position, let contract {
+                draggableBlock(quantity: position, type: contract.type)
             }
         }
+    }
+
+    // MARK: - Tažení nohy (nahoru/dolů = strike, do strany = call ↔ put)
+
+    private func draggableBlock(quantity: Int, type: OptionType) -> some View {
+        let isDragging = draggingType == type
+        return PositionBlock(quantity: quantity)
+            .overlay(alignment: type == .call ? .trailing : .leading) {
+                if isDragging, let target = dragTarget(from: type) {
+                    Text("\(target.strike.strikeLabel) \(target.type == .call ? "C" : "P")")
+                        .font(.system(size: 11, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(ChainTheme.itm, in: Capsule())
+                        .fixedSize()
+                        .offset(x: type == .call ? 48 : -48)
+                }
+            }
+            .scaleEffect(isDragging ? 1.12 : 1)
+            .shadow(color: .black.opacity(isDragging ? 0.6 : 0), radius: 6)
+            .offset(isDragging ? dragOffset : .zero)
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 3)
+                    .onChanged { value in
+                        draggingType = type
+                        dragOffset = value.translation
+                    }
+                    .onEnded { value in
+                        dragOffset = value.translation
+                        commitDrag(from: type)
+                        draggingType = nil
+                        dragOffset = .zero
+                    }
+            )
+    }
+
+    /// Cílový kontrakt podle posunu prstu: řádky = striky, přes polovinu = druhý typ.
+    private func dragTarget(from type: OptionType) -> (strike: Double, type: OptionType)? {
+        var targetType = type
+        if type == .call, dragOffset.width > Self.flipThreshold { targetType = .put }
+        if type == .put, dragOffset.width < -Self.flipThreshold { targetType = .call }
+        let strikes = chain.contracts(targetType).map(\.strike).sorted()
+        guard let index = StrikeLadder.nearestIndex(to: strike, in: strikes) else { return nil }
+        let steps = Int((dragOffset.height / rowHeight).rounded())
+        let target = min(max(index + steps, 0), strikes.count - 1)
+        return (strikes[target], targetType)
+    }
+
+    private func commitDrag(from type: OptionType) {
+        guard let target = dragTarget(from: type),
+              let original = chain.contract(type, strike: strike),
+              let leg = model.leg(for: original, expiration: chain.expiration),
+              let destination = chain.contract(target.type, strike: target.strike),
+              destination.id != original.id else { return }
+        model.moveLeg(id: leg.id, to: destination, chain: chain)
     }
 
     private func details(_ contract: OptionContract?) -> (delta: String, openInterest: String) {
@@ -501,7 +571,7 @@ struct QuoteCell: View {
     var body: some View {
         Button(action: action) {
             Text(value.map { $0.fixed(2) } ?? "–")
-                .font(.system(size: 14))
+                .font(.system(size: 13))
                 .monospacedDigit()
                 .underline(value != nil, color: color.opacity(0.6))
                 .foregroundStyle(value == nil ? Color(white: 0.45) : color)

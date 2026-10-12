@@ -1,5 +1,13 @@
 # Změny
 
+## 0.3.1 – 2026-10-12
+
+- Vybranou nohu v tabulce jde táhnout za barevný blok: nahoru/dolů na jiný strike, do strany přes střed na call ↔ put
+  (během tažení ukazuje cílový kontrakt).
+- Menší žluté popisky ITM se šipkami, aktuální cena jako kapka na stupnici striků.
+- Menší písmo v tabulce i v payoffu.
+- Vyhledávání tickeru na záložce Opce nahrazeno tlačítkem „Strategie ▾“ (ticker se vybírá na záložce Trh).
+
 ## 0.3.0 – 2026-10-12
 
 - Záložka Strategie zrušena, šablony jsou v Opcích (tlačítko „Strategie ▾“). Staví se z reálného řetězce

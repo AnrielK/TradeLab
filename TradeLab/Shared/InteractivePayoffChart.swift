@@ -68,7 +68,7 @@ struct InteractivePayoffChart: View {
         if let id = draggingMarker, let marker = markers.first(where: { $0.id == id }) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Strike \(marker.label): \(marker.strike.strikeLabel)")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                 Text("Pusť pro přecenění z řetězce")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -86,11 +86,11 @@ struct InteractivePayoffChart: View {
                         .foregroundStyle(Color.pnl(values.current))
                 }
             }
-            .font(.caption)
+            .font(.caption2)
             .monospacedDigit()
         } else {
             Text("Tažením po grafu zobrazíš P/L pro cenu.")
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
         }
     }

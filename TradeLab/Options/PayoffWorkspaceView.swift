@@ -48,7 +48,7 @@ struct PayoffWorkspaceView: View {
         let markers = strategy.optionLegs.map(marker(for:))
 
         Text(ticketTitle(strategy, quote: strategy.netQuote))
-            .font(.headline)
+            .font(.subheadline.weight(.semibold))
 
         statsRow(analysis: analysis, extrinsic: strategy.extrinsicValue(spot: spot))
         breakevenRow(analysis.breakevens, spot: spot)
@@ -98,7 +98,7 @@ struct PayoffWorkspaceView: View {
         }
         if !model.canAdjustFromChain {
             Text("Posun striků, šířky a expirace funguje pro nohy přidané z opčního řetězce.")
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
         }
     }
@@ -142,7 +142,7 @@ struct PayoffWorkspaceView: View {
                     .monospacedDigit()
             }
         }
-        .font(.subheadline)
+        .font(.footnote)
     }
 
     private func breakevenText(_ value: Double, spot: Double) -> String {
@@ -153,7 +153,7 @@ struct PayoffWorkspaceView: View {
     private func stat(_ title: String, _ value: String, color: Color = .secondary) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.caption2.weight(.semibold)).foregroundStyle(color)
-            Text(value).font(.headline).monospacedDigit()
+            Text(value).font(.subheadline.weight(.bold)).monospacedDigit()
         }
     }
 
@@ -163,7 +163,7 @@ struct PayoffWorkspaceView: View {
             legendItem(.orange, currentLabel + (ivShiftPoints == 0 ? "" : ", IV \(ivShiftPoints > 0 ? "+" : "")\(Int(ivShiftPoints)) b."))
             legendItem(.purple, "Break-even")
         }
-        .font(.caption)
+        .font(.caption2)
     }
 
     private func legendItem(_ color: Color, _ text: String) -> some View {
@@ -215,16 +215,16 @@ struct PayoffWorkspaceView: View {
         VStack(alignment: .leading, spacing: 8) {
             if maxDays >= 2 {
                 Text("Posun v čase: \(Int(daysForward)) z \(Int(maxDays)) dní")
-                    .font(.caption)
+                    .font(.caption2)
                 Slider(value: $daysForward, in: 0...(maxDays - 1), step: 1)
             }
             Text("Posun IV: \(ivShiftPoints > 0 ? "+" : "")\(Int(ivShiftPoints)) p. b.")
-                .font(.caption)
+                .font(.caption2)
             Slider(value: $ivShiftPoints, in: -30...30, step: 1)
             HStack {
                 Spacer()
                 Button("Obnovit ceny") { run { await model.repriceStrategy() } }
-                    .font(.caption)
+                    .font(.caption2)
                     .disabled(!model.canAdjustFromChain || isBusy)
             }
         }
@@ -248,19 +248,19 @@ struct ControlBox: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(title).font(.caption2).foregroundStyle(.secondary)
             HStack {
                 Button(action: left.action) {
-                    Image(systemName: left.icon).frame(width: 36, height: 30)
+                    Image(systemName: left.icon).frame(width: 30, height: 24)
                 }
                 Spacer(minLength: 0)
                 Text(value ?? "")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .monospacedDigit()
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 Button(action: right.action) {
-                    Image(systemName: right.icon).frame(width: 36, height: 30)
+                    Image(systemName: right.icon).frame(width: 30, height: 24)
                 }
             }
             .buttonStyle(.bordered)
