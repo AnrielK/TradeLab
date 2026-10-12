@@ -33,6 +33,29 @@ extension Double {
     }
 }
 
+extension Double {
+    /// Strike bez zbytečných desetinných míst (225, 227.5, 12.25).
+    var strikeLabel: String {
+        if self == rounded() { return fixed(0) }
+        if (self * 10) == (self * 10).rounded() { return fixed(1) }
+        return fixed(2)
+    }
+}
+
+extension Date {
+    private static let utc = TimeZone(identifier: "UTC")!
+
+    /// Datum expirace (Yahoo udává půlnoc UTC), např. „30. 10. 2026“.
+    var expiryLabel: String {
+        formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: Self.utc))
+    }
+
+    /// Krátký tvar „30. 10.“
+    var shortExpiryLabel: String {
+        formatted(Date.FormatStyle(timeZone: Self.utc).day().month(.defaultDigits))
+    }
+}
+
 extension Color {
     static func pnl(_ value: Double) -> Color {
         if value > 0 { return .green }

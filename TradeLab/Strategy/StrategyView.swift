@@ -141,7 +141,14 @@ struct StrategyView: View {
     private func payoffSection(analysis: StrategyAnalysis, current: [PayoffPoint], spot: Double, maxDays: Double) -> some View {
         let legendText = ivShiftPoints == 0 ? currentLabel : "\(currentLabel), IV \(ivShiftLabel)"
         return Section("Payoff") {
-            PayoffChart(expiry: analysis.expiryCurve, current: current, spot: spot, breakevens: analysis.breakevens)
+            InteractivePayoffChart(
+                expiry: analysis.expiryCurve,
+                current: current,
+                spot: spot,
+                breakevens: analysis.breakevens,
+                currentLabel: currentLabel,
+                valueAt: valueAt(spot: spot)
+            )
                 .frame(height: 260)
             HStack(spacing: 16) {
                 LegendDot(color: .blue, text: "Expirace")
@@ -161,6 +168,17 @@ struct StrategyView: View {
                     .font(.caption)
                 Slider(value: $ivShiftPoints, in: -30...30, step: 1)
             }
+        }
+    }
+
+    private func valueAt(spot: Double) -> (Double) -> (expiry: Double, current: Double) {
+        let strategy = model.strategy
+        let market = model.market
+        let days = daysForward
+        let ivShift = ivShiftPoints / 100
+        return { price in
+            (strategy.expiryProfitLoss(atSpot: price, market: market),
+             strategy.profitLoss(atSpot: price, daysElapsed: days, ivShift: ivShift, market: market))
         }
     }
 
@@ -238,7 +256,7 @@ struct LegRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
                 if leg.instrument != .stock {
-                    Text("\(Int(leg.daysToExpiry.rounded())) d · IV \(leg.impliedVolatility.percent)")
+                    Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -249,60 +267,16 @@ struct LegRow: View {
         }
     }
 
+    private var detail: String {
+        let expiry = leg.expiration.map { $0.shortExpiryLabel + " · " } ?? ""
+        return expiry + "\(Int(leg.daysToExpiry.rounded())) d · IV " + leg.impliedVolatility.percent
+    }
+
     private var title: String {
         switch leg.instrument {
         case .call: return "Call \(leg.strike.fixed(leg.strike.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 1))"
         case .put: return "Put \(leg.strike.fixed(leg.strike.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 1))"
         case .stock: return "Akcie ×100"
         }
-    }
-}
-
-struct PayoffChart: View {
-    let expiry: [PayoffPoint]
-    let current: [PayoffPoint]
-    let spot: Double
-    let breakevens: [Double]
-
-    var body: some View {
-        Chart {
-            RuleMark(y: .value("Nula", 0))
-                .foregroundStyle(Color.secondary.opacity(0.6))
-                .lineStyle(StrokeStyle(lineWidth: 1))
-
-            ForEach(expiry, id: \.spot) { point in
-                LineMark(
-                    x: .value("Cena", point.spot),
-                    y: .value("P/L", point.pnl),
-                    series: .value("Křivka", "Expirace")
-                )
-                .foregroundStyle(Color.blue)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-            }
-
-            ForEach(current, id: \.spot) { point in
-                LineMark(
-                    x: .value("Cena", point.spot),
-                    y: .value("P/L", point.pnl),
-                    series: .value("Křivka", "Aktuální")
-                )
-                .foregroundStyle(Color.orange)
-                .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
-            }
-
-            RuleMark(x: .value("Spot", spot))
-                .foregroundStyle(Color.gray)
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
-                .annotation(position: .top, alignment: .center) {
-                    Text("Spot").font(.caption2).foregroundStyle(.secondary)
-                }
-
-            ForEach(breakevens, id: \.self) { be in
-                PointMark(x: .value("Break-even", be), y: .value("P/L", 0))
-                    .foregroundStyle(Color.purple)
-                    .symbolSize(30)
-            }
-        }
-        .chartXScale(domain: (expiry.first?.spot ?? 0)...max(expiry.last?.spot ?? 1, (expiry.first?.spot ?? 0) + 1))
     }
 }

@@ -14,6 +14,7 @@ enum AppTab: Hashable {
 @Observable
 final class AppModel {
     let client = YahooFinanceClient.shared
+    let chainStore: ChainStore
 
     var selectedTab: AppTab = .market
 
@@ -39,6 +40,7 @@ final class AppModel {
     private static let optionsSymbolKey = "optionsSymbol"
 
     init() {
+        chainStore = ChainStore(client: YahooFinanceClient.shared)
         let defaults = UserDefaults.standard
         watchlist = defaults.stringArray(forKey: Self.watchlistKey) ?? ["SPY", "QQQ", "AAPL", "NVDA", "MSFT", "TSLA"]
         optionsSymbol = defaults.string(forKey: Self.optionsSymbolKey) ?? "AAPL"
@@ -114,27 +116,111 @@ final class AppModel {
         selectedTab = .options
     }
 
-    /// Přidá kontrakt z řetězce jako nohu strategie (s tržní mid cenou a IV).
-    func addLeg(from contract: OptionContract, side: PositionSide, chain: OptionChain) {
-        if strategy.underlying.uppercased() != chain.symbol.uppercased() {
+    // MARK: - Tiket z opčního řetězce
+
+    private func isTicket(for symbol: String) -> Bool {
+        strategy.underlying.uppercased() == symbol.uppercased()
+    }
+
+    /// Klepnutí na bid (prodej) nebo ask (nákup).
+    /// Stejný kontrakt a směr nohu odebere, opačný směr ji otočí, jinak se noha přidá.
+    func toggleLeg(_ contract: OptionContract, side: PositionSide, chain: OptionChain) {
+        if !isTicket(for: chain.symbol) {
             strategy = OptionStrategy(underlying: chain.symbol)
         }
         strategySpot = chain.underlyingPrice
-        let days = contract.daysToExpiry()
-        let iv = contract.estimatedVolatility(spot: chain.underlyingPrice, rate: riskFreeRate) ?? 0.3
-        let leg = StrategyLeg(
-            instrument: contract.type == .call ? .call : .put,
-            side: side,
-            quantity: 1,
-            strike: contract.strike,
-            premium: contract.mid ?? 0,
-            daysToExpiry: (days * 100).rounded() / 100,
-            impliedVolatility: iv,
-            contractSymbol: contract.contractSymbol
-        )
-        strategy.legs.append(leg)
-        if strategy.legs.count == 1 { strategy.name = "Vlastní strategie" }
+        let candidate = chain.leg(for: contract, side: side, quantity: max(strategy.spreadCount, 1), rate: riskFreeRate)
+        if let index = strategy.legs.firstIndex(where: { $0.isSameContract(as: candidate) }) {
+            if strategy.legs[index].side == side {
+                strategy.legs.remove(at: index)
+            } else {
+                strategy.legs[index].side = side
+            }
+        } else {
+            strategy.legs.append(candidate)
+        }
+        renameStrategy()
         saveStrategy()
+    }
+
+    /// Pozice v tiketu pro daný kontrakt: +n long, −n short, nil = není.
+    func position(of contract: OptionContract?, expiration: Date) -> Int? {
+        guard let contract, isTicket(for: chainStore.symbol) else { return nil }
+        let instrument: LegInstrument = contract.type == .call ? .call : .put
+        guard let leg = strategy.legs.first(where: {
+            $0.instrument == instrument && $0.strike == contract.strike && $0.expiration == expiration
+        }) else { return nil }
+        return leg.side == .long ? leg.quantity : -leg.quantity
+    }
+
+    /// Lze strategii posouvat po řetězci (všechny opční nohy mají expiraci z řetězce)?
+    var canAdjustFromChain: Bool {
+        let options = strategy.optionLegs
+        return !options.isEmpty && options.allSatisfy { $0.expiration != nil } && isTicket(for: chainStore.symbol)
+    }
+
+    private func strikes(for leg: StrategyLeg) -> [Double] {
+        guard let expiration = leg.expiration else { return [] }
+        return chainStore.chains[expiration]?.strikes ?? []
+    }
+
+    func shiftStrikes(by steps: Int) async {
+        guard let shifted = strategy.shiftingStrikes(by: steps, strikes: strikes(for:)) else { return }
+        strategy = shifted
+        await repriceStrategy()
+    }
+
+    func changeWidth(by steps: Int) async {
+        guard let changed = strategy.changingWidth(by: steps, strikes: strikes(for:)) else { return }
+        strategy = changed
+        await repriceStrategy()
+    }
+
+    func changeQuantity(by delta: Int) {
+        let count = max(strategy.spreadCount + delta, 1)
+        strategy = strategy.withSpreadCount(count)
+        saveStrategy()
+    }
+
+    /// Posune všechny opční nohy o `steps` expirací (striky přichytí k nejbližším dostupným).
+    func shiftExpiration(by steps: Int) async {
+        let dates = chainStore.expirations
+        guard !dates.isEmpty else { return }
+        var copy = strategy
+        for i in copy.legs.indices where copy.legs[i].instrument != .stock {
+            guard let current = copy.legs[i].expiration,
+                  let index = dates.firstIndex(of: current) else { return }
+            let target = index + steps
+            guard dates.indices.contains(target) else { return }
+            guard let chain = await chainStore.chain(for: dates[target], rate: riskFreeRate) else { return }
+            copy.legs[i].expiration = dates[target]
+            if let strike = StrikeLadder.nearest(to: copy.legs[i].strike, in: chain.strikes) {
+                copy.legs[i].strike = strike
+            }
+        }
+        strategy = copy
+        await repriceStrategy()
+    }
+
+    /// Načte aktuální kotace pro všechny nohy z řetězce.
+    func repriceStrategy() async {
+        for leg in strategy.legs {
+            guard leg.instrument != .stock, let expiration = leg.expiration,
+                  let chain = await chainStore.chain(for: expiration, rate: riskFreeRate) else { continue }
+            let repriced = chain.repriced(leg, rate: riskFreeRate)
+            if let index = strategy.legs.firstIndex(where: { $0.id == leg.id }) {
+                strategy.legs[index] = repriced
+            }
+        }
+        if chainStore.underlyingPrice > 0, isTicket(for: chainStore.symbol) {
+            strategySpot = chainStore.underlyingPrice
+        }
+        renameStrategy()
+        saveStrategy()
+    }
+
+    private func renameStrategy() {
+        strategy.name = strategy.legs.isEmpty ? "Vlastní strategie" : StrategyClassifier.name(for: strategy)
     }
 
     // MARK: - Strategie
