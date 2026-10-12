@@ -33,6 +33,17 @@ struct InteractivePayoffChart: View {
 
     /// Rozsah osy X zafixovaný během tažení, aby graf „neujížděl“ pod prstem.
     @State private var frozenDomain: ClosedRange<Double>?
+    @State private var frozenYDomain: ClosedRange<Double>?
+
+    /// Rozsah osy Y s rezervou; během tažení zafixovaný, aby se graf nechvěl.
+    private var yDomain: ClosedRange<Double> {
+        if let frozenYDomain { return frozenYDomain }
+        let values = expiry.map(\.pnl) + current.map(\.pnl) + [0]
+        let low = values.min() ?? -1
+        let high = values.max() ?? 1
+        let pad = max((high - low) * 0.12, 1)
+        return (low - pad)...(high + pad)
+    }
 
     private var domain: ClosedRange<Double> {
         if let frozenDomain { return frozenDomain }
@@ -95,14 +106,17 @@ struct InteractivePayoffChart: View {
 
     // MARK: - Graf
 
-    private var visibleExpiry: [PayoffPoint] {
-        let d = domain
-        return expiry.filter { d.contains($0.spot) }
-    }
+    private var visibleExpiry: [PayoffPoint] { visible(expiry) }
 
-    private var visibleCurrent: [PayoffPoint] {
+    private var visibleCurrent: [PayoffPoint] { visible(current) }
+
+    /// Body v rozsahu os (hodnoty mimo osu Y se ořežou, aby nekreslily mimo graf).
+    private func visible(_ points: [PayoffPoint]) -> [PayoffPoint] {
         let d = domain
-        return current.filter { d.contains($0.spot) }
+        let y = yDomain
+        return points
+            .filter { d.contains($0.spot) }
+            .map { PayoffPoint(spot: $0.spot, pnl: min(max($0.pnl, y.lowerBound), y.upperBound)) }
     }
 
     private var chart: some View {
@@ -207,13 +221,15 @@ struct InteractivePayoffChart: View {
         ])
         .chartLegend(.hidden)
         .chartXScale(domain: domain)
+        .chartYScale(domain: yDomain)
         .padding(.top, 6 + CGFloat(tagRows) * Self.tagRowHeight) // místo pro štítky striků
         .chartOverlay { proxy in
             GeometryReader { geometry in
                 Rectangle()
                     .fill(Color.clear)
                     .contentShape(Rectangle())
-                    .gesture(dragGesture(proxy: proxy, geometry: geometry))
+                    // Vysoká priorita: při tažení po grafu se neposouvá stránka (jinak graf „poskakuje“).
+                    .highPriorityGesture(dragGesture(proxy: proxy, geometry: geometry))
             }
         }
     }
@@ -244,6 +260,7 @@ struct InteractivePayoffChart: View {
                 if !gestureActive {
                     gestureActive = true
                     frozenDomain = domain
+                    frozenYDomain = yDomain
                     draggingMarker = hitMarker(at: value.startLocation, proxy: proxy, plot: plot)
                 }
 
@@ -263,6 +280,7 @@ struct InteractivePayoffChart: View {
                 draggingMarker = nil
                 gestureActive = false
                 frozenDomain = nil
+                frozenYDomain = nil
             }
     }
 

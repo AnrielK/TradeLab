@@ -1,5 +1,12 @@
 # Změny
 
+## 0.2.3 – 2026-10-12
+
+- Kompaktnější tabulka: nižší řádky expirací i striků, menší písmo, IV a ±1σ na jednom řádku.
+- Delta pod bidem a open interest pod askem přes celou šířku pole bid–ask.
+- Rámeček vybrané nohy obepíná i strike.
+- Payoff se při tažení nechvěje: graf má přednost před scrollováním stránky a osa Y je během tažení zafixovaná.
+
 ## 0.2.2 – 2026-10-12
 
 - Vzhled tabulky jako v brokerské aplikaci: záložky TABULKA / PAYOFF, šedá lišta sloupců,

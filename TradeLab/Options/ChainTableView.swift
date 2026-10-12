@@ -148,7 +148,7 @@ struct ChainColumnHeader: View {
         }
         .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(Color(white: 0.85))
-        .frame(height: 40)
+        .frame(height: 34)
         .background(ChainTheme.headerBar)
     }
 
@@ -173,18 +173,18 @@ struct ExpirationHeader: View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
                 Text(date.chainLabel)
-                    .font(.system(size: 15, weight: isExpanded ? .semibold : .regular))
+                    .font(.system(size: 14, weight: isExpanded ? .semibold : .regular))
                     .monospacedDigit()
                 if !monthly {
                     Text("W")
-                        .font(.system(size: 12, weight: .bold))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
                         .background(ChainTheme.badge, in: RoundedRectangle(cornerRadius: 4))
                 }
                 Spacer(minLength: 4)
                 if isExpanded {
-                    Text("Cally").font(.system(size: 13)).foregroundStyle(Color(white: 0.85))
+                    Text("Cally").font(.system(size: 12)).foregroundStyle(Color(white: 0.85))
                 }
             }
             .padding(.leading, 12)
@@ -192,7 +192,7 @@ struct ExpirationHeader: View {
             .frame(maxWidth: .infinity)
 
             Text("\(Int(OptionChain.daysToExpiry(date).rounded(.down)))d")
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .monospacedDigit()
                 .frame(width: 64)
                 .frame(maxHeight: .infinity)
@@ -200,7 +200,7 @@ struct ExpirationHeader: View {
 
             HStack(spacing: 6) {
                 if isExpanded {
-                    Text("Puty").font(.system(size: 13)).foregroundStyle(Color(white: 0.85))
+                    Text("Puty").font(.system(size: 12)).foregroundStyle(Color(white: 0.85))
                 }
                 Spacer(minLength: 4)
                 ivText
@@ -210,7 +210,7 @@ struct ExpirationHeader: View {
             .frame(maxWidth: .infinity)
         }
         .foregroundStyle(.white)
-        .frame(height: 50)
+        .frame(height: 38)
         .background(monthly ? ChainTheme.monthly : ChainTheme.weekly)
         .overlay(alignment: .bottom) {
             Rectangle().fill(ChainTheme.separator).frame(height: 1)
@@ -220,16 +220,18 @@ struct ExpirationHeader: View {
     @ViewBuilder
     private var ivText: some View {
         if let summary, let iv = summary.atmVolatility {
-            VStack(alignment: .trailing, spacing: 1) {
+            HStack(spacing: 4) {
                 Text("IV \(iv.percent)")
                 if let move = summary.oneSigmaMove {
-                    Text("±\(move.fixed(2))").foregroundStyle(Color(white: 0.75))
+                    Text("(±\(move.fixed(2)))").foregroundStyle(Color(white: 0.75))
                 }
             }
-            .font(.system(size: 13))
+            .font(.system(size: 12))
             .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         } else if isLoading {
-            ProgressView().controlSize(.small).tint(.white)
+            ProgressView().controlSize(.mini).tint(.white)
         } else {
             Text("–").foregroundStyle(Color(white: 0.6))
         }
@@ -291,7 +293,7 @@ struct ChainGrid: View {
             }
             .font(.caption.weight(.semibold))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.vertical, 7)
             .background(ChainTheme.headerBar)
         }
         .buttonStyle(.plain)
@@ -364,8 +366,9 @@ struct StrikeRow: View {
     let showOpenInterest: Bool
     @Environment(AppModel.self) private var model
 
+    private static let strikeWidth: CGFloat = 64
     private var showsDetails: Bool { showDelta || showOpenInterest }
-    private var rowHeight: CGFloat { showsDetails ? 56 : 46 }
+    private var rowHeight: CGFloat { showsDetails ? 42 : 34 }
 
     var body: some View {
         let call = chain.contract(.call, strike: strike)
@@ -378,10 +381,10 @@ struct StrikeRow: View {
             side(contract: call, position: callPosition, inTheMoney: strike < spot, edge: .leading)
 
             Text(strike.strikeLabel)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.white)
-                .frame(width: 64)
+                .frame(width: Self.strikeWidth)
                 .frame(maxHeight: .infinity)
                 .background(ChainTheme.strikeColumn)
 
@@ -391,32 +394,51 @@ struct StrikeRow: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(ChainTheme.separator).frame(height: 1)
         }
+        .overlay {
+            // Rámeček vybrané nohy obepíná i strike (call: vlevo + strike, put: strike + vpravo).
+            GeometryReader { geometry in
+                let sideWidth = (geometry.size.width - Self.strikeWidth) / 2
+                let frameWidth = sideWidth + Self.strikeWidth
+                if let callPosition {
+                    Rectangle()
+                        .stroke(callPosition > 0 ? ChainTheme.long : ChainTheme.short, lineWidth: 2)
+                        .frame(width: frameWidth - 2, height: geometry.size.height - 2)
+                        .position(x: frameWidth / 2, y: geometry.size.height / 2)
+                }
+                if let putPosition {
+                    Rectangle()
+                        .stroke(putPosition > 0 ? ChainTheme.long : ChainTheme.short, lineWidth: 2)
+                        .frame(width: frameWidth - 2, height: geometry.size.height - 2)
+                        .position(x: sideWidth + frameWidth / 2, y: geometry.size.height / 2)
+                }
+            }
+            .allowsHitTesting(false)
+        }
     }
 
     private func side(contract: OptionContract?, position: Int?, inTheMoney: Bool, edge: HorizontalEdge) -> some View {
         let color = ChainTheme.priceColor(change: contract?.change)
-        return VStack(spacing: 2) {
+        let detail = details(contract)
+        return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 QuoteCell(value: contract?.bid, color: color) { tap(contract, .short) }
                 QuoteCell(value: contract?.ask, color: color) { tap(contract, .long) }
             }
             if showsDetails {
-                Text(details(contract))
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color(white: 0.55))
-                    .monospacedDigit()
-                    .lineLimit(1)
+                // Delta pod bidem, OI pod askem – přes celou šířku pole bid–ask.
+                HStack(spacing: 0) {
+                    Text(detail.delta).frame(maxWidth: .infinity)
+                    Text(detail.openInterest).frame(maxWidth: .infinity)
+                }
+                .font(.system(size: 10))
+                .foregroundStyle(Color(white: 0.55))
+                .monospacedDigit()
+                .lineLimit(1)
+                .padding(.bottom, 3)
             }
         }
-        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(inTheMoney ? ChainTheme.rowInTheMoney : ChainTheme.row)
-        .overlay {
-            if let position {
-                Rectangle()
-                    .stroke(position > 0 ? ChainTheme.long : ChainTheme.short, lineWidth: 2)
-            }
-        }
         .overlay(alignment: edge == .leading ? .leading : .trailing) {
             if let position {
                 PositionBlock(quantity: position)
@@ -424,17 +446,17 @@ struct StrikeRow: View {
         }
     }
 
-    /// „Δ 0,62 · OI 12 tis.“
-    private func details(_ contract: OptionContract?) -> String {
-        guard let contract else { return " " }
-        var parts: [String] = []
+    private func details(_ contract: OptionContract?) -> (delta: String, openInterest: String) {
+        guard let contract else { return ("", "") }
+        var delta = ""
         if showDelta, let greeks = contract.greeks(spot: chain.underlyingPrice, rate: model.riskFreeRate) {
-            parts.append("Δ " + greeks.delta.fixed(2))
+            delta = "Δ " + greeks.delta.fixed(2)
         }
+        var openInterest = ""
         if showOpenInterest, let oi = contract.openInterest {
-            parts.append("OI " + oi.formatted(.number.notation(.compactName)))
+            openInterest = "OI " + oi.formatted(.number.notation(.compactName))
         }
-        return parts.isEmpty ? " " : parts.joined(separator: " · ")
+        return (delta, openInterest)
     }
 
     private func tap(_ contract: OptionContract?, _ side: PositionSide) {
@@ -451,7 +473,7 @@ struct QuoteCell: View {
     var body: some View {
         Button(action: action) {
             Text(value.map { $0.fixed(2) } ?? "–")
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .monospacedDigit()
                 .underline(value != nil, color: color.opacity(0.6))
                 .foregroundStyle(value == nil ? Color(white: 0.45) : color)
@@ -469,10 +491,10 @@ struct PositionBlock: View {
 
     var body: some View {
         Text(quantity > 0 ? "\(quantity)" : "\(quantity)")
-            .font(.system(size: 18, weight: .semibold))
+            .font(.system(size: 15, weight: .semibold))
             .monospacedDigit()
             .foregroundStyle(.white)
-            .frame(width: 34)
+            .frame(width: 28)
             .frame(maxHeight: .infinity)
             .background(quantity > 0 ? ChainTheme.long : ChainTheme.short)
     }
