@@ -1,8 +1,60 @@
 import SwiftUI
 
+/// Období vloženého grafu – stejná nabídka jako v aplikaci TradingView.
+enum DetailChartSpan: String, CaseIterable, Identifiable {
+    case day = "1D"
+    case fiveDays = "5D"
+    case month = "1M"
+    case threeMonths = "3M"
+    case yearToDate = "YTD"
+    case year = "1Y"
+    case fiveYears = "5Y"
+    case all = "Vše"
+
+    var id: String { rawValue }
+
+    /// Interval svíček pro dané období.
+    var resolution: String {
+        switch self {
+        case .day: return "5"
+        case .fiveDays: return "15"
+        case .month: return "60"
+        case .threeMonths, .yearToDate: return "1D"
+        case .year, .fiveYears: return "1W"
+        case .all: return "1M"
+        }
+    }
+
+    var span: ChartSpan {
+        let day: TimeInterval = 86_400
+        switch self {
+        case .day: return .sessions(1)
+        case .fiveDays: return .sessions(5)
+        case .month: return .seconds(31 * day)
+        case .threeMonths: return .seconds(92 * day)
+        case .yearToDate: return .yearToDate
+        case .year: return .seconds(366 * day)
+        case .fiveYears: return .seconds(5 * 366 * day)
+        case .all: return .all
+        }
+    }
+
+    var historyBars: Int {
+        switch self {
+        case .day, .fiveDays: return 300
+        case .month: return 400
+        case .threeMonths: return 200
+        case .yearToDate: return 300
+        case .year: return 120
+        case .fiveYears: return 300
+        case .all: return 400
+        }
+    }
+}
+
 /// Graf z TVChart vložený do detailu tickeru:
-/// bez indikátorů, volba svíčky / linka a interval, čáry opční pozice.
-/// Tlačítko vpravo otevře plný graf s indikátory (už bez čar pozice).
+/// bez indikátorů, svíčky / linka, období 1D–Vše, čáry opční pozice.
+/// Tlačítko zvětšení otevře plný graf s indikátory a všemi intervaly (bez čar pozice).
 struct EmbeddedTVChart: View {
     let symbol: String
     var priceLines: [ChartPriceLine] = []
@@ -10,11 +62,9 @@ struct EmbeddedTVChart: View {
     @State private var vm = EmbeddedTVChart.makeViewModel()
     @State private var showFullScreen = false
     @AppStorage("detail.chartKind") private var chartKind = "Candlestick"
-    @AppStorage("detail.resolution") private var resolution = "1D"
+    @AppStorage("detail.span") private var spanRaw = DetailChartSpan.year.rawValue
 
-    private static let resolutions: [(value: String, label: String)] = [
-        ("15", "15m"), ("60", "1H"), ("240", "4H"), ("1D", "1D"), ("1W", "1W"),
-    ]
+    private var span: DetailChartSpan { DetailChartSpan(rawValue: spanRaw) ?? .year }
 
     private static func makeViewModel() -> ChartViewModel {
         let vm = ChartViewModel()
@@ -24,50 +74,53 @@ struct EmbeddedTVChart: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(spacing: 10) {
+            HStack {
                 Picker("Typ grafu", selection: $chartKind) {
                     Image(systemName: "chart.bar.xaxis").tag("Candlestick")
                     Image(systemName: "chart.xyaxis.line").tag("Line")
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 110)
-
-                Menu {
-                    Picker("Interval", selection: $resolution) {
-                        ForEach(Self.resolutions, id: \.value) { item in
-                            Text(item.label).tag(item.value)
-                        }
-                    }
-                } label: {
-                    Text(Self.resolutions.first { $0.value == resolution }?.label ?? resolution)
-                        .font(.system(size: 13, weight: .semibold))
-                        .monospacedDigit()
-                        .frame(minWidth: 34)
-                }
-                .buttonStyle(.glass)
-
                 Spacer()
-
-                Button {
-                    showFullScreen = true
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 13, weight: .bold))
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .accessibilityLabel("Zvětšit graf")
             }
 
             NativeChartView(vm: vm)
                 .frame(height: 320)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            HStack(spacing: 6) {
+                ForEach(DetailChartSpan.allCases) { item in
+                    Button {
+                        spanRaw = item.rawValue
+                    } label: {
+                        Text(item.rawValue)
+                            .font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 30)
+                            .background(item == span ? Color.white.opacity(0.22) : Color.white.opacity(0.08),
+                                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .foregroundStyle(item == span ? Color.primary : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button {
+                    showFullScreen = true
+                } label: {
+                    Image(systemName: "viewfinder")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Zvětšit graf")
+            }
         }
         .onAppear {
             vm.chartKind = chartKind
-            vm.resolution = resolution
+            apply(span, reconnect: false)
             vm.priceLines = priceLines
             vm.symbol = symbol.uppercased()
             vm.connect()
@@ -77,13 +130,27 @@ struct EmbeddedTVChart: View {
         }
         .onChange(of: priceLines) { _, lines in vm.priceLines = lines }
         .onChange(of: chartKind) { _, kind in vm.setChartKind(kind) }
-        .onChange(of: resolution) { _, value in vm.changeResolution(value) }
+        .onChange(of: spanRaw) { _, _ in apply(span, reconnect: true) }
         .onChange(of: showFullScreen) { _, shown in
             // Plný graf má vlastní spojení – vložený mezitím odpojíme.
             if shown { vm.disconnect() } else { vm.connect() }
         }
         .fullScreenCover(isPresented: $showFullScreen) {
             TVChartScreen(initialSymbol: symbol)
+        }
+    }
+
+    /// Nastaví interval, počet barů a výřez podle období.
+    private func apply(_ span: DetailChartSpan, reconnect: Bool) {
+        let resolutionChanged = vm.resolution != span.resolution || vm.historyBars != span.historyBars
+        vm.preferredSpan = span.span
+        vm.historyBars = span.historyBars
+        vm.resolution = span.resolution
+        guard reconnect else { return }
+        if resolutionChanged {
+            vm.connect()
+        } else {
+            vm.fitPreferredSpan()
         }
     }
 }

@@ -1,5 +1,11 @@
 # Změny
 
+## 0.5.2 – 2026-10-12
+
+- Vložený graf v detailu má období jako aplikace TradingView: 1D (5m), 5D (15m), 1M (1H), 3M a YTD (1D),
+  1Y a 5Y (1W), Vše (1M). Výřez se nastaví přesně na zvolené období; menší intervaly jsou v plném grafu.
+- TVChart: `preferredSpan` (`ChartSpan`), `historyBars`, `fitPreferredSpan()`.
+
 ## 0.5.1 – 2026-10-12
 
 - Detail tickeru: místo jednoduchého grafu je vložený TVChart (bez indikátorů) s volbou svíčky / linka

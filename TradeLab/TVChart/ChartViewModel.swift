@@ -31,6 +31,11 @@ final class ChartViewModel {
     /// Zapisovat symbol/interval/historii do UserDefaults? Vložený graf nemá
     /// přepisovat poslední stav celoobrazovkového grafu.
     var persistsSession = true
+    /// Pevně daný výřez (1D, 5D, 1M… jako v aplikaci TradingView). Když je
+    /// nastavený, výřez se po načtení historie nastaví podle něj, ne z uložení.
+    var preferredSpan: ChartSpan?
+    /// Kolik barů historie si říct serveru.
+    var historyBars = 400
     var activeTool: String = DrawToolKind.cursor.rawValue
     /// Nové kresby vznikají bílé a tenké; barvu i tloušťku lze změnit
     /// u konkrétního objektu v jeho editoru.
@@ -231,7 +236,7 @@ final class ChartViewModel {
 
         status = "Připojuji se · \(sym)"
         client.resolution = resolution
-        client.historyBarCount = 400
+        client.historyBarCount = historyBars
         client.connect(symbol: sym)
         isConnected = true
     }
@@ -613,6 +618,15 @@ final class ChartViewModel {
         saveViewport()
     }
 
+    /// Výřez podle `preferredSpan`: zobrazí právě bary daného období.
+    func fitPreferredSpan() {
+        guard let span = preferredSpan, !bars.isEmpty else { return }
+        let count = span.barCount(in: bars)
+        viewport.barsVisible = Swift.max(Double(count), Viewport.minBars)
+        viewport.rightIndex = Double(bars.count - 1) + 1
+        viewport.resetPriceScale()
+    }
+
     /// Posun na poslední svíčku bez změny přiblížení.
     func scrollToEnd() {
         guard !bars.isEmpty else { return }
@@ -636,7 +650,7 @@ final class ChartViewModel {
     }
 
     func saveViewport() {
-        guard hasRestored, let data = try? JSONEncoder().encode(viewport) else { return }
+        guard hasRestored, persistsSession, preferredSpan == nil, let data = try? JSONEncoder().encode(viewport) else { return }
         UserDefaults.standard.set(data, forKey: viewportKey)
     }
 
@@ -646,6 +660,7 @@ final class ChartViewModel {
         guard landscape != isLandscape else { return }
         saveViewport()              // ještě pod starým klíčem
         isLandscape = landscape
+        if preferredSpan != nil { fitPreferredSpan(); return }
         if !restoreViewport() { fitContent() }
     }
 
@@ -788,7 +803,11 @@ extension ChartViewModel: TVRealtimeClientDelegate {
         bars = newBars.sorted { $0.time < $1.time }
         recomputeIndicators()
         restoreDrawings()          // nastaví hasRestored, ať smí ukládat
-        if !restoreViewport() { fitContent() }
+        if preferredSpan != nil {
+            fitPreferredSpan()
+        } else if !restoreViewport() {
+            fitContent()
+        }
         status = "Živě · \(symbol)"
     }
 
@@ -827,4 +846,43 @@ struct ChartPriceLine: Hashable, Identifiable {
     var dashed: Bool = true
 
     var id: String { "\(label)@\(price)" }
+}
+
+/// Období grafu jako v aplikaci TradingView (1D, 5D, 1M, 3M, YTD, 1Y, 5Y, Vše).
+enum ChartSpan: Hashable {
+    /// Posledních N obchodních dní (podle data v New Yorku).
+    case sessions(Int)
+    case seconds(TimeInterval)
+    case yearToDate
+    case all
+
+    func barCount(in bars: [Bar]) -> Int {
+        guard let last = bars.last else { return 0 }
+        switch self {
+        case .all:
+            return bars.count
+        case .seconds(let span):
+            return bars.filter { $0.time >= last.time - span }.count
+        case .yearToDate:
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: "America/New_York")!
+            let year = calendar.component(.year, from: Date(timeIntervalSince1970: last.time))
+            let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1))?.timeIntervalSince1970 ?? 0
+            return bars.filter { $0.time >= start }.count
+        case .sessions(let n):
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(identifier: "America/New_York")!
+            var days: [DateComponents] = []
+            var count = 0
+            for bar in bars.reversed() {
+                let day = calendar.dateComponents([.year, .month, .day], from: Date(timeIntervalSince1970: bar.time))
+                if days.last != day {
+                    if days.count == n { break }
+                    days.append(day)
+                }
+                count += 1
+            }
+            return count
+        }
+    }
 }
