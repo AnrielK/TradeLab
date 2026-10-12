@@ -1,5 +1,14 @@
 # Změny
 
+## 0.5.1 – 2026-10-12
+
+- Detail tickeru: místo jednoduchého grafu je vložený TVChart (bez indikátorů) s volbou svíčky / linka
+  a intervalu 15m–1W. Do grafu se kreslí striky (zeleně long, červeně short) a break-even (fialově)
+  aktuální opční pozice na tomto tickeru.
+- Tlačítko pro zvětšení otevře plný TVChart s vlastními indikátory a kreslením, bez čar pozice.
+- Odstraněna tlačítka „Graf TradingView“ a „Opční řetězec“, volba období je u statistik.
+- TVChart: `indicatorsEnabled`, `priceLines` (`ChartPriceLine`) a `persistsSession` pro vložené použití.
+
 ## 0.5.0 – 2026-10-12
 
 - Graf z projektu TVChart-iOS (real-time TradingView, svíčky, indikátory, kreslení, volume profil)

@@ -10,7 +10,6 @@ struct SymbolDetailView: View {
     @State private var data: ChartData?
     @State private var errorMessage: String?
     @State private var isLoading = false
-    @State private var showTradingViewChart = false
 
     var body: some View {
         List {
@@ -34,46 +33,23 @@ struct SymbolDetailView: View {
                     }
                 }
 
+                // Graf z TVChart (bez indikátorů) se striky a break-even aktuální pozice.
+                EmbeddedTVChart(symbol: symbol, priceLines: positionLines)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+            }
+
+            Section("Statistiky období") {
                 Picker("Období", selection: $range) {
                     ForEach(ChartRange.chartable) { r in
                         Text(r.label).tag(r)
                     }
                 }
                 .pickerStyle(.segmented)
-
-                ZStack {
-                    PriceChart(bars: data?.bars ?? [])
-                    if isLoading && data == nil { ProgressView() }
-                }
-                .frame(height: 240)
-                .contentShape(Rectangle())
-                .onTapGesture { showTradingViewChart = true }
-            }
-
-            if let bars = data?.bars, bars.count > 2 {
-                Section("Statistiky období") {
+                if let bars = data?.bars, bars.count > 2 {
                     statistics(bars)
+                } else if isLoading {
+                    ProgressView().frame(maxWidth: .infinity)
                 }
-            }
-
-            Section {
-                Button {
-                    showTradingViewChart = true
-                } label: {
-                    Label("Graf TradingView", systemImage: "chart.xyaxis.line")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glass)
-                .listRowBackground(Color.clear)
-
-                Button {
-                    model.openOptions(for: symbol)
-                } label: {
-                    Label("Opční řetězec", systemImage: "list.bullet.rectangle")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .listRowBackground(Color.clear)
             }
 
             if let errorMessage {
@@ -81,9 +57,6 @@ struct SymbolDetailView: View {
                     Text(errorMessage).foregroundStyle(.red)
                 }
             }
-        }
-        .fullScreenCover(isPresented: $showTradingViewChart) {
-            TVChartScreen(initialSymbol: symbol)
         }
         .navigationTitle(symbol)
         .navigationBarTitleDisplayMode(.inline)
@@ -93,6 +66,26 @@ struct SymbolDetailView: View {
             await model.client.clearCache()
             await load()
         }
+    }
+
+    /// Striky a break-even opční pozice na tomto tickeru jako čáry do grafu.
+    private var positionLines: [ChartPriceLine] {
+        let strategy = model.strategy
+        guard strategy.underlying.uppercased() == symbol.uppercased(), !strategy.optionLegs.isEmpty else { return [] }
+        var lines = strategy.optionLegs.map { leg in
+            let sign = leg.side == .long ? "+" : "−"
+            let type = leg.instrument == .call ? "C" : "P"
+            return ChartPriceLine(price: leg.strike,
+                                  label: sign + String(leg.quantity) + type + " " + leg.strike.strikeLabel,
+                                  color: leg.side == .long ? ChainTheme.long : ChainTheme.short)
+        }
+        let spot = model.strategySpot > 0 ? model.strategySpot : (data?.quote.price ?? 0)
+        if spot > 0 {
+            for be in strategy.analyze(spot: spot, market: model.market).breakevens {
+                lines.append(ChartPriceLine(price: be, label: "BE " + be.fixed(2), color: Color.purple, dashed: false))
+            }
+        }
+        return lines
     }
 
     @ViewBuilder

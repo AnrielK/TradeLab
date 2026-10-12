@@ -709,6 +709,38 @@ enum ChartRenderer {
         ctx.draw(label, at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
     }
 
+    /// Vodorovné čáry opční pozice: čára přes graf, popisek vlevo, cena na ose.
+    static func drawPriceLines(_ ctx: inout GraphicsContext, geo: ChartGeometry,
+                               lines: [ChartPriceLine], decimals: Int) {
+        for line in lines {
+            let y = geo.y(for: line.price)
+            guard y >= 0, y <= geo.candleRect.maxY else { continue }
+            var p = Path()
+            p.move(to: CGPoint(x: 0, y: y))
+            p.addLine(to: CGPoint(x: geo.plotWidth, y: y))
+            ctx.stroke(p, with: .color(line.color.opacity(0.9)),
+                       style: StrokeStyle(lineWidth: 1.2, dash: line.dashed ? [5, 4] : []))
+
+            let text = Text(line.label)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(.black)
+            let resolved = ctx.resolve(text)
+            let size = resolved.measure(in: CGSize(width: 200, height: 20))
+            let tag = CGRect(x: 6, y: y - size.height / 2 - 2,
+                             width: size.width + 8, height: size.height + 4)
+            ctx.fill(Path(roundedRect: tag, cornerRadius: 3), with: .color(line.color))
+            ctx.draw(resolved, at: CGPoint(x: tag.midX, y: tag.midY), anchor: .center)
+
+            let rect = CGRect(x: geo.plotWidth + 2, y: y - 8,
+                              width: ChartGeometry.axisWidth - 4, height: 16)
+            ctx.fill(Path(roundedRect: rect, cornerRadius: 3), with: .color(line.color))
+            ctx.draw(Text(format(line.price, decimals: decimals))
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundColor(.black),
+                     at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
+        }
+    }
+
     /// Čára poslední ceny včetně štítku vpravo.
     static func drawLastPrice(_ ctx: inout GraphicsContext, geo: ChartGeometry,
                               bar: Bar, decimals: Int, countdown: String? = nil) {

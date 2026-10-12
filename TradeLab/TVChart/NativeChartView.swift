@@ -61,6 +61,7 @@ struct NativeChartView: View {
                                                 settings: vm.volumeProfile)
                 ChartRenderer.drawCandles(&ctx, geo: geo, bars: vm.bars, kind: vm.chartKind)
                 ChartRenderer.drawIndicators(&ctx, geo: geo, outputs: vm.indicatorOutputs)
+                ChartRenderer.drawPriceLines(&ctx, geo: geo, lines: vm.priceLines, decimals: dec)
 
                 if let last = vm.lastBar {
                     ChartRenderer.drawLastPrice(&ctx, geo: geo, bar: last, decimals: dec)
@@ -167,7 +168,7 @@ struct NativeChartView: View {
 
             // Nahoře jen ty, co se kreslí přes svíčky. Oscilátory mají
             // popisek u svého panelu dole.
-            ForEach(vm.indicators.filter { $0.def?.overlay ?? true }) { ind in
+            ForEach(vm.indicatorsEnabled ? vm.indicators.filter { $0.def?.overlay ?? true } : []) { ind in
                 Text(ind.label)
                     .font(.system(size: 11))
                     .foregroundStyle(ind.style.color)

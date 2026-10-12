@@ -19,6 +19,18 @@ final class ChartViewModel {
     // MARK: Vzhled a nástroje
 
     var chartKind: String = "Candlestick"
+
+    // MARK: Vložení do TradeLabu
+
+    /// Vypnuté indikátory (malý graf v detailu tickeru); sestava zůstává uložená.
+    var indicatorsEnabled = true {
+        didSet { recomputeIndicators() }
+    }
+    /// Vodorovné čáry dodané zvenku (striky a break-even opční pozice).
+    var priceLines: [ChartPriceLine] = []
+    /// Zapisovat symbol/interval/historii do UserDefaults? Vložený graf nemá
+    /// přepisovat poslední stav celoobrazovkového grafu.
+    var persistsSession = true
     var activeTool: String = DrawToolKind.cursor.rawValue
     /// Nové kresby vznikají bílé a tenké; barvu i tloušťku lze změnit
     /// u konkrétního objektu v jeho editoru.
@@ -194,9 +206,11 @@ final class ChartViewModel {
 
     private func start(with sym: String) {
         // historie symbolů pro listování v liště
-        var recent = recentSymbols.filter { $0 != sym }
-        recent.insert(sym, at: 0)
-        recentSymbols = Array(recent.prefix(12))
+        if persistsSession {
+            var recent = recentSymbols.filter { $0 != sym }
+            recent.insert(sym, at: 0)
+            recentSymbols = Array(recent.prefix(12))
+        }
 
         // Uložit jen to, co je opravdu načtené. Při startu aplikace je pole
         // ještě prázdné (historie nedorazila) a uložení by smazalo všechno,
@@ -204,8 +218,10 @@ final class ChartViewModel {
         if hasRestored { saveDrawings() }
         hasRestored = false
         symbol = sym
-        UserDefaults.standard.set(sym, forKey: "lastSymbol")
-        UserDefaults.standard.set(resolution, forKey: "lastResolution")
+        if persistsSession {
+            UserDefaults.standard.set(sym, forKey: "lastSymbol")
+            UserDefaults.standard.set(resolution, forKey: "lastResolution")
+        }
 
         bars = []
         drawings = []
@@ -241,6 +257,7 @@ final class ChartViewModel {
         let right: Double, visible: Double, zoom: Double, shift: Double
         let bars: Int, lastTime: Double
         let indicators: Int, osc: Double, volume: Int
+        let lines: [Double]
     }
     @ObservationIgnored private var geoKey: GeoKey?
     @ObservationIgnored private var geoCache: ChartGeometry?
@@ -255,7 +272,8 @@ final class ChartViewModel {
                          bars: bars.count, lastTime: bars.last?.time ?? 0,
                          indicators: indicatorOutputs.count,
                          osc: oscHeightRatio,
-                         volume: volumeMode == .pane ? 1 : 0)
+                         volume: volumeMode == .pane ? 1 : 0,
+                         lines: priceLines.map(\.price))
         if key == geoKey, let geoCache { return geoCache }
 
         let geo = computeGeometry(for: size)
@@ -293,6 +311,11 @@ final class ChartViewModel {
                     hi = Swift.max(hi, p.value)
                 }
             }
+        }
+        // čáry opční pozice se musí vejít taky
+        for line in priceLines where line.price > 0 {
+            lo = Swift.min(lo, line.price)
+            hi = Swift.max(hi, line.price)
         }
         if lo > hi { lo = 0; hi = 1 }
         let pad = (hi - lo) * 0.08
@@ -686,7 +709,7 @@ final class ChartViewModel {
     }
 
     private func recomputeIndicators() {
-        guard !bars.isEmpty else { indicatorOutputs = []; return }
+        guard indicatorsEnabled, !bars.isEmpty else { indicatorOutputs = []; return }
         var pane = 0
         indicatorOutputs = indicators.map { inst in
             var out = IndicatorMath.compute(inst, bars: bars)
@@ -794,4 +817,14 @@ extension ChartViewModel: TVRealtimeClientDelegate {
         status = error.localizedDescription
         isConnected = false
     }
+}
+
+/// Vodorovná čára přes graf se štítkem (strike, break-even…).
+struct ChartPriceLine: Hashable, Identifiable {
+    var price: Double
+    var label: String
+    var color: Color
+    var dashed: Bool = true
+
+    var id: String { "\(label)@\(price)" }
 }
