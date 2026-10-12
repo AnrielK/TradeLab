@@ -12,6 +12,7 @@ enum OptionsMode: String, CaseIterable, Identifiable {
 struct OptionsHomeView: View {
     @Environment(AppModel.self) private var model
     @State private var mode: OptionsMode = .table
+    @State private var showTradingViewChart = false
 
     var body: some View {
         NavigationStack {
@@ -30,9 +31,17 @@ struct OptionsHomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 // Ticker se vybírá na záložce Trh; tady je výběr strategie.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Graf", systemImage: "chart.xyaxis.line") {
+                        showTradingViewChart = true
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     StrategyMenuButton()
                 }
+            }
+            .fullScreenCover(isPresented: $showTradingViewChart) {
+                TVChartScreen(initialSymbol: model.optionsSymbol)
             }
             .task(id: model.optionsSymbol) {
                 await model.chainStore.load(symbol: model.optionsSymbol, rate: model.riskFreeRate)

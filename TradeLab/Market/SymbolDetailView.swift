@@ -10,6 +10,7 @@ struct SymbolDetailView: View {
     @State private var data: ChartData?
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @State private var showTradingViewChart = false
 
     var body: some View {
         List {
@@ -45,6 +46,8 @@ struct SymbolDetailView: View {
                     if isLoading && data == nil { ProgressView() }
                 }
                 .frame(height: 240)
+                .contentShape(Rectangle())
+                .onTapGesture { showTradingViewChart = true }
             }
 
             if let bars = data?.bars, bars.count > 2 {
@@ -54,6 +57,15 @@ struct SymbolDetailView: View {
             }
 
             Section {
+                Button {
+                    showTradingViewChart = true
+                } label: {
+                    Label("Graf TradingView", systemImage: "chart.xyaxis.line")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                .listRowBackground(Color.clear)
+
                 Button {
                     model.openOptions(for: symbol)
                 } label: {
@@ -69,6 +81,9 @@ struct SymbolDetailView: View {
                     Text(errorMessage).foregroundStyle(.red)
                 }
             }
+        }
+        .fullScreenCover(isPresented: $showTradingViewChart) {
+            TVChartScreen(initialSymbol: symbol)
         }
         .navigationTitle(symbol)
         .navigationBarTitleDisplayMode(.inline)

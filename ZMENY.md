@@ -1,5 +1,11 @@
 # Změny
 
+## 0.5.0 – 2026-10-12
+
+- Graf z projektu TVChart-iOS (real-time TradingView, svíčky, indikátory, kreslení, volume profil)
+  v `TradeLab/TVChart/`. Otevírá se na celou obrazovku z detailu tickeru (tlačítko nebo klepnutí na graf)
+  a tlačítkem „Graf“ na záložce Opce, vždy pro aktuální ticker. Zavírá se křížkem, stream se odpojí.
+
 ## 0.4.1 – 2026-10-12
 
 - Vybranou nohu v tabulce jde táhnout za celé označené pole (strana i strike), ne jen za blok s počtem.

@@ -11,6 +11,7 @@ Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a o
 - **Strategie** (v záložce Opce) – šablony (spready, straddle, strangle, iron condor, butterfly, covered call…) postavené z reálného řetězce,
   graf P/L při expiraci i „dnes / za N dní“ s posunem IV, max. zisk/ztráta, break-even,
   pravděpodobnost zisku, Greeks celé pozice.
+- **Graf TradingView** – převzatý TVChart (real-time data, indikátory, kreslení) na celou obrazovku.
 - **Kalkulačka** – Black-Scholes cena + Greeks, výpočet implikované volatility z tržní ceny.
 - Bezriziková sazba se načítá z 13týdenních T-bills (`^IRX`).
 
