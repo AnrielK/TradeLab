@@ -13,7 +13,7 @@ Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a o
   pravděpodobnost zisku, Greeks celé pozice.
 - **Graf TradingView** – převzatý TVChart (real-time data, indikátory, kreslení) na celou obrazovku.
 - **Backtest** – SMA/MACD/RSI/buy & hold na denních datech, metriky, křivka kapitálu vs. SPY, drawdown, obchody.
-- **Agent** – chat s Claude (vlastní Anthropic API klíč v Keychainu), který si sám volá nástroje aplikace:
+- **Agent** – chat s Claude, ChatGPT nebo Gemini (vlastní API klíč v Keychainu), který si sám volá nástroje aplikace:
   ceny, statistiky historie, opční řetězce, ocenění, analýzu strategií z reálných kontraktů a backtest.
 - **Kalkulačka** – Black-Scholes cena + Greeks, výpočet implikované volatility z tržní ceny.
 - Bezriziková sazba se načítá z 13týdenních T-bills (`^IRX`).

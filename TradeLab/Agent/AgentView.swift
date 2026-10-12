@@ -83,9 +83,9 @@ struct AgentView: View {
 
     private var apiKeyCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Chybí Anthropic API klíč", systemImage: "key.fill")
+            Label("Chybí API klíč pro \(agent.provider.displayName)", systemImage: "key.fill")
                 .font(.headline)
-            Text("Agent volá Claude API s tvým klíčem. Klíč se uloží jen do Keychainu v tomto iPhonu.")
+            Text("Agent volá API \(agent.provider.company) s tvým klíčem. Klíč se uloží jen do Keychainu v tomto iPhonu. V nastavení můžeš přepnout na Claude, ChatGPT nebo Gemini.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button("Zadat klíč") { showSettings = true }
@@ -128,7 +128,7 @@ struct AgentView: View {
 
     private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Zeptej se agenta…", text: $draft, axis: .vertical)
+            TextField("Zeptej se – \(agent.model.name)", text: $draft, axis: .vertical)
                 .lineLimit(1...6)
                 .focused($inputFocused)
                 .padding(.horizontal, 14)
@@ -297,45 +297,84 @@ struct AgentSettingsView: View {
     @Environment(AgentModel.self) private var agent
     @Environment(\.dismiss) private var dismiss
     @State private var keyDraft = ""
+    @State private var customModel = ""
 
     var body: some View {
         @Bindable var agent = agent
+        let provider = agent.provider
         NavigationStack {
             Form {
                 Section {
-                    if let masked = agent.maskedAPIKey {
+                    Picker("Poskytovatel", selection: $agent.provider) {
+                        ForEach(Provider.allCases) { p in
+                            Text(p.displayName).tag(p)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(agent.isRunning)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                } footer: {
+                    Text("Konverzace pokračuje i po přepnutí – nový model dostane celou dosavadní historii.")
+                }
+
+                Section {
+                    if let masked = agent.maskedAPIKey(for: provider) {
                         LabeledContent("Uložený klíč", value: masked)
                             .monospaced()
                     }
-                    SecureField("sk-ant-…", text: $keyDraft)
+                    SecureField(provider.keyPlaceholder, text: $keyDraft)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     Button(agent.hasAPIKey ? "Nahradit klíč" : "Uložit klíč") {
-                        agent.saveAPIKey(keyDraft)
+                        agent.saveAPIKey(keyDraft, for: provider)
                         keyDraft = ""
                     }
                     .disabled(keyDraft.trimmingCharacters(in: .whitespaces).isEmpty)
                     if agent.hasAPIKey {
-                        Button("Odebrat klíč", role: .destructive) { agent.removeAPIKey() }
+                        Button("Odebrat klíč", role: .destructive) { agent.removeAPIKey(for: provider) }
                     }
                 } header: {
-                    Text("Anthropic API klíč")
+                    Text("API klíč \(provider.company)")
                 } footer: {
-                    Text("Klíč vytvoříš v Claude Console (console.anthropic.com). Ukládá se jen do Keychainu tohoto zařízení a posílá se pouze na api.anthropic.com.")
+                    Text("Klíč vytvoříš na \(provider.keyConsole). Ukládá se jen do Keychainu tohoto zařízení a posílá se pouze na \(provider.apiHost).")
                 }
 
-                Section("Model") {
+                Section {
                     Picker("Model", selection: $agent.modelID) {
-                        ForEach(ClaudeModel.all) { m in
+                        ForEach(provider.models) { m in
                             VStack(alignment: .leading) {
                                 Text(m.name)
-                                Text(m.note).font(.caption).foregroundStyle(.secondary)
+                                Text("\(m.id) · \(m.note)").font(.caption).foregroundStyle(.secondary)
                             }
                             .tag(m.id)
+                        }
+                        if !provider.models.contains(where: { $0.id == agent.modelID }) {
+                            VStack(alignment: .leading) {
+                                Text(agent.modelID)
+                                Text("vlastní model").font(.caption).foregroundStyle(.secondary)
+                            }
+                            .tag(agent.modelID)
                         }
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
+
+                    HStack {
+                        TextField("Vlastní ID modelu", text: $customModel)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.callout.monospaced())
+                        Button("Použít") {
+                            agent.modelID = customModel.trimmingCharacters(in: .whitespaces)
+                            customModel = ""
+                        }
+                        .disabled(customModel.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: {
+                    Text("Model")
+                } footer: {
+                    Text("Když poskytovatel vydá nový model, stačí zadat jeho ID.")
                 }
 
                 Section("Spotřeba v této relaci") {
@@ -351,6 +390,7 @@ struct AgentSettingsView: View {
                     Button("Hotovo") { dismiss() }
                 }
             }
+            .onChange(of: agent.provider) { keyDraft = "" }
         }
     }
 }

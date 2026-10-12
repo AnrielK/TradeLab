@@ -1,25 +1,124 @@
 import Foundation
 
-/// Modely Claude, které agent nabízí.
-public struct ClaudeModel: Hashable, Identifiable, Sendable {
+/// Poskytovatel jazykového modelu.
+public enum Provider: String, CaseIterable, Identifiable, Codable, Sendable {
+    case anthropic
+    case openai
+    case gemini
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .anthropic: return "Claude"
+        case .openai: return "ChatGPT"
+        case .gemini: return "Gemini"
+        }
+    }
+
+    public var company: String {
+        switch self {
+        case .anthropic: return "Anthropic"
+        case .openai: return "OpenAI"
+        case .gemini: return "Google"
+        }
+    }
+
+    /// Kde si uživatel vytvoří API klíč.
+    public var keyConsole: String {
+        switch self {
+        case .anthropic: return "console.anthropic.com"
+        case .openai: return "platform.openai.com/api-keys"
+        case .gemini: return "aistudio.google.com/apikey"
+        }
+    }
+
+    public var apiHost: String {
+        switch self {
+        case .anthropic: return "api.anthropic.com"
+        case .openai: return "api.openai.com"
+        case .gemini: return "generativelanguage.googleapis.com"
+        }
+    }
+
+    public var keyPlaceholder: String {
+        switch self {
+        case .anthropic: return "sk-ant-…"
+        case .openai: return "sk-…"
+        case .gemini: return "AIza…"
+        }
+    }
+
+    public var models: [ModelOption] {
+        ModelOption.all.filter { $0.provider == self }
+    }
+
+    public var defaultModel: ModelOption { models[0] }
+
+    /// Transport pro tohoto poskytovatele.
+    public func transport(apiKey: String) -> MessagesTransport {
+        switch self {
+        case .anthropic: return HTTPMessagesTransport(apiKey: apiKey)
+        case .openai: return OpenAITransport(apiKey: apiKey)
+        case .gemini: return GeminiTransport(apiKey: apiKey)
+        }
+    }
+}
+
+/// Model nabízený v nastavení agenta (vlastní ID jde zadat ručně).
+public struct ModelOption: Hashable, Identifiable, Sendable {
     public var id: String
     public var name: String
     public var note: String
+    public var provider: Provider
 
-    public init(id: String, name: String, note: String) {
+    public init(id: String, name: String, note: String, provider: Provider) {
         self.id = id
         self.name = name
         self.note = note
+        self.provider = provider
     }
 
-    public static let opus = ClaudeModel(id: "claude-opus-5-5", name: "Opus 5.5", note: "nejchytřejší, výchozí")
-    public static let sonnet = ClaudeModel(id: "claude-sonnet-5-5", name: "Sonnet 5.5", note: "rychlý a levnější")
-    public static let haiku = ClaudeModel(id: "claude-haiku-5-5", name: "Haiku 5.5", note: "nejrychlejší a nejlevnější")
+    public static let all: [ModelOption] = [
+        ModelOption(id: "claude-opus-5-5", name: "Opus 5.5", note: "nejchytřejší, výchozí", provider: .anthropic),
+        ModelOption(id: "claude-sonnet-5-5", name: "Sonnet 5.5", note: "rychlý a levnější", provider: .anthropic),
+        ModelOption(id: "claude-haiku-5-5", name: "Haiku 5.5", note: "nejrychlejší a nejlevnější", provider: .anthropic),
+        ModelOption(id: "gpt-6.1-sol", name: "GPT-6.1 Sol", note: "vyvážený, výchozí", provider: .openai),
+        ModelOption(id: "gpt-6-astra", name: "GPT-6 Astra", note: "nejschopnější", provider: .openai),
+        ModelOption(id: "gpt-6-luna", name: "GPT-6 Luna", note: "nejrychlejší a nejlevnější", provider: .openai),
+        ModelOption(id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", note: "stabilní, výchozí", provider: .gemini),
+        ModelOption(id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", note: "nejschopnější (preview)", provider: .gemini),
+        ModelOption(id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash-Lite", note: "nejrychlejší a nejlevnější", provider: .gemini),
+    ]
 
-    public static let all: [ClaudeModel] = [.opus, .sonnet, .haiku]
+    /// Známý model podle ID, jinak vlastní záznam.
+    public static func named(_ id: String, provider: Provider) -> ModelOption {
+        all.first { $0.id == id } ?? ModelOption(id: id, name: id, note: "vlastní model", provider: provider)
+    }
+}
 
-    public static func named(_ id: String) -> ClaudeModel {
-        all.first { $0.id == id } ?? .opus
+/// Typ skrytého bloku se surovými daty poskytovatele (podpisy myšlení, reasoning položky).
+/// Do Claude API se neposílá; OpenAI a Gemini ho při dalším kole vrací beze změny.
+public enum ProviderBlock {
+    public static let type = "_provider"
+
+    public static func make(_ provider: Provider, _ payload: JSONValue) -> JSONValue {
+        ["type": .string(type), "provider": .string(provider.rawValue), "payload": payload]
+    }
+
+    public static func payload(in message: Message, for provider: Provider) -> JSONValue? {
+        message.content.first {
+            $0["type"]?.stringValue == type && $0["provider"]?.stringValue == provider.rawValue
+        }?["payload"]
+    }
+
+    /// Bloky bez interních (`_`) typů a klíčů.
+    static func sanitized(_ blocks: [JSONValue]) -> [JSONValue] {
+        blocks.compactMap { block in
+            guard let o = block.objectValue else { return block }
+            if o["type"]?.stringValue?.hasPrefix("_") == true { return nil }
+            return .object(o.filter { !$0.key.hasPrefix("_") })
+        }
     }
 }
 
@@ -61,9 +160,6 @@ public struct Message: Hashable, Codable, Sendable, Identifiable {
         content.compactMap(ToolResult.init(block:))
     }
 
-    var apiValue: JSONValue {
-        ["role": .string(role.rawValue), "content": .array(content)]
-    }
 }
 
 /// Konstruktory bloků obsahu.
@@ -196,7 +292,11 @@ public struct MessagesRequest: Sendable {
         if let system, !system.isEmpty {
             o["system"] = [["type": "text", "text": .string(system), "cache_control": ["type": "ephemeral"]]]
         }
-        var apiMessages = messages.map(\.apiValue)
+        var apiMessages: [JSONValue] = messages.compactMap { message in
+            let blocks = ProviderBlock.sanitized(message.content)
+            guard !blocks.isEmpty else { return nil }
+            return ["role": .string(message.role.rawValue), "content": .array(blocks)]
+        }
         if var last = apiMessages.last?.objectValue,
            var blocks = last["content"]?.arrayValue,
            var lastBlock = blocks.last?.objectValue {
@@ -248,7 +348,7 @@ public enum ClaudeAPIError: Error, LocalizedError, Equatable {
         case .missingAPIKey:
             return "Chybí API klíč. Zadej ho v nastavení agenta."
         case .invalidResponse:
-            return "Neočekávaná odpověď Claude API."
+            return "Neočekávaná odpověď API."
         case .http(let status, let type, let message):
             let base: String
             switch status {
@@ -257,9 +357,9 @@ public enum ClaudeAPIError: Error, LocalizedError, Equatable {
             case 404: base = "Model nenalezen"
             case 413: base = "Požadavek je moc velký"
             case 429: base = "Překročen limit požadavků"
-            case 529: base = "Claude API je přetížené"
-            case 500...599: base = "Chyba serveru Claude API"
-            default: base = "Chyba Claude API (\(status))"
+            case 503, 529: base = "API je přetížené"
+            case 500...599: base = "Chyba serveru API"
+            default: base = "Chyba API (\(status))"
             }
             if let message, !message.isEmpty {
                 return "\(base): \(message)"
@@ -268,12 +368,13 @@ public enum ClaudeAPIError: Error, LocalizedError, Equatable {
         }
     }
 
-    /// Rozparsuje chybové tělo `{"type":"error","error":{"type":…,"message":…}}`.
+    /// Rozparsuje chybové tělo: Anthropic `{"error":{"type","message"}}`,
+    /// OpenAI `{"error":{"type","code","message"}}`, Gemini `{"error":{"status","message"}}`.
     public static func from(status: Int, body: Data) -> ClaudeAPIError {
         let json = try? JSONDecoder().decode(JSONValue.self, from: body)
-        return .http(status: status,
-                     type: json?["error"]?["type"]?.stringValue,
-                     message: json?["error"]?["message"]?.stringValue)
+        let error = json?["error"]
+        let type = error?["type"]?.stringValue ?? error?["status"]?.stringValue ?? error?["code"]?.stringValue
+        return .http(status: status, type: type, message: error?["message"]?.stringValue)
     }
 
     var isRetryable: Bool {

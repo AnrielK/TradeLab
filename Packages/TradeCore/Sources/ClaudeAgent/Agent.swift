@@ -66,7 +66,7 @@ public struct Agent: Sendable {
     public var maxTokens: Int
     public var maxTurns: Int
 
-    public init(transport: MessagesTransport, model: String = ClaudeModel.opus.id, system: String? = nil,
+    public init(transport: MessagesTransport, model: String = Provider.anthropic.defaultModel.id, system: String? = nil,
                 tools: [AgentTool] = [], maxTokens: Int = 8_000, maxTurns: Int = 10) {
         self.transport = transport
         self.model = model

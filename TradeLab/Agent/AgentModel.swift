@@ -5,13 +5,21 @@ import ClaudeAgent
 @MainActor
 @Observable
 final class AgentModel {
-    private static let keyAccount = "anthropic-api-key"
-    private static let modelKey = "agentModel"
+    private static let providerKey = "agentProvider"
 
     private(set) var messages: [Message] = []
-    private(set) var hasAPIKey: Bool
+    /// Poskytovatelé s uloženým klíčem.
+    private(set) var configuredProviders: Set<Provider> = []
+
+    var provider: Provider {
+        didSet {
+            UserDefaults.standard.set(provider.rawValue, forKey: Self.providerKey)
+            modelID = Self.storedModel(for: provider)
+        }
+    }
+
     var modelID: String {
-        didSet { UserDefaults.standard.set(modelID, forKey: Self.modelKey) }
+        didSet { UserDefaults.standard.set(modelID, forKey: Self.modelKey(provider)) }
     }
 
     private(set) var isRunning = false
@@ -22,34 +30,42 @@ final class AgentModel {
     private var task: Task<Void, Never>? = nil
 
     init() {
-        hasAPIKey = !(KeychainStore.read(Self.keyAccount) ?? "").isEmpty
-        modelID = UserDefaults.standard.string(forKey: Self.modelKey) ?? ClaudeModel.opus.id
+        let stored = UserDefaults.standard.string(forKey: Self.providerKey).flatMap(Provider.init(rawValue:)) ?? .anthropic
+        provider = stored
+        modelID = Self.storedModel(for: stored)
+        configuredProviders = Set(Provider.allCases.filter { !(KeychainStore.read(Self.keyAccount($0)) ?? "").isEmpty })
         messages = Self.loadConversation()
     }
 
-    var model: ClaudeModel { ClaudeModel.named(modelID) }
+    private static func keyAccount(_ provider: Provider) -> String { "\(provider.rawValue)-api-key" }
+    private static func modelKey(_ provider: Provider) -> String { "agentModel.\(provider.rawValue)" }
 
-    // MARK: - API klíč
-
-    func saveAPIKey(_ key: String) {
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            KeychainStore.delete(Self.keyAccount)
-        } else {
-            KeychainStore.save(trimmed, for: Self.keyAccount)
-        }
-        hasAPIKey = !trimmed.isEmpty
+    private static func storedModel(for provider: Provider) -> String {
+        UserDefaults.standard.string(forKey: modelKey(provider)) ?? provider.defaultModel.id
     }
 
-    func removeAPIKey() {
-        KeychainStore.delete(Self.keyAccount)
-        hasAPIKey = false
+    var model: ModelOption { ModelOption.named(modelID, provider: provider) }
+    var hasAPIKey: Bool { configuredProviders.contains(provider) }
+
+    // MARK: - API klíče
+
+    func saveAPIKey(_ key: String, for provider: Provider) {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        KeychainStore.save(trimmed, for: Self.keyAccount(provider))
+        configuredProviders.insert(provider)
+    }
+
+    func removeAPIKey(for provider: Provider) {
+        KeychainStore.delete(Self.keyAccount(provider))
+        configuredProviders.remove(provider)
     }
 
     /// Maskovaný klíč pro zobrazení v nastavení.
-    var maskedAPIKey: String? {
-        guard let key = KeychainStore.read(Self.keyAccount), key.count > 12 else { return nil }
-        return String(key.prefix(7)) + "…" + String(key.suffix(4))
+    func maskedAPIKey(for provider: Provider) -> String? {
+        guard configuredProviders.contains(provider),
+              let key = KeychainStore.read(Self.keyAccount(provider)), key.count > 12 else { return nil }
+        return String(key.prefix(6)) + "…" + String(key.suffix(4))
     }
 
     // MARK: - Konverzace
@@ -66,8 +82,8 @@ final class AgentModel {
     func send(_ text: String, app: AppModel) {
         let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isRunning else { return }
-        guard let key = KeychainStore.read(Self.keyAccount), !key.isEmpty else {
-            errorMessage = ClaudeAPIError.missingAPIKey.localizedDescription
+        guard let key = KeychainStore.read(Self.keyAccount(provider)), !key.isEmpty else {
+            errorMessage = "Chybí API klíč pro \(provider.displayName). Zadej ho v nastavení agenta."
             return
         }
         errorMessage = nil
@@ -75,7 +91,7 @@ final class AgentModel {
         save()
 
         let agent = Agent(
-            transport: HTTPMessagesTransport(apiKey: key),
+            transport: provider.transport(apiKey: key),
             model: modelID,
             system: Self.systemPrompt(rate: app.riskFreeRate),
             tools: AgentToolbox.tools(model: app),
@@ -130,13 +146,14 @@ final class AgentModel {
         task = nil
         if let error {
             if (error as? URLError)?.code == .cancelled { return }
-            errorMessage = error.localizedDescription
+            errorMessage = "\(provider.displayName): \(error.localizedDescription)"
             return
         }
         switch stop {
         case .maxTokens: errorMessage = "Odpověď byla useknuta (limit délky)."
         case .refusal: errorMessage = "Model odmítl odpovědět."
         case .turnLimit: errorMessage = "Agent dosáhl limitu kroků. Napiš „pokračuj“."
+        case .other("malformed_function_call"): errorMessage = "Model poslal neplatné volání nástroje. Zkus dotaz zopakovat."
         case .other(let reason): errorMessage = "Zastaveno: \(reason)"
         default: break
         }

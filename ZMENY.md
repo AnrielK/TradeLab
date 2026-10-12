@@ -1,5 +1,14 @@
 # Změny
 
+## 0.7.1 – 2026-10-12
+
+- Agent umí kromě Claude i **ChatGPT** (OpenAI Responses API: GPT-6.1 Sol, GPT-6 Astra, GPT-6 Luna)
+  a **Gemini** (generateContent: Gemini 3.8 Flash, 3.1 Pro preview, 3.5 Flash-Lite) se stejnými nástroji.
+- Nastavení: přepínač poskytovatele, samostatný klíč pro každého (Keychain), výběr modelu a vlastní ID modelu.
+- Konverzaci jde přepnout na jiný model uprostřed – historie se převádí; šifrované reasoning položky OpenAI
+  a podpisy myšlení Gemini se ukládají a vrací beze změny.
+- Jádro: `OpenAITransport`, `GeminiTransport`, `Provider`, `ModelOption`; testy převodu tam i zpět.
+
 ## 0.7.0 – 2026-10-12
 
 - Nová záložka **Agent**: chat s Claude (Opus 5.5 výchozí, Sonnet 5.5, Haiku 5.5), který si sám volá
