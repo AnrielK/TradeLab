@@ -38,9 +38,10 @@ enum TeamPresets {
                     id: "quant", name: "Kvant", icon: "function",
                     instructions: """
                     Spusť 2–3 backtesty za 5 let (SMA 50/200, MACD 12/26/9, RSI 14 30/70) a porovnej s buy & hold \
-                    (CAGR, Sharpe, max. drawdown). Závěr: jaký režim (trend vs. mean reversion) u tohoto titulu fungoval.
+                    (CAGR, Sharpe, max. drawdown). Pro nejlepší pravidlo spusť i run_options_backtest (selection auto) \
+                    a porovnej s akciemi. Závěr: jaký režim (trend vs. mean reversion) u tohoto titulu fungoval.
                     """,
-                    tools: ["run_backtest", "get_price_history"]),
+                    tools: ["run_backtest", "run_options_backtest", "get_price_history"]),
             ]),
             TeamStage([
                 TeamRole(

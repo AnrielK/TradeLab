@@ -163,6 +163,34 @@ enum AgentToolbox {
             ) { input in try await drawOnChart(input, model: model) },
 
             AgentTool(
+                name: "run_options_backtest",
+                description: """
+                Simulovaný backtest opčních strategií: pravidlo (stejná jako v run_backtest, stejné parametry) dává směr \
+                a podle situace se otevře opční strategie. selection auto: býčí signál + vysoká volatilita → bull put spread, \
+                nízká → bull call spread; medvědí → bear call / bear put spread; bez signálu volitelně iron condor. \
+                selection fixed: bullish_play / bearish_play. Ceny opcí z Black-Scholes (IV = HV 20 × iv_multiplier), \
+                skluz a poplatky, velikost podle rizika na obchod. Vrací metriky vs. buy & hold, rozpad podle strategií a poslední obchody. \
+                Jde o simulaci, ne o historické kotace opcí – uveď to.
+                """,
+                inputSchema: Schema.object([
+                    "symbol": Schema.string("Ticker"),
+                    "strategy": Schema.string("Pravidlo pro směr (viz run_backtest)"),
+                    "range": Schema.string("Období (výchozí 5y)", enum: HistoryRange.allCases.map(\.rawValue)),
+                    "selection": Schema.string("auto (podle situace) nebo fixed", enum: ["auto", "fixed"]),
+                    "bullish_play": Schema.string("fixed: strategie pro býčí signál", enum: OptionPlay.allCases.filter { $0.direction == 1 }.map(\.rawValue)),
+                    "bearish_play": Schema.string("fixed: strategie pro medvědí signál", enum: OptionPlay.allCases.filter { $0.direction == -1 }.map(\.rawValue)),
+                    "allow_bearish": Schema.boolean("Obchodovat i medvědí signály (výchozí true)"),
+                    "neutral_condor": Schema.boolean("auto: iron condor bez signálu při vysoké volatilitě (výchozí false)"),
+                    "days_to_expiry": Schema.integer("DTE při otevření (výchozí 35)"),
+                    "short_delta": Schema.number("Delta prodávané nohy (výchozí 0.30)"),
+                    "width_pct": Schema.number("Šířka spreadu v % ceny (výchozí 5)"),
+                    "risk_pct": Schema.number("Max. ztráta obchodu v % kapitálu (výchozí 5)"),
+                    "high_vol_rank": Schema.number("Percentil HV pro „vysokou“ volatilitu (výchozí 50)"),
+                    "iv_multiplier": Schema.number("IV = HV × násobek (výchozí 1.1)"),
+                ], required: ["symbol", "strategy"])
+            ) { input in try await optionsBacktest(input, model: model) },
+
+            AgentTool(
                 name: "run_backtest",
                 description: """
                 Backtest pravidla (signál ze zavírací ceny svíčky, obchod za otevírací cenu další svíčky) a srovnání \
@@ -774,9 +802,75 @@ enum AgentToolbox {
 
     // MARK: - Backtest
 
-    static func backtest(_ input: JSONValue, model: AppModel) async throws -> String {
+    static func optionsBacktest(_ input: JSONValue, model: AppModel) async throws -> String {
         let s = try symbol(input)
         let range = input["range"]?.stringValue.flatMap(HistoryRange.init(rawValue:)) ?? .fiveYears
+        let signal = try parseStrategy(input)
+        let allowBearish = input["allow_bearish"]?.boolValue ?? true
+        let selection: OptionSelection
+        if input["selection"]?.stringValue == "fixed" {
+            let bullish = input["bullish_play"]?.stringValue.flatMap(OptionPlay.init(rawValue:)) ?? .bullCallSpread
+            let bearish = input["bearish_play"]?.stringValue.flatMap(OptionPlay.init(rawValue:)) ?? .bearPutSpread
+            selection = .fixed(bullish: bullish, bearish: bearish)
+        } else {
+            selection = .auto(neutralCondor: input["neutral_condor"]?.boolValue ?? false)
+        }
+        let config = OptionsBacktestConfig(
+            signal: signal, selection: selection, allowBearish: allowBearish,
+            daysToExpiry: input["days_to_expiry"]?.intValue ?? 35,
+            shortDelta: input["short_delta"]?.doubleValue ?? 0.30,
+            widthPct: (input["width_pct"]?.doubleValue ?? 5) / 100,
+            ivMultiplier: input["iv_multiplier"]?.doubleValue ?? 1.1,
+            highVolRank: input["high_vol_rank"]?.doubleValue ?? 50,
+            riskPerTrade: (input["risk_pct"]?.doubleValue ?? 5) / 100,
+            riskFreeRate: model.riskFreeRate)
+
+        let series = try await BacktestData.load(symbol: s, range: range, client: model.client)
+        let bars = series.bars
+        guard bars.count > 60 else { throw ToolError("Málo dat (\(bars.count) svíček).") }
+        let result = await Task.detached(priority: .userInitiated) { OptionsBacktest.run(bars: bars, config: config) }.value
+
+        func metrics(_ m: BacktestMetrics) -> JSONValue {
+            [
+                "total_return_pct": pct(m.totalReturn), "cagr_pct": pct(m.cagr), "sharpe": num(m.sharpe),
+                "max_drawdown_pct": pct(m.maxDrawdown), "trades": .number(Double(m.tradeCount)),
+                "win_rate_pct": pct(m.winRate), "avg_return_on_risk_pct": pct(m.averageTrade),
+                "exposure_pct": pct(m.exposure),
+            ]
+        }
+        let plays: [JSONValue] = result.playCounts.map {
+            ["play": .string($0.play.rawValue), "trades": .number(Double($0.count)), "pnl_usd": num($0.pnl, 0)]
+        }
+        let lastTrades: [JSONValue] = result.trades.suffix(6).map { t in
+            [
+                "play": .string(t.play.rawValue),
+                "legs": .string(t.legsText),
+                "entry": .string(day(t.entryDate)),
+                "exit": t.exitDate.map { JSONValue.string(day($0)) } ?? "otevřený",
+                "reason": .string(t.exitReason),
+                "premium": num(t.entryPremium),
+                "pnl_usd": num(t.pnl, 0),
+                "return_on_risk_pct": pct(t.returnOnRisk),
+                "iv_pct": pct(t.impliedVol),
+                "hv_rank": num(t.volRank, 0),
+            ]
+        }
+        let summary: [String: JSONValue] = [
+            "symbol": .string(s),
+            "signal_rule": .string(signal.name),
+            "data": .string(series.label),
+            "from": .string(day(bars[0].date)),
+            "to": .string(day(bars[bars.count - 1].date)),
+            "options": metrics(result.metrics),
+            "buy_and_hold_underlying": metrics(result.buyAndHoldMetrics),
+            "plays": .array(plays),
+            "last_trades": .array(lastTrades),
+            "note": "Simulace: ceny opcí z Black-Scholes s IV odvozenou z historické volatility, ne historické kotace.",
+        ]
+        return output(.object(summary))
+    }
+
+    static func parseStrategy(_ input: JSONValue) throws -> BacktestStrategy {
         let strategy: BacktestStrategy
         switch input["strategy"]?.stringValue {
         case "sma_cross":
@@ -819,6 +913,13 @@ enum AgentToolbox {
         default:
             throw ToolError("Neznámé pravidlo. Použij sma_cross, macd_cross, rsi_reversion, break_retest, reversal, ma_bounce nebo buy_and_hold.")
         }
+        return strategy
+    }
+
+    static func backtest(_ input: JSONValue, model: AppModel) async throws -> String {
+        let s = try symbol(input)
+        let range = input["range"]?.stringValue.flatMap(HistoryRange.init(rawValue:)) ?? .fiveYears
+        let strategy = try parseStrategy(input)
 
         let series = try await BacktestData.load(symbol: s, range: range, client: model.client)
         let bars = series.bars

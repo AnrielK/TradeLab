@@ -1,5 +1,20 @@
 # Změny
 
+## 0.13.0 – 2026-10-13
+
+- **Opční backtest** (Backtest → Obchodovat: Opce): zvolená strategie dává jen směr a opční strategie se vybere
+  podle situace:
+  - býčí signál + vysoká volatilita → bull put spread (kredit), nízká → bull call spread (debet);
+  - medvědí signál → bear call / bear put spread; bez signálu volitelně iron condor;
+  - nebo pevně zvolené strategie (vč. long call / long put).
+- Simulace: ceny opcí z Black-Scholes s IV = realizovaná volatilita 20 svíček × násobek, „vysoká“ volatilita
+  podle percentilu za rok, striky na mřížce podle delty (short noha 30Δ) a šířky, skluz a poplatky za nohu,
+  velikost pozice podle rizika na obchod. Výstupy: cíl (50 % kreditu / +100 % debetu), stop (2× kredit / −50 % debetu),
+  7 dní před expirací, změna signálu.
+- Výsledky: metriky vs. buy & hold podkladu, rozpad podle zvolených strategií, obchody s nohami, IV a HV rankem.
+- Agent: nástroj `run_options_backtest`; kvant v Investičním výboru porovnává akcie a opce.
+- Jádro: `OptionsBacktest`, `OptionPlay`, `OptionSelection`, `OptionsBacktestConfig` s testy.
+
 ## 0.12.0 – 2026-10-12
 
 - Backtest: strategie nad strukturou trhu – hladiny a trendlinie se v každé svíčce skládají jen z potvrzených

@@ -43,6 +43,12 @@ enum StrategyKind: String, CaseIterable, Identifiable {
     }
 }
 
+enum BacktestInstrument: String, CaseIterable, Identifiable {
+    case stock = "Akcie"
+    case options = "Opce"
+    var id: String { rawValue }
+}
+
 struct CurvePoint: Identifiable {
     let date: Date
     let value: Double
@@ -79,6 +85,22 @@ final class BacktestModel {
     var rewardRisk = 2.0
     var pullbackTrend = 200
     var pullbackSwing = 20
+    var instrument: BacktestInstrument = .stock
+    var optionsAuto = true
+    var neutralCondor = false
+    var fixedBullish: OptionPlay = .bullCallSpread
+    var fixedBearish: OptionPlay = .bearPutSpread
+    var daysToExpiry = 35
+    var shortDelta = 0.30
+    var widthPct = 5.0
+    var riskPerTradePct = 5.0
+    var ivMultiplier = 1.1
+    var highVolRank = 50.0
+    var creditTakeProfitPct = 50.0
+    var creditStopMultiple = 2.0
+    var debitTakeProfitPct = 100.0
+    var debitStopPct = 50.0
+    var optionsResult: OptionsBacktestResult? = nil
     var fibExit = false
     var fibLookback = 20
     var fibTarget = 1.272
@@ -118,6 +140,18 @@ final class BacktestModel {
         }
     }
 
+    func optionsConfig(riskFreeRate: Double) -> OptionsBacktestConfig {
+        OptionsBacktestConfig(
+            signal: strategy,
+            selection: optionsAuto ? .auto(neutralCondor: neutralCondor)
+                                   : .fixed(bullish: fixedBullish, bearish: allowShort ? fixedBearish : nil),
+            allowBearish: allowShort,
+            daysToExpiry: daysToExpiry, shortDelta: shortDelta, widthPct: widthPct / 100,
+            ivMultiplier: ivMultiplier, highVolRank: highVolRank, riskPerTrade: riskPerTradePct / 100,
+            creditTakeProfit: creditTakeProfitPct / 100, debitTakeProfit: debitTakeProfitPct / 100,
+            creditStop: creditStopMultiple, debitStop: debitStopPct / 100, riskFreeRate: riskFreeRate)
+    }
+
     var exitRule: ExitRule {
         fibExit ? .fibonacci(lookback: fibLookback, target: fibTarget, stop: fibStop) : .strategy
     }
@@ -141,9 +175,16 @@ final class BacktestModel {
             let config = BacktestConfig(strategy: strategy, allowShort: allowShort, costBps: costBps,
                                         riskFreeRate: riskFreeRate, exit: exitRule)
             // Strukturní strategie počítají hladiny v každé svíčce – mimo hlavní vlákno.
-            result = await Task.detached(priority: .userInitiated) {
-                BacktestEngine.run(bars: bars, config: config)
-            }.value
+            if instrument == .options {
+                let optionsConfig = self.optionsConfig(riskFreeRate: riskFreeRate)
+                optionsResult = await Task.detached(priority: .userInitiated) {
+                    OptionsBacktest.run(bars: bars, config: optionsConfig)
+                }.value
+            } else {
+                result = await Task.detached(priority: .userInitiated) {
+                    BacktestEngine.run(bars: bars, config: config)
+                }.value
+            }
             dataLabel = series.label
 
             benchmark = []
@@ -175,12 +216,23 @@ struct BacktestView: View {
         @Bindable var bt = bt
         NavigationStack {
             List {
+                instrumentSection
                 settingsSection
+                if bt.instrument == .options { optionsSection }
                 dataSection
                 if let error = bt.errorMessage {
                     Section { Text(error).foregroundStyle(.red) }
                 }
-                if let result = bt.result {
+                if bt.instrument == .options {
+                    if let result = bt.optionsResult {
+                        metricsSection(name: "Opce", m: result.metrics, h: result.buyAndHoldMetrics,
+                                       footer: "Simulace: ceny opcí z Black-Scholes (IV = HV 20 × \(bt.ivMultiplier.fixed(1))), skluz a poplatky. Win rate a Ø obchod jsou vůči riziku obchodu.")
+                        playsSection(result)
+                        equitySection(equity: result.equity, hold: result.buyAndHold)
+                        drawdownSection(equity: result.equity)
+                        optionTradesSection(result)
+                    }
+                } else if let result = bt.result {
                     metricsSection(result)
                     equitySection(result)
                     drawdownSection(result)
@@ -260,11 +312,13 @@ struct BacktestView: View {
             }
 
             if bt.kind != .hold {
-                Toggle("Povolit short", isOn: $bt.allowShort)
+                Toggle(bt.instrument == .options ? "Povolit medvědí strategie" : "Povolit short", isOn: $bt.allowShort)
             }
 
-            Toggle("Fibonacciho výstup", isOn: $bt.fibExit.animation())
-            if bt.fibExit {
+            if bt.instrument == .stock {
+                Toggle("Fibonacciho výstup", isOn: $bt.fibExit.animation())
+            }
+            if bt.fibExit, bt.instrument == .stock {
                 Stepper("Swing z \(bt.fibLookback) svíček", value: $bt.fibLookback, in: 5...200, step: 5)
                 Picker("Cíl (extenze)", selection: $bt.fibTarget) {
                     Text("1.0 – předchozí extrém").tag(1.0)
@@ -305,6 +359,115 @@ struct BacktestView: View {
         }
     }
 
+    private var instrumentSection: some View {
+        @Bindable var bt = bt
+        return Section {
+            Picker("Obchodovat", selection: $bt.instrument) {
+                ForEach(BacktestInstrument.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+        } footer: {
+            Text(bt.instrument == .stock
+                 ? "Strategie obchoduje přímo podklad."
+                 : "Strategie dává jen směr (long / short / bez signálu) a podle situace se otevře opční strategie. Ceny opcí se simulují – historické kotace opcí nejsou volně dostupné.")
+        }
+    }
+
+    private var optionsSection: some View {
+        @Bindable var bt = bt
+        return Section {
+            Picker("Výběr strategie", selection: $bt.optionsAuto) {
+                Text("Podle situace").tag(true)
+                Text("Pevně").tag(false)
+            }
+            .pickerStyle(.segmented)
+            if bt.optionsAuto {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Býčí signál: vysoká volatilita → **bull put spread** (kredit), nízká → **bull call spread** (debet).")
+                    Text("Medvědí signál (s povoleným short): vysoká → **bear call spread**, nízká → **bear put spread**.")
+                    Text("Bez signálu: volitelně **iron condor** při vysoké volatilitě.")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Toggle("Iron condor bez signálu", isOn: $bt.neutralCondor)
+                Stepper("Vysoká volatilita od \(Int(bt.highVolRank)). percentilu", value: $bt.highVolRank, in: 20...80, step: 10)
+            } else {
+                Picker("Býčí signál", selection: $bt.fixedBullish) {
+                    ForEach(OptionPlay.allCases.filter { $0.direction == 1 }, id: \.self) { Text($0.name).tag($0) }
+                }
+                Picker("Medvědí signál", selection: $bt.fixedBearish) {
+                    ForEach(OptionPlay.allCases.filter { $0.direction == -1 }, id: \.self) { Text($0.name).tag($0) }
+                }
+                .disabled(!bt.allowShort)
+            }
+            Stepper("Expirace: \(bt.daysToExpiry) dní", value: $bt.daysToExpiry, in: 7...120, step: 7)
+            Stepper("Short noha: \(Int(bt.shortDelta * 100))Δ", value: $bt.shortDelta, in: 0.10...0.45, step: 0.05)
+            Stepper("Šířka spreadu: \(bt.widthPct.fixed(1)) % ceny", value: $bt.widthPct, in: 1...15, step: 0.5)
+            Stepper("Riziko na obchod: \(bt.riskPerTradePct.fixed(0)) % kapitálu", value: $bt.riskPerTradePct, in: 1...20, step: 1)
+            Stepper("Kredit: cíl \(Int(bt.creditTakeProfitPct)) % max. zisku", value: $bt.creditTakeProfitPct, in: 20...100, step: 10)
+            Stepper("Kredit: stop \(bt.creditStopMultiple.fixed(1))× kreditu", value: $bt.creditStopMultiple, in: 0.5...4, step: 0.5)
+            Stepper("Debet: cíl +\(Int(bt.debitTakeProfitPct)) %", value: $bt.debitTakeProfitPct, in: 20...300, step: 10)
+            Stepper("Debet: stop −\(Int(bt.debitStopPct)) %", value: $bt.debitStopPct, in: 20...100, step: 10)
+            Stepper("IV = HV × \(bt.ivMultiplier.fixed(1))", value: $bt.ivMultiplier, in: 0.7...1.6, step: 0.1)
+        } header: {
+            Text("Opční strategie")
+        } footer: {
+            Text("Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok. Výstup: cíl, stop, 7 dní před expirací nebo při změně signálu. Po stopu se čeká na nový signál.")
+        }
+    }
+
+    private func playsSection(_ result: OptionsBacktestResult) -> some View {
+        Section {
+            ForEach(result.playCounts) { item in
+                HStack {
+                    Text(item.play.name)
+                    Spacer()
+                    Text("\(item.count)×").foregroundStyle(.secondary)
+                    Text(item.pnl.signedUSDWhole)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.pnl(item.pnl))
+                        .frame(minWidth: 80, alignment: .trailing)
+                }
+                .font(.footnote)
+                .monospacedDigit()
+            }
+        } header: {
+            Text("Zvolené opční strategie")
+        }
+    }
+
+    private func optionTradesSection(_ result: OptionsBacktestResult) -> some View {
+        Section {
+            if result.trades.isEmpty {
+                Text("Žádné obchody").foregroundStyle(.secondary)
+            }
+            ForEach(result.trades.suffix(40).reversed()) { trade in
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(trade.play.name)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(trade.play.direction >= 0 ? (trade.play.direction == 0 ? Color.purple : ChainTheme.long) : ChainTheme.short,
+                                        in: Capsule())
+                        Text(trade.legsText).font(.caption.monospaced())
+                        Spacer()
+                        Text(trade.pnl.signedUSDWhole)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Color.pnl(trade.pnl))
+                    }
+                    Text("\(trade.entryDate.formatted(date: .numeric, time: .omitted)) → \(trade.exitDate?.formatted(date: .numeric, time: .omitted) ?? "otevřený") · \(trade.exitReason) · \(trade.entryPremium < 0 ? "kredit" : "debet") \(abs(trade.entryPremium).fixed(2)) · IV \(trade.impliedVol.percent) · HV rank \(Int(trade.volRank)) · RoR \(trade.returnOnRisk.signedPercent)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .monospacedDigit()
+            }
+        } header: {
+            Text("Opční obchody (posledních \(min(result.trades.count, 40)) z \(result.trades.count))")
+        }
+    }
+
     private var dataSection: some View {
         Section {
             Picker("Zdroj dat", selection: $source) {
@@ -317,7 +480,7 @@ struct BacktestView: View {
                 }
                 .pickerStyle(.segmented)
             }
-            if !bt.dataLabel.isEmpty, bt.result != nil {
+            if !bt.dataLabel.isEmpty, bt.result != nil || bt.optionsResult != nil {
                 Text("Poslední běh: \(bt.dataLabel)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -334,13 +497,16 @@ struct BacktestView: View {
     // MARK: - Výsledky
 
     private func metricsSection(_ result: BacktestResult) -> some View {
-        let m = result.metrics
-        let h = result.buyAndHoldMetrics
+        metricsSection(name: result.config.strategy.name, m: result.metrics, h: result.buyAndHoldMetrics,
+                       footer: result.config.exit != .strategy ? result.config.title : nil)
+    }
+
+    private func metricsSection(name: String, m: BacktestMetrics, h: BacktestMetrics, footer: String?) -> some View {
         return Section {
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                 GridRow {
                     Text("").gridColumnAlignment(.leading)
-                    Text(result.config.strategy.name).font(.caption.weight(.semibold)).gridColumnAlignment(.trailing)
+                    Text(name).font(.caption.weight(.semibold)).gridColumnAlignment(.trailing)
                     Text("Buy & hold").font(.caption.weight(.semibold)).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
                 }
                 metricRow("Celkový výnos", m.totalReturn.signedPercent, h.totalReturn.signedPercent, m.totalReturn - h.totalReturn)
@@ -360,8 +526,8 @@ struct BacktestView: View {
         } header: {
             Text("Metriky")
         } footer: {
-            if result.config.exit != .strategy {
-                Text(result.config.title)
+            if let footer {
+                Text(footer)
             }
         }
     }
@@ -377,10 +543,14 @@ struct BacktestView: View {
     }
 
     private func equitySection(_ result: BacktestResult) -> some View {
-        let start = result.equity.first?.equity ?? 1
-        let holdStart = result.buyAndHold.first?.equity ?? 1
-        let strategyCurve = result.equity.map { CurvePoint(date: $0.date, value: $0.equity / start * 100, series: "Strategie") }
-        let holdCurve = result.buyAndHold.map { CurvePoint(date: $0.date, value: $0.equity / holdStart * 100, series: "Buy & hold") }
+        equitySection(equity: result.equity, hold: result.buyAndHold)
+    }
+
+    private func equitySection(equity: [EquityPoint], hold: [EquityPoint]) -> some View {
+        let start = equity.first?.equity ?? 1
+        let holdStart = hold.first?.equity ?? 1
+        let strategyCurve = equity.map { CurvePoint(date: $0.date, value: $0.equity / start * 100, series: "Strategie") }
+        let holdCurve = hold.map { CurvePoint(date: $0.date, value: $0.equity / holdStart * 100, series: "Buy & hold") }
         let all = strategyCurve + holdCurve + bt.benchmark
         return Section {
             Chart(all) { point in
@@ -406,8 +576,12 @@ struct BacktestView: View {
     }
 
     private func drawdownSection(_ result: BacktestResult) -> some View {
+        drawdownSection(equity: result.equity)
+    }
+
+    private func drawdownSection(equity: [EquityPoint]) -> some View {
         Section {
-            Chart(result.equity, id: \.date) { point in
+            Chart(equity, id: \.date) { point in
                 AreaMark(
                     x: .value("Datum", point.date),
                     yStart: .value("Nula", 0.0),

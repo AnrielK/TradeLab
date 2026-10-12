@@ -13,10 +13,10 @@ let package = Package(
     targets: [
         .target(name: "OptionsMath"),
         .target(name: "MarketData", dependencies: ["OptionsMath"]),
-        .target(name: "Backtest"),
+        .target(name: "Backtest", dependencies: ["OptionsMath"]),
         .target(name: "ClaudeAgent"),
         .testTarget(name: "ClaudeAgentTests", dependencies: ["ClaudeAgent"]),
-        .testTarget(name: "BacktestTests", dependencies: ["Backtest"]),
+        .testTarget(name: "BacktestTests", dependencies: ["Backtest", "OptionsMath"]),
         .testTarget(name: "OptionsMathTests", dependencies: ["OptionsMath"]),
         .testTarget(
             name: "MarketDataTests",

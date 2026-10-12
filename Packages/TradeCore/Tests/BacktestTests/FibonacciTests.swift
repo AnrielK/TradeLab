@@ -41,7 +41,7 @@ final class FibonacciTests: XCTestCase {
 
     func testSwingAndLevels() {
         let b = bars([100, 105, 120, 115, 110, 112])
-        let swing = try! XCTUnwrap(Fibonacci.lastSwing(b, lookback: 10))
+        guard let swing = Fibonacci.lastSwing(b, lookback: 10) else { return XCTFail("swing") }
         XCTAssertEqual(swing.direction, .up)
         XCTAssertEqual(swing.startPrice, 99.5)
         XCTAssertEqual(swing.endPrice, 120.5)

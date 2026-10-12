@@ -260,6 +260,7 @@ struct ToolChip: View {
         case "analyze_strategy": return "Analýza strategie"
         case "get_current_position": return "Aktuální pozice"
         case "run_backtest": return "Backtest"
+        case "run_options_backtest": return "Opční backtest"
         case "find_levels": return "Hladiny"
         case "draw_on_chart": return "Kreslení do grafu"
         default: return name
