@@ -104,7 +104,12 @@ final class EngineTests: XCTestCase {
     }
 
     func testStrategiesProduceTargets() {
-        let b = bars((0..<300).map { 100 + 10 * sin(Double($0) / 8) + Double($0) * 0.05 }, stepDays: 1)
+        let closes: [Double] = (0..<300).map { i -> Double in
+            let x = Double(i)
+            let wave: Double = 10 * sin(x / 8)
+            return 100 + wave + x * 0.05
+        }
+        let b = bars(closes, stepDays: 1)
         for strategy in [BacktestStrategy.buyAndHold, .breakout(BreakoutSettings())] {
             let t = strategy.targets(bars: b, allowShort: true)
             XCTAssertEqual(t.count, b.count)
