@@ -258,7 +258,7 @@ public enum BreakoutStrategy {
         }
 
         mutating func weekly(_ bar: BacktestBar) {
-            let key = weekKey(bar.date)
+            let key = BreakoutStrategy.weekKey(bar.date)
             if let current = weekKey, key != current, let w = week {
                 weeklyCloses.append(w.c)
                 weeklyUp = weeklyPsar.update(h: w.h, l: w.l, c: w.c)
