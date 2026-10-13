@@ -90,6 +90,14 @@ public struct BreakoutEvaluation: Sendable {
     /// Stav po poslední svíčce.
     public var watch: BreakoutWatch?
     public var atr: Double?
+    /// Konsolidace na poslední svíčce podle směru (1 rezistence nad cenou, −1 support pod ní).
+    public var zones: [Int: BreakoutZone] = [:]
+}
+
+/// Hladina konsolidace a její protější kraj.
+public struct BreakoutZone: Hashable, Sendable {
+    public var level: Double
+    public var other: Double
 }
 
 /// Breakout nad rezistenci / breakdown pod support z konsolidace (denní svíčky, filtr týdenního grafu).
@@ -107,8 +115,14 @@ public enum BreakoutStrategy {
         for bar in bars {
             targets.append(state.update(bar))
         }
+        var zones: [Int: BreakoutZone] = [:]
+        if bars.count > 2 {
+            for d in [1, -1] {
+                if let z = state.zone(d) { zones[d] = BreakoutZone(level: z.level, other: z.other) }
+            }
+        }
         return BreakoutEvaluation(targets: targets, signals: state.signals, watch: state.watch(),
-                                  atr: state.atr.last ?? nil)
+                                  atr: state.atr.last ?? nil, zones: zones)
     }
 
     /// Klíč týdne (ISO rok × 100 + týden) v UTC.

@@ -1,4 +1,5 @@
 import SwiftUI
+import Backtest
 import Charts
 import MarketData
 import OptionsMath
@@ -10,6 +11,9 @@ struct SymbolDetailView: View {
     @State private var data: ChartData?
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @AppStorage(SetupChartMode.defaultsKey) private var setupMode: SetupChartMode = .auto
+    @State private var setupPicture: SetupPicture?
+    @State private var setupStatus: String?
 
     var body: some View {
         List {
@@ -38,6 +42,8 @@ struct SymbolDetailView: View {
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
             }
 
+            setupSection
+
             Section("Statistiky období") {
                 Picker("Období", selection: $range) {
                     ForEach(ChartRange.chartable) { r in
@@ -64,10 +70,68 @@ struct SymbolDetailView: View {
             ToolbarItem(placement: .topBarTrailing) { AgentToolbarButton() }
         }
         .task(id: range) { await load() }
+        .task(id: setupMode) { await drawSetup() }
         .onAppear { model.selectOptionsSymbol(symbol) }
         .refreshable {
             await model.client.clearCache()
             await load()
+        }
+    }
+
+    // MARK: - Strategie v grafu
+
+    private var setupSection: some View {
+        Section {
+            Picker("Zakreslit", selection: $setupMode) {
+                ForEach(SetupChartMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.menu)
+            if let p = setupPicture {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        if p.direction != 0 {
+                            Image(systemName: p.direction > 0 ? "arrow.up.right" : "arrow.down.right")
+                                .foregroundStyle(p.direction > 0 ? .green : .red)
+                        }
+                        Text(p.title).font(.subheadline.weight(.semibold))
+                    }
+                    if let entry = p.entry, let stop = p.stop, let target = p.target {
+                        let risk = abs(entry - stop)
+                        let reward = abs(target - entry)
+                        Text("Vstup \(entry.fixed(2)) · stop \(stop.fixed(2)) · cíl \(target.fixed(2))"
+                             + (risk > 0 ? " · R:R \((reward / risk).fixed(1))" : ""))
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if let setupStatus {
+                Text(setupStatus).font(.caption).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Strategie v grafu")
+        } footer: {
+            Text("Hladiny, trojúhelník, trendlinie nebo průměr podle strategie z denních svíček; u otevřeného vstupu i vstup, stop a cíl. Automaticky = strategie z watchlistu setupů, jinak trendlinie.")
+        }
+    }
+
+    private func drawSetup() async {
+        if setupMode == .off {
+            setupPicture = nil
+            setupStatus = nil
+            await SetupChart.clear(symbol: symbol)
+            return
+        }
+        setupStatus = "Počítám…"
+        let strategy = SetupChart.strategy(for: setupMode, symbol: symbol, scanner: model.scanner)
+        do {
+            setupPicture = try await SetupChart.draw(symbol: symbol, strategy: strategy,
+                                                     allowShort: model.scanner.settings.allowBearish,
+                                                     client: model.client)
+            setupStatus = setupPicture == nil ? "Strategie teď na grafu nic nevidí." : nil
+        } catch {
+            setupPicture = nil
+            setupStatus = "Nepodařilo se načíst svíčky: \(error.localizedDescription)"
         }
     }
 

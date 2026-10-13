@@ -1,5 +1,15 @@
 # Změny
 
+## 0.22.0 – 2026-10-14
+
+- **Strategie v grafu**: detail tickeru sám zakreslí do grafu, co strategie vidí – u Breakoutu rezistenci
+  a support konsolidace, u Trendlinie trojúhelník (obě linie) nebo rostoucí supportní / klesající
+  rezistenční trendline, u Odrazu od KP průměr, od kterého se cena odráží. U otevřeného vstupu přidá
+  čáry vstupu, stopu a cíle a pod grafem ukáže vstup, stop, cíl a R:R.
+- Volba „Zakreslit“ pod grafem: Automaticky (strategie z watchlistu setupů, jinak trendlinie), Breakout,
+  Odraz od KP, Trendlinie nebo Nezakreslovat. Kresby jsou vidět i ve velkém grafu na všech intervalech
+  a při změně se nahradí; nastavení strategií se bere ze skeneru.
+
 ## 0.21.0 – 2026-10-14
 
 - Nová strategie **Trendlinie a trojúhelník** (long i short) se třemi vstupy:

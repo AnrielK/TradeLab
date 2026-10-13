@@ -93,6 +93,9 @@ public struct TrendlineSignal: Hashable, Codable, Sendable {
     public var price: Double
     public var stop: Double
     public var target: Double
+    /// Linie, přes kterou vstup vznikl, a u trojúhelníku i protější linie.
+    public var line: SwingLine
+    public var otherLine: SwingLine?
 }
 
 /// Kandidát: cena uvnitř trojúhelníku, nebo u trendline.
@@ -122,6 +125,9 @@ public struct TrendlineEvaluation: Sendable {
     public var watch: TrendlineWatch?
     public var triangle: TrianglePattern?
     public var atr: Double?
+    /// Rostoucí supportní a klesající rezistenční linie na poslední svíčce.
+    public var supportLine: SwingLine?
+    public var resistanceLine: SwingLine?
 }
 
 /// Trendlinie a trojúhelník: průraz trojúhelníku, odraz od trendline a průraz trendline (long i short).
@@ -140,7 +146,8 @@ public enum TrendlineStrategy {
         let last = state.lastLines()
         return TrendlineEvaluation(targets: targets, signals: state.signals, watch: state.watch(lines: last),
                                    triangle: last.flatMap { state.triangle(state.bars.count - 1, $0.highs, $0.lows) },
-                                   atr: state.atr.last ?? nil)
+                                   atr: state.atr.last ?? nil, supportLine: last?.lows[1],
+                                   resistanceLine: last?.highs[-1])
     }
 
     typealias Lines = [Int: SwingLine]
@@ -151,6 +158,7 @@ public enum TrendlineStrategy {
         var height: Double
         var top: Double
         var other: Double
+        var otherLine: SwingLine? = nil
     }
 
     struct Candidate {
@@ -161,6 +169,7 @@ public enum TrendlineStrategy {
         var height: Double
         var top: Double
         var other: Double
+        var otherLine: SwingLine? = nil
     }
 
     struct State {
@@ -420,16 +429,19 @@ public enum TrendlineStrategy {
                 pending[d] = nil
                 if let w = waiting, clean(d, w.line.value(at: i)) {
                     candidates.append(Candidate(priority: w.entry == .triangle ? 0 : 1, entry: w.entry, direction: d,
-                                                line: w.line, height: w.height, top: w.top, other: w.other))
+                                                line: w.line, height: w.height, top: w.top, other: w.other,
+                                                otherLine: w.otherLine))
                 }
                 if let tri {
                     let line = d == 1 ? tri.resistance : tri.support
+                    let opposite = d == 1 ? tri.support : tri.resistance
                     if (bar.close - line.value(at: i)) * sd > 0 {
                         if clean(d, line.value(at: i)) {
                             candidates.append(Candidate(priority: 0, entry: .triangle, direction: d, line: line,
-                                                        height: tri.height, top: 0, other: 0))
+                                                        height: tri.height, top: 0, other: 0, otherLine: opposite))
                         } else {
-                            pending[d] = Pending(entry: .triangle, line: line, height: tri.height, top: 0, other: 0)
+                            pending[d] = Pending(entry: .triangle, line: line, height: tri.height, top: 0, other: 0,
+                                                 otherLine: opposite)
                         }
                     }
                 }
@@ -464,7 +476,8 @@ public enum TrendlineStrategy {
                     target = plan.target
                     signals.append(TrendlineSignal(index: i, date: bar.date, entry: c.entry, direction: c.direction,
                                                    level: c.line.value(at: i), price: bar.close,
-                                                   stop: plan.stop, target: plan.target))
+                                                   stop: plan.stop, target: plan.target, line: c.line,
+                                                   otherLine: c.otherLine))
                     pending = [:]
                     break
                 }

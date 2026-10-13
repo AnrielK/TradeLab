@@ -70,3 +70,41 @@ final class TrendlineTests: XCTestCase {
         XCTAssertEqual(line.value(at: 25), 115)
     }
 }
+
+final class SetupGeometryTests: XCTestCase {
+    func testTriangleEntryPicture() throws {
+        // Seed 3: průraz trojúhelníku dolů na svíčce 282, pozice trvá i o dvě svíčky později.
+        let bars = Array(BreakoutTests.series(seed: 3).prefix(285))
+        let t = TrendlineStrategy.evaluate(bars, settings: TrendlineSettings(), allowShort: true)
+        XCTAssertEqual(t.signals.last?.entry, .triangle)
+        XCTAssertNotNil(t.signals.last?.otherLine)
+        if t.targets.last == -1 {
+            let p = try XCTUnwrap(SetupGeometry.picture(for: .trendline(TrendlineSettings()), bars: bars))
+            XCTAssertEqual(p.direction, -1)
+            XCTAssertEqual(p.shapes.filter { !$0.isHorizontal }.count, 2)
+            XCTAssertNotNil(p.stop)
+            XCTAssertTrue(p.shapes.contains { $0.role == .target })
+        }
+    }
+
+    func testBreakoutWatchPicture() throws {
+        let p = try XCTUnwrap(SetupGeometry.picture(for: .breakout(BreakoutSettings()),
+                                                    bars: BreakoutTests.series(seed: 1)))
+        XCTAssertEqual(p.direction, 1)
+        XCTAssertTrue(p.shapes.contains { $0.role == .resistance && abs($0.startPrice - 164.660933) < 1e-4 })
+        XCTAssertTrue(p.shapes.contains { $0.role == .support })
+        XCTAssertNil(p.stop)
+    }
+
+    func testMABounceWatchPicture() throws {
+        let p = try XCTUnwrap(SetupGeometry.picture(for: .maBounce(MABounceSettings()),
+                                                    bars: BreakoutTests.series(seed: 9)))
+        XCTAssertEqual(p.title, "Test KP 50")
+        XCTAssertFalse(p.shapes.isEmpty)
+        XCTAssertTrue(p.shapes.allSatisfy { $0.role == .movingAverage })
+    }
+
+    func testBuyAndHoldHasNoPicture() {
+        XCTAssertNil(SetupGeometry.picture(for: .buyAndHold, bars: BreakoutTests.series(seed: 1)))
+    }
+}

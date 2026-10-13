@@ -535,7 +535,7 @@ extension Collection {
 
 /// Vzhled a viditelnost čar, které do grafu zakreslil agent.
 struct AgentDrawingStyle {
-    enum Kind { case support, resistance, supportLine, resistanceLine, fib, other }
+    enum Kind { case support, resistance, supportLine, resistanceLine, fib, movingAverage, entry, stop, target, other }
 
     var kind: Kind
     /// Timeframe, ze kterého čára pochází, v minutách (4H = 240, 1D = 1440, 1W = 10080).
@@ -562,6 +562,10 @@ struct AgentDrawingStyle {
         case "R": kind = .resistance
         case "TL": kind = main.contains("support") ? .supportLine : .resistanceLine
         case "Fib": kind = .fib
+        case "KP": kind = .movingAverage
+        case "Vstup": kind = .entry
+        case "Stop": kind = .stop
+        case "Cíl": kind = .target
         default: kind = .other
         }
     }
@@ -572,6 +576,10 @@ struct AgentDrawingStyle {
         case .resistance: return Color(hex: Self.resistanceHex)
         case .supportLine: return Color(hex: Self.supportLineHex)
         case .resistanceLine: return Color(hex: Self.resistanceLineHex)
+        case .movingAverage: return Color(hex: "#E0B85C")
+        case .entry: return Color(hex: "#6FA8DC")
+        case .stop: return Color(hex: "#E06C75")
+        case .target: return Color(hex: "#7CC48F")
         case .fib, .other: return Color(hex: "#9aa7b4")
         }
     }
