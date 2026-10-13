@@ -44,7 +44,6 @@
 		AD0CF9773DB8A7E990909F64 /* OptionsMath in Frameworks */ = {isa = PBXBuildFile; productRef = D830B69924E58DCED8CE1FD6 /* OptionsMath */; };
 		AFE20196359F576596BBA771 /* TradeLabApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3778FB31437AD0B081004530 /* TradeLabApp.swift */; };
 		B1D3D223FE182311982EB5B2 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5549C95496CD8F1C059C877 /* Formatting.swift */; };
-		BA678CDCB70CAA3C6908311C /* CalculatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59695CA642635A2BD94D2D21 /* CalculatorView.swift */; };
 		D21D8069B35F8CE4D24FB2A7 /* AgentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1992AB53D51D4444CE097875 /* AgentModel.swift */; };
 		D8214997B6DD392C3DAEA7FC /* MarketView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D2E5DBA0F82B5502B5A847 /* MarketView.swift */; };
 		F78A633CE3425FA9261B287E /* TeamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B4C68C24D203037B2A560A /* TeamView.swift */; };
@@ -70,7 +69,6 @@
 		42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartAnnotations.swift; sourceTree = "<group>"; };
 		4ED2981986A1949B029BE1C1 /* LegRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegRow.swift; sourceTree = "<group>"; };
 		51B9AED544068FF2144CBE54 /* Timeframes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timeframes.swift; sourceTree = "<group>"; };
-		59695CA642635A2BD94D2D21 /* CalculatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorView.swift; sourceTree = "<group>"; };
 		606189AC4CDFF6BFD8376EC2 /* TeamModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamModel.swift; sourceTree = "<group>"; };
 		66B4C68C24D203037B2A560A /* TeamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamView.swift; sourceTree = "<group>"; };
 		70172DD98FA84E8BD0322407 /* ChartCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartCore.swift; sourceTree = "<group>"; };
@@ -155,7 +153,6 @@
 				2E332B82417D318713C297E3 /* Agent */,
 				4E2786173EB6A86D39143D0C /* App */,
 				B1A9CBBFFC82FF505CA1A394 /* Backtest */,
-				677BE43E437875C338988B37 /* Calculator */,
 				3654223FF7D47553E07EC091 /* Market */,
 				EDB42301B83A9F4737141E84 /* Options */,
 				1FF6BF88A312087F7500F8E6 /* Resources */,
@@ -180,14 +177,6 @@
 				3778FB31437AD0B081004530 /* TradeLabApp.swift */,
 			);
 			path = App;
-			sourceTree = "<group>";
-		};
-		677BE43E437875C338988B37 /* Calculator */ = {
-			isa = PBXGroup;
-			children = (
-				59695CA642635A2BD94D2D21 /* CalculatorView.swift */,
-			);
-			path = Calculator;
 			sourceTree = "<group>";
 		};
 		9DA797640B44530B21B9433F = {
@@ -345,7 +334,6 @@
 				95D2984A590F00942E065C7B /* AppModel.swift in Sources */,
 				9BE57D7D5C23700E47566AA6 /* BacktestData.swift in Sources */,
 				4327D4CC4142E12AF634C0B2 /* BacktestView.swift in Sources */,
-				BA678CDCB70CAA3C6908311C /* CalculatorView.swift in Sources */,
 				2D6B93D01BB0CE7E723A86BD /* ChainStore.swift in Sources */,
 				207C0B077AF34F2CFE5AD299 /* ChainTableView.swift in Sources */,
 				FDEB06CCD10B34CA759FC34F /* ChainTheme.swift in Sources */,
@@ -432,7 +420,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.2;
+				MARKETING_VERSION = 0.15.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -498,7 +486,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.14.2;
+				MARKETING_VERSION = 0.15.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
