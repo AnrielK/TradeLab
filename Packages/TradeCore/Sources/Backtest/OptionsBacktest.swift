@@ -153,6 +153,10 @@ public struct OptionsBacktestResult: Sendable {
     public var metrics: BacktestMetrics
     public var buyAndHold: [EquityPoint]
     public var buyAndHoldMetrics: BacktestMetrics
+    /// Odkud jsou ceny opcí.
+    public var pricing: String = "Simulace: Black-Scholes, IV z historické volatility"
+    /// Kolikrát se nepodařilo otevřít pozici (chybějící kotace).
+    public var skippedEntries: Int = 0
 
     public struct PlaySummary: Identifiable, Hashable, Sendable {
         public var play: OptionPlay

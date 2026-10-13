@@ -170,7 +170,7 @@ enum AgentToolbox {
                 nízká → bull call spread; medvědí → bear call / bear put spread; bez signálu volitelně iron condor. \
                 selection fixed: bullish_play / bearish_play. Ceny opcí z Black-Scholes (IV = HV 20 × iv_multiplier), \
                 skluz a poplatky, velikost podle rizika na obchod. Vrací metriky vs. buy & hold, rozpad podle strategií a poslední obchody. \
-                Jde o simulaci, ne o historické kotace opcí – uveď to.
+                pricing historical použije skutečné historické kotace konce dne (od 2019); jinak jde o simulaci – uveď, která varianta běžela.
                 """,
                 inputSchema: Schema.object([
                     "symbol": Schema.string("Ticker"),
@@ -186,7 +186,9 @@ enum AgentToolbox {
                     "width_pct": Schema.number("Šířka spreadu v % ceny (výchozí 5)"),
                     "risk_pct": Schema.number("Max. ztráta obchodu v % kapitálu (výchozí 5)"),
                     "high_vol_rank": Schema.number("Percentil HV pro „vysokou“ volatilitu (výchozí 50)"),
-                    "iv_multiplier": Schema.number("IV = HV × násobek (výchozí 1.1)"),
+                    "iv_multiplier": Schema.number("simulated: IV = HV × násobek (výchozí 1.1)"),
+                    "pricing": Schema.string("simulated (Black-Scholes, rychlé) nebo historical (skutečné EOD kotace z DoltHubu od 2019, pomalejší)",
+                                             enum: ["simulated", "historical"]),
                 ], required: ["symbol", "strategy"])
             ) { input in try await optionsBacktest(input, model: model) },
 
@@ -825,10 +827,19 @@ enum AgentToolbox {
             riskPerTrade: (input["risk_pct"]?.doubleValue ?? 5) / 100,
             riskFreeRate: model.riskFreeRate)
 
-        let series = try await BacktestData.load(symbol: s, range: range, client: model.client)
-        let bars = series.bars
+        let historical = input["pricing"]?.stringValue == "historical"
+        let series = try await BacktestData.load(symbol: s, range: range,
+                                                 source: historical ? .yahoo : .current,
+                                                 interval: historical ? .day : .current, client: model.client)
+        let bars = historical ? series.bars.filter { $0.date >= HistoricalOptionsData.firstDay } : series.bars
         guard bars.count > 60 else { throw ToolError("Málo dat (\(bars.count) svíček).") }
-        let result = await Task.detached(priority: .userInitiated) { OptionsBacktest.run(bars: bars, config: config) }.value
+        let result: OptionsBacktestResult
+        if historical {
+            result = try await OptionsBacktest.runHistorical(bars: bars, symbol: s, config: config,
+                                                             source: HistoricalOptionsData.shared)
+        } else {
+            result = await Task.detached(priority: .userInitiated) { OptionsBacktest.run(bars: bars, config: config) }.value
+        }
 
         func metrics(_ m: BacktestMetrics) -> JSONValue {
             [
@@ -865,7 +876,8 @@ enum AgentToolbox {
             "buy_and_hold_underlying": metrics(result.buyAndHoldMetrics),
             "plays": .array(plays),
             "last_trades": .array(lastTrades),
-            "note": "Simulace: ceny opcí z Black-Scholes s IV odvozenou z historické volatility, ne historické kotace.",
+            "pricing": .string(result.pricing),
+            "skipped_entries": .number(Double(result.skippedEntries)),
         ]
         return output(.object(summary))
     }

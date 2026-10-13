@@ -1,5 +1,16 @@
 # Změny
 
+## 0.14.0 – 2026-10-13
+
+- Opční backtest umí **historická data**: skutečné kotace konce dne z veřejné databáze DoltHub
+  (`post-no-preference/options`, US akcie od 2019, bez klíče).
+  - Expirace nejblíž zvolenému DTE, short noha podle skutečné delty, křídla z dostupných striků.
+  - Vstup i výstup za mid ± polovinu spreadu, denní přecenění na mid, vypořádání v expiraci na vnitřní hodnotu.
+  - „Vysoká volatilita“ podle IV ranku z databáze (jinak HV rank).
+  - Dotazy se ukládají do cache v zařízení – druhý běh je rychlý. Průběh stahování je vidět na tlačítku.
+- Přepínač **Ceny opcí: Simulace / Historická data** v Backtestu; agent v `run_options_backtest` má `pricing`.
+- Jádro: `HistoricalOptionsSource`, `DoltHubOptionsSource`, `OptionsBacktest.runHistorical` s testy (maketa zdroje).
+
 ## 0.13.3 – 2026-10-13
 
 - Graf v detailu tickeru se vždy otevře na YTD.

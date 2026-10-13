@@ -43,6 +43,22 @@ enum StrategyKind: String, CaseIterable, Identifiable {
     }
 }
 
+/// Odkud jsou ceny opcí v opčním backtestu.
+enum OptionsPricing: String, CaseIterable, Identifiable {
+    case simulated = "Simulace"
+    case historical = "Historická data"
+    var id: String { rawValue }
+}
+
+/// Sdílený zdroj historických opčních kotací (DoltHub) s diskovou cache.
+enum HistoricalOptionsData {
+    static let shared = DoltHubOptionsSource(
+        cacheDirectory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("dolthub-options"))
+    /// Data v databázi začínají v roce 2019.
+    static let firstDay = HistoricalDay.date("2019-02-01")!
+}
+
 enum BacktestInstrument: String, CaseIterable, Identifiable {
     case stock = "Akcie"
     case options = "Opce"
@@ -101,6 +117,8 @@ final class BacktestModel {
     var debitTakeProfitPct = 100.0
     var debitStopPct = 50.0
     var optionsResult: OptionsBacktestResult? = nil
+    var optionsPricing: OptionsPricing = .simulated
+    var progressText: String? = nil
     var fibExit = false
     var fibLookback = 20
     var fibTarget = 1.272
@@ -163,11 +181,13 @@ final class BacktestModel {
         errorMessage = nil
         defer { isRunning = false }
         do {
-            let source = BacktestSource.current
-            let interval = BacktestInterval.current
+            let historicalOptions = instrument == .options && optionsPricing == .historical
+            // Historické opční kotace jsou denní – podklad pak vždy z denních dat Yahoo.
+            let source = historicalOptions ? .yahoo : BacktestSource.current
+            let interval = historicalOptions ? .day : BacktestInterval.current
             let series = try await BacktestData.load(symbol: ticker, range: range, source: source,
                                                      interval: interval, client: client)
-            let bars = series.bars
+            let bars = historicalOptions ? series.bars.filter { $0.date >= HistoricalOptionsData.firstDay } : series.bars
             guard bars.count > 30 else {
                 errorMessage = "Málo dat pro backtest (\(bars.count) svíček)."
                 return
@@ -177,9 +197,17 @@ final class BacktestModel {
             // Strukturní strategie počítají hladiny v každé svíčce – mimo hlavní vlákno.
             if instrument == .options {
                 let optionsConfig = self.optionsConfig(riskFreeRate: riskFreeRate)
-                optionsResult = await Task.detached(priority: .userInitiated) {
-                    OptionsBacktest.run(bars: bars, config: optionsConfig)
-                }.value
+                if historicalOptions {
+                    progressText = "Stahuji historické opční kotace…"
+                    defer { progressText = nil }
+                    optionsResult = try await OptionsBacktest.runHistorical(
+                        bars: bars, symbol: ticker, config: optionsConfig, source: HistoricalOptionsData.shared,
+                        onProgress: { text in await MainActor.run { self.progressText = text } })
+                } else {
+                    optionsResult = await Task.detached(priority: .userInitiated) {
+                        OptionsBacktest.run(bars: bars, config: optionsConfig)
+                    }.value
+                }
             } else {
                 result = await Task.detached(priority: .userInitiated) {
                     BacktestEngine.run(bars: bars, config: config)
@@ -226,7 +254,7 @@ struct BacktestView: View {
                 if bt.instrument == .options {
                     if let result = bt.optionsResult {
                         metricsSection(name: "Opce", m: result.metrics, h: result.buyAndHoldMetrics,
-                                       footer: "Simulace: ceny opcí z Black-Scholes (IV = HV 20 × \(bt.ivMultiplier.fixed(1))), skluz a poplatky. Win rate a Ø obchod jsou vůči riziku obchodu.")
+                                       footer: "\(result.pricing). Win rate a Ø obchod jsou vůči riziku obchodu." + (result.skippedEntries > 0 ? " Vynechané vstupy bez kotací: \(result.skippedEntries)." : ""))
                         playsSection(result)
                         equitySection(equity: result.equity, hold: result.buyAndHold)
                         drawdownSection(equity: result.equity)
@@ -344,7 +372,8 @@ struct BacktestView: View {
             } label: {
                 HStack {
                     if bt.isRunning { ProgressView().controlSize(.small) }
-                    Text(bt.isRunning ? "Počítám…" : "Spustit backtest")
+                    Text(bt.isRunning ? (bt.progressText ?? "Počítám…") : "Spustit backtest")
+                        .lineLimit(1)
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
@@ -376,6 +405,15 @@ struct BacktestView: View {
     private var optionsSection: some View {
         @Bindable var bt = bt
         return Section {
+            Picker("Ceny opcí", selection: $bt.optionsPricing) {
+                ForEach(OptionsPricing.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            Text(bt.optionsPricing == .simulated
+                 ? "Black-Scholes s IV z historické volatility – rychlé, libovolné období i interval."
+                 : "Skutečné kotace konce dne z veřejné databáze DoltHub (od 2019, denní data). Vstup a výstup za mid ± polovinu spreadu, vysoká volatilita podle IV ranku. První běh stahuje data déle, pak se berou z cache.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Picker("Výběr strategie", selection: $bt.optionsAuto) {
                 Text("Podle situace").tag(true)
                 Text("Pevně").tag(false)
@@ -408,7 +446,9 @@ struct BacktestView: View {
             Stepper("Kredit: stop \(bt.creditStopMultiple.fixed(1))× kreditu", value: $bt.creditStopMultiple, in: 0.5...4, step: 0.5)
             Stepper("Debet: cíl +\(Int(bt.debitTakeProfitPct)) %", value: $bt.debitTakeProfitPct, in: 20...300, step: 10)
             Stepper("Debet: stop −\(Int(bt.debitStopPct)) %", value: $bt.debitStopPct, in: 20...100, step: 10)
-            Stepper("IV = HV × \(bt.ivMultiplier.fixed(1))", value: $bt.ivMultiplier, in: 0.7...1.6, step: 0.1)
+            if bt.optionsPricing == .simulated {
+                Stepper("IV = HV × \(bt.ivMultiplier.fixed(1))", value: $bt.ivMultiplier, in: 0.7...1.6, step: 0.1)
+            }
         } header: {
             Text("Opční strategie")
         } footer: {
