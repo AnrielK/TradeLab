@@ -4,6 +4,7 @@ import Foundation
 public enum SetupStrategy: String, Codable, Hashable, Sendable {
     case breakout
     case maBounce
+    case trendline
 }
 
 /// Nalezený setup pro ticker: čerstvý vstup strategie, nebo kandidát těsně u hladiny / průměru.
@@ -18,6 +19,8 @@ public struct SetupHit: Identifiable, Codable, Hashable, Sendable {
     public var entry: BreakoutEntry?
     /// Průměr u odrazu od KP (20, 50, 100, 200).
     public var maPeriod: Int?
+    /// Typ vstupu u trendlinie a trojúhelníku.
+    public var trendlineEntry: TrendlineEntry?
     /// Před kolika svíčkami vznikl vstup (0 = poslední zavřená svíčka).
     public var barsAgo: Int
     /// Rezistence / support nebo hodnota průměru.
@@ -45,6 +48,9 @@ public struct SetupHit: Identifiable, Codable, Hashable, Sendable {
         case .maBounce:
             let p = maPeriod.map(String.init) ?? ""
             return isEntry ? "Odraz od KP \(p)" : "Test KP \(p)"
+        case .trendline:
+            if isEntry { return trendlineEntry?.name(direction: direction) ?? "Trendline" }
+            return trendlineEntry == .triangle ? "Trojúhelník" : "Test trendline"
         }
     }
 
@@ -53,6 +59,7 @@ public struct SetupHit: Identifiable, Codable, Hashable, Sendable {
         switch strategy {
         case .breakout: return direction > 0 ? "R" : "S"
         case .maBounce: return "KP \(maPeriod.map(String.init) ?? "")"
+        case .trendline: return trendlineEntry == .triangle ? (direction > 0 ? "R" : "S") : "TL"
         }
     }
 }
@@ -65,7 +72,7 @@ public enum SetupScanner {
     ///   - includeWatch: vracet i kandidáty těsně u hladiny / průměru (bez vstupu).
     ///   - highVolRank: od jakého percentilu HV se volí kreditní spread místo debetního.
     public static func scan(symbol: String, bars: [BacktestBar], breakout: BreakoutSettings? = BreakoutSettings(),
-                            maBounce: MABounceSettings? = nil, maxAge: Int = 3, allowBearish: Bool = true,
+                            maBounce: MABounceSettings? = nil, trendline: TrendlineSettings? = nil, maxAge: Int = 3, allowBearish: Bool = true,
                             includeWatch: Bool = true, highVolRank: Double = 50) -> SetupHit? {
         let n = bars.count
         guard n >= 60, let last = bars.last else { return nil }
@@ -78,11 +85,11 @@ public enum SetupScanner {
 
         var hits: [SetupHit] = []
         func add(_ strategy: SetupStrategy, direction: Int, isEntry: Bool, entry: BreakoutEntry? = nil,
-                 period: Int? = nil, age: Int, level: Double, stop: Double?, target: Double?, distance: Double?,
+                 period: Int? = nil, line: TrendlineEntry? = nil, age: Int, level: Double, stop: Double?, target: Double?, distance: Double?,
                  atr: Double?, score: Double) {
             guard let play = OptionsBacktest.choose(signal: direction, rank: rank ?? 50, config: config) else { return }
             hits.append(SetupHit(symbol: symbol, strategy: strategy, direction: direction, isEntry: isEntry,
-                                 entry: entry, maPeriod: period, barsAgo: age, level: level, stop: stop,
+                                 entry: entry, maPeriod: period, trendlineEntry: line, barsAgo: age, level: level, stop: stop,
                                  target: target, distanceATR: distance, close: last.close, changePercent: change,
                                  atr: atr, historicalVolatility: hv[n - 1], volatilityRank: rank,
                                  suggestedPlay: play, score: score, date: last.date))
@@ -112,6 +119,21 @@ public enum SetupScanner {
             } else if includeWatch, let w = e.watch {
                 add(.maBounce, direction: w.direction, isEntry: false, period: w.period, age: 0, level: w.level,
                     stop: nil, target: nil, distance: w.distanceATR, atr: e.atr, score: 1.4 - w.distanceATR)
+            }
+        }
+
+        if let settings = trendline {
+            let e = TrendlineStrategy.evaluate(bars, settings: settings, allowShort: allowBearish)
+            if let signal = e.signals.last, e.targets.last == signal.direction, n - 1 - signal.index <= maxAge {
+                let age = n - 1 - signal.index
+                let bonus: Double = signal.entry == .triangle ? 0.4 : (signal.entry == .breakout ? 0.2 : 0.1)
+                add(.trendline, direction: signal.direction, isEntry: true, line: signal.entry, age: age,
+                    level: signal.level, stop: signal.stop, target: signal.target, distance: nil, atr: e.atr,
+                    score: 3 + bonus - 0.3 * Double(age))
+            } else if includeWatch, let w = e.watch {
+                add(.trendline, direction: w.direction, isEntry: false, line: w.entry, age: 0, level: w.level,
+                    stop: nil, target: nil, distance: w.distanceATR, atr: e.atr,
+                    score: (w.entry == .triangle ? 1.6 : 1.3) - 0.5 * w.distanceATR)
             }
         }
 

@@ -37,9 +37,9 @@ enum TeamPresets {
                 TeamRole(
                     id: "quant", name: "Kvant", icon: "function",
                     instructions: """
-                    Spusť backtesty strategií breakout a ma_bounce za 5 let (výchozí nastavení, allow_short true) a porovnej \
+                    Spusť backtesty strategií breakout, ma_bounce a trendline za 5 let (výchozí nastavení, allow_short true) a porovnej \
                     s buy & hold (CAGR, Sharpe, max. drawdown, počet obchodů, win rate). Pro lepší z nich spusť i \
-                    run_options_backtest (selection auto) a porovnej s akciemi. Závěr: fungují u titulu breakouty, nebo odrazy?
+                    run_options_backtest (selection auto) a porovnej s akciemi. Závěr: co u titulu funguje nejlépe?
                     """,
                     tools: ["run_backtest", "run_options_backtest", "get_price_history"]),
             ]),

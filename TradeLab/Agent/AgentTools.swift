@@ -32,8 +32,9 @@ enum AgentToolbox {
                 name: "get_option_setups",
                 description: """
                 Výsledky skeneru setupů (watchlist na záložce Trh): tickery s čerstvým vstupem Breakout/Breakdown \
-                (těsně před breakoutem, po breakoutu, pullback PNR) nebo Odraz od KP 20/50/100/200, případně kandidáti \
-                těsně u hladiny / průměru; \
+                (těsně před breakoutem, po breakoutu, pullback PNR), Odraz od KP 20/50/100/200 nebo trendlinie \
+                (průraz trojúhelníku, odraz od / průraz trendline), případně kandidáti těsně u hladiny / průměru \
+                a tickery uvnitř trojúhelníku; \
                 směr, hladina, stop, cíl, stáří vstupu, percentil HV, IV/HV, likvidita ATM opcí a navržený spread. \
                 rescan=true spustí nový sken (trvá desítky sekund).
                 """,
@@ -186,7 +187,7 @@ enum AgentToolbox {
                 """,
                 inputSchema: Schema.object(breakoutSchema.merging([
                     "symbol": Schema.string("Ticker"),
-                    "strategy": Schema.string("Pravidlo pro směr (viz run_backtest)", enum: ["breakout", "ma_bounce", "buy_and_hold"]),
+                    "strategy": Schema.string("Pravidlo pro směr (viz run_backtest)", enum: ["breakout", "ma_bounce", "trendline", "buy_and_hold"]),
                     "range": Schema.string("Období (výchozí 5y)", enum: HistoryRange.allCases.map(\.rawValue)),
                     "selection": Schema.string("auto (podle situace) nebo fixed", enum: ["auto", "fixed"]),
                     "bullish_play": Schema.string("fixed: strategie pro býčí signál", enum: OptionPlay.allCases.filter { $0.direction == 1 }.map(\.rawValue)),
@@ -215,7 +216,9 @@ enum AgentToolbox {
                 3) první pullback PNR; stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace) \
                 ma_bounce (odraz od SMA 20/50/100/200 v trendu s reverzním svíčkovým patternem – reverzní svíčka \
                 s tělem za průměrem a stínem skrz něj, potvrzující svíčka; stop za reverzní svíčku aspoň 1× ATR, \
-                cíl Fibonacciho extenze pullbacku v 1,5–3 R) a buy_and_hold. Vše se v každé svíčce počítá jen z minulých dat.
+                cíl Fibonacciho extenze pullbacku v 1,5–3 R), trendline (průraz trojúhelníku – cíl výška trojúhelníku, \
+                odraz od rostoucí/klesající trendline s reverzním patternem, průraz trendline – cíl Fibonacci, aspoň 1,5 R; \
+                linie z potvrzených swingů) a buy_and_hold. Vše se v každé svíčce počítá jen z minulých dat.
                 """,
                 inputSchema: Schema.object(breakoutSchema.merging([
                     "symbol": Schema.string("Ticker"),
@@ -313,6 +316,7 @@ enum AgentToolbox {
                     "is_entry": .bool(h.isEntry),
                     "strategy": .string(h.strategy.rawValue),
                     "ma_period": h.maPeriod.map { .number(Double($0)) } ?? .null,
+                    "trendline_entry": h.trendlineEntry.map { .string($0.rawValue) } ?? .null,
                     "bars_ago": .number(Double(h.barsAgo)),
                     "level": num(h.level),
                     "stop": num(h.stop),
@@ -933,7 +937,12 @@ enum AgentToolbox {
         "ma_weekly_filter": Schema.boolean("ma_bounce: u 20 MA týdenní cena nad 10 MA a KP rostou (výchozí true)"),
         "stochastic_filter": Schema.boolean("ma_bounce: u 50 MA stochastic pod 30 / nad 70 (výchozí true)"),
         "headroom": Schema.boolean("ma_bounce: žádná rezistence mezi swingem a cílem (výchozí true)"),
-        "min_rr": Schema.number("ma_bounce: cíl nejméně N × riziko (výchozí 1.5)"),
+        "min_rr": Schema.number("ma_bounce / trendline: cíl nejméně N × riziko (výchozí 1.5)"),
+        "triangle": Schema.boolean("trendline: průraz trojúhelníku (výchozí true)"),
+        "tl_bounce": Schema.boolean("trendline: odraz od trendline (výchozí true)"),
+        "tl_breakout": Schema.boolean("trendline: průraz trendline (výchozí true)"),
+        "tl_lookback": Schema.integer("trendline: linie ze swingů N svíček (výchozí 120)"),
+        "tl_daily_filter": Schema.boolean("trendline: denní SMA 50 > 100 > 200 ve směru (výchozí true)"),
         "max_rr": Schema.number("ma_bounce: cíl nejvýš N × riziko (výchozí 3)"),
     ]
 
@@ -977,10 +986,26 @@ enum AgentToolbox {
             if let v = input["min_rr"]?.doubleValue { settings.minRR = v }
             if let v = input["max_rr"]?.doubleValue { settings.maxRR = max(v, settings.minRR) }
             return .maBounce(settings)
+        case "trendline":
+            var settings = TrendlineSettings()
+            if let v = input["triangle"]?.boolValue { settings.triangle = v }
+            if let v = input["tl_bounce"]?.boolValue { settings.bounce = v }
+            if let v = input["tl_breakout"]?.boolValue { settings.breakout = v }
+            if let v = input["tl_lookback"]?.intValue { settings.lookback = max(30, v) }
+            if let v = input["min_touches"]?.intValue { settings.minTouches = max(2, v) }
+            if let v = input["tolerance_pct"]?.doubleValue { settings.tolerance = v / 100 }
+            if let v = input["weekly_filter"]?.boolValue { settings.weeklyFilter = v }
+            if let v = input["tl_daily_filter"]?.boolValue { settings.dailyFilter = v }
+            if let v = input["headroom"]?.boolValue { settings.headroom = v }
+            if let v = input["stop_atr"]?.doubleValue { settings.stopATR = v }
+            if let v = input["target_fib"]?.doubleValue { settings.targetFib = v }
+            if let v = input["min_rr"]?.doubleValue { settings.minRR = v }
+            if let v = input["max_rr"]?.doubleValue { settings.maxRR = max(v, settings.minRR) }
+            return .trendline(settings)
         case "buy_and_hold":
             return .buyAndHold
         default:
-            throw ToolError("Neznámé pravidlo. Použij breakout, ma_bounce nebo buy_and_hold.")
+            throw ToolError("Neznámé pravidlo. Použij breakout, ma_bounce, trendline nebo buy_and_hold.")
         }
     }
 

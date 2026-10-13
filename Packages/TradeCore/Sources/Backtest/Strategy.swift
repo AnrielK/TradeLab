@@ -9,6 +9,8 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
     case breakout(BreakoutSettings)
     /// Odraz od klouzavých průměrů 20/50/100/200 s reverzním svíčkovým patternem.
     case maBounce(MABounceSettings)
+    /// Průraz trojúhelníku, odraz od trendline a průraz trendline.
+    case trendline(TrendlineSettings)
 
     public var name: String {
         switch self {
@@ -21,6 +23,12 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
             return "Breakout/Breakdown (\(entries.joined(separator: ", ")))"
         case .maBounce(let s):
             return "Odraz od KP \(s.enabledPeriods.map(String.init).joined(separator: "/"))"
+        case .trendline(let s):
+            var entries: [String] = []
+            if s.triangle { entries.append("trojúhelník") }
+            if s.bounce { entries.append("odraz") }
+            if s.breakout { entries.append("průraz") }
+            return "Trendlinie (\(entries.joined(separator: ", ")))"
         }
     }
 
@@ -33,6 +41,8 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
             return BreakoutStrategy.evaluate(bars, settings: settings, allowShort: allowShort).targets
         case .maBounce(let settings):
             return MABounceStrategy.evaluate(bars, settings: settings, allowShort: allowShort).targets
+        case .trendline(let settings):
+            return TrendlineStrategy.evaluate(bars, settings: settings, allowShort: allowShort).targets
         }
     }
 }

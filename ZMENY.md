@@ -1,5 +1,20 @@
 # Změny
 
+## 0.21.0 – 2026-10-14
+
+- Nová strategie **Trendlinie a trojúhelník** (long i short) se třemi vstupy:
+  - **průraz trojúhelníku** – klesající / plochá rezistence a rostoucí / plochý support přes potvrzené swingy
+    (aspoň 2 dotyky, zavírací ceny je nepřekročí) se sbíhají; čistá svíčka za linií hned nebo druhý den,
+    cíl výška trojúhelníku od linie (aspoň 1,5× ATR), stop 1× ATR nebo za předchozí svíčku;
+  - **průraz trendline** – zavření nad klesající rezistenční linií (pod rostoucí supportní), cíl Fibonacciho
+    extenze od první kotvy linie, aspoň 1,5 R;
+  - **odraz od trendline** – reverzní pattern (2svíčkový nebo pinbar) na rostoucí (klesající) linii jako u odrazu
+    od KP, stop za reverzní svíčku aspoň 1× ATR, cíl Fibonacci v 1,5–3 R, žádná rezistence před cílem.
+  - Filtry jako u předchozích strategií: týdenní KP 10/20/40 + PSAR ve směru, denní SMA 50 > 100 > 200.
+- **Skener** hledá i trojúhelníky: ticker uvnitř sbíhajícího se trojúhelníku je kandidát „Trojúhelník“
+  (s hladinou průrazu a vzdáleností v ATR), cena u trendline „Test trendline“, čerstvé vstupy s typem vstupu.
+- Strategie je v Backtestu (akcie i opce), u agenta (`trendline`) i v exportu do QuantConnectu.
+
 ## 0.20.0 – 2026-10-14
 
 - Nová strategie **Odraz od klouzavých průměrů** (SMA 20/50/100/200, long i short) podle prezentace:

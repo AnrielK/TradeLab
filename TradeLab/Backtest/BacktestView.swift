@@ -7,6 +7,7 @@ import Backtest
 enum StrategyKind: String, CaseIterable, Identifiable {
     case breakout = "Breakout / Breakdown"
     case maBounce = "Odraz od klouzavých průměrů"
+    case trendline = "Trendlinie a trojúhelník"
     case hold = "Buy & hold"
 
     var id: String { rawValue }
@@ -17,6 +18,8 @@ enum StrategyKind: String, CaseIterable, Identifiable {
             return "Konsolidace (boční trend, aspoň 2 dotyky hladiny, KP 20 × 50 se kříží). Týdenní graf v trendu (KP 10/20/40 seřazeny, PSAR ve směru), denní KP 20/50/100 seřazeny a PSAR ve směru, daleko od další hladiny. Stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace."
         case .maBounce:
             return "V trendu (KP seřazeny) se cena vrátí k SMA 20, 50, 100 nebo 200 a vytvoří reverzní pattern: reverzní svíčka s tělem nad průměrem a stínem skrz něj (níž než předchozí svíčky, nebo pinbar), potvrzující býčí svíčka s vyšším dnem zavře nad ní. Průměr testovaný už dřív; u 20 MA týdenní graf v trendu, u 50 MA stochastic pod 30. Stop pod reverzní svíčku (aspoň 1× ATR), cíl Fibonacciho extenze pullbacku v rozmezí 1,5–3 R. Short zrcadlově."
+        case .trendline:
+            return "Linie přes potvrzené swingy (aspoň 2 dotyky, zavírací ceny je nepřekročí). Průraz trojúhelníku (klesající/plochá rezistence a rostoucí/plochý support se sbíhají): čistá svíčka za linií, cíl výška trojúhelníku. Průraz trendline (klesající rezistence nahoru, rostoucí support dolů): cíl Fibonacciho extenze, aspoň 1,5 R. Odraz od rostoucí (klesající) trendline s reverzním patternem jako u odrazu od KP. Filtr týdenního grafu a denních SMA 50/100/200, stop 1× ATR nebo za předchozí / reverzní svíčku."
         case .hold: return "Koupit a držet."
         }
     }
@@ -59,6 +62,7 @@ final class BacktestModel {
     var kind: StrategyKind = .breakout
     var breakout = BreakoutSettings()
     var maBounce = MABounceSettings()
+    var trendline = TrendlineSettings()
     var instrument: BacktestInstrument = .stock
     var optionsAuto = true
     var neutralCondor = false
@@ -91,6 +95,7 @@ final class BacktestModel {
         switch kind {
         case .breakout: return .breakout(breakout)
         case .maBounce: return .maBounce(maBounce)
+        case .trendline: return .trendline(trendline)
         case .hold: return .buyAndHold
         }
     }
@@ -237,6 +242,11 @@ struct BacktestView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            if bt.kind == .trendline {
+                trendlineSettings
+                Toggle(bt.instrument == .options ? "Povolit medvědí strategie (short)" : "Povolit short",
+                       isOn: $bt.allowShort)
+            }
             if bt.kind == .maBounce {
                 maBounceSettings
                 Toggle(bt.instrument == .options ? "Povolit medvědí strategie (short odrazy)" : "Povolit short (odraz dolů)",
@@ -269,6 +279,27 @@ struct BacktestView: View {
         } footer: {
             Text("Signál se počítá ze zavírací ceny svíčky a obchod proběhne za otevírací cenu další svíčky.")
         }
+    }
+
+    @ViewBuilder
+    private var trendlineSettings: some View {
+        @Bindable var bt = bt
+        Toggle("Průraz trojúhelníku", isOn: $bt.trendline.triangle)
+        Toggle("Odraz od trendline", isOn: $bt.trendline.bounce)
+        Toggle("Průraz trendline", isOn: $bt.trendline.breakout)
+        Stepper("Linie ze swingů \(bt.trendline.lookback) svíček", value: $bt.trendline.lookback, in: 40...250, step: 10)
+        Stepper("Dotyky linie: aspoň \(bt.trendline.minTouches)", value: $bt.trendline.minTouches, in: 2...5)
+        Stepper("Tolerance: \((bt.trendline.tolerance * 100).fixed(2)) %", value: $bt.trendline.tolerance,
+                in: 0.0025...0.03, step: 0.0025)
+        Toggle("Týdenní graf v trendu (KP + PSAR)", isOn: $bt.trendline.weeklyFilter)
+        Toggle("Denní SMA 50 > 100 > 200 ve směru", isOn: $bt.trendline.dailyFilter)
+        Toggle("Odraz: žádná rezistence před cílem", isOn: $bt.trendline.headroom)
+        Stepper("Stop aspoň \(bt.trendline.stopATR.fixed(1))× ATR", value: $bt.trendline.stopATR, in: 0.5...2, step: 0.25)
+        Picker("Cíl (Fibonacci)", selection: $bt.trendline.targetFib) {
+            Text("127,2 %").tag(1.272)
+            Text("161,8 %").tag(1.618)
+        }
+        Stepper("Cíl nejméně \(bt.trendline.minRR.fixed(1)) R", value: $bt.trendline.minRR, in: 1...3, step: 0.5)
     }
 
     @ViewBuilder

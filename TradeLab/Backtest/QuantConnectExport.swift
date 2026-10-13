@@ -89,6 +89,15 @@ extension QuantConnectExport {
             headroom=\(py(m.headroom)), stop_atr=\(py(m.stopATR)), target_fib=\(py(m.targetFib)), \
             min_rr=\(py(m.minRR)), max_rr=\(py(m.maxRR)), swing_bars=\(m.swingBars), allow_short=\(py(allowShort)))
             """
+        case .trendline(let t):
+            return """
+            Trendline(triangle=\(py(t.triangle)), bounce=\(py(t.bounce)), breakout=\(py(t.breakout)), \
+            lookback=\(t.lookback), min_touches=\(t.minTouches), tolerance=\(py(t.tolerance)), flat=\(py(t.flat)), \
+            weekly=\(py(t.weeklyFilter)), daily=\(py(t.dailyFilter)), headroom=\(py(t.headroom)), \
+            stop_atr=\(py(t.stopATR)), target_fib=\(py(t.targetFib)), min_rr=\(py(t.minRR)), max_rr=\(py(t.maxRR)), \
+            swing_bars=\(t.swingBars), two_candle=\(py(t.twoCandle)), one_candle=\(py(t.oneCandle)), \
+            allow_short=\(py(allowShort)))
+            """
         }
     }
 
@@ -110,6 +119,7 @@ extension QuantConnectExport {
         case .buyAndHold: return 0
         case .breakout(let b): return max(42 * 7, Int(Double(max(b.lookback, 100)) * 1.5)) + 30
         case .maBounce: return 42 * 7 + 30
+        case .trendline(let t): return max(42 * 7, Int(Double(max(t.lookback, 200)) * 1.5)) + 30
         }
     }
 

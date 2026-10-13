@@ -24,7 +24,7 @@ struct SetupWatchlistSection: View {
             }
             if scanner.visibleResults.isEmpty && !scanner.isScanning {
                 Text(scanner.lastScan == nil
-                     ? "Skener projde likvidní akcie a hledá breakouty a breakdowny z konsolidace a odrazy od klouzavých průměrů 20/50/100/200 – i kandidáty, kteří na signál teprve čekají."
+                     ? "Skener projde likvidní akcie a hledá breakouty a breakdowny z konsolidace odrazy od klouzavých průměrů 20/50/100/200, trojúhelníky a trendlinie – i kandidáty, kteří na signál teprve čekají."
                      : "Žádný setup. Zkus delší stáří signálu, vypnout některý filtr nebo jiný seznam tickerů.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -223,11 +223,20 @@ struct ScannerSettingsView: View {
                 Section {
                     Toggle("Breakout / Breakdown", isOn: $scanner.settings.useBreakout)
                     Toggle("Odraz od klouzavých průměrů", isOn: $scanner.settings.useMABounce)
+                    Toggle("Trendlinie a trojúhelník", isOn: $scanner.settings.useTrendline)
                     Toggle("Kandidáti (čekají na signál)", isOn: $scanner.settings.includeWatch)
                 } header: {
                     Text("Strategie")
                 } footer: {
-                    Text("Kandidát u breakoutu = konsolidace se splněnými filtry do 1,5× ATR pod rezistencí (nad supportem). U odrazu = cena se v trendu vrací k průměru (do 1× ATR).")
+                    Text("Kandidát u breakoutu = konsolidace se splněnými filtry do 1,5× ATR pod rezistencí (nad supportem). U odrazu = cena se v trendu vrací k průměru (do 1× ATR). U trendlinie = cena uvnitř trojúhelníku, nebo do 1× ATR od trendline.")
+                }
+
+                Section("Trendlinie a trojúhelník") {
+                    Toggle("Průraz trojúhelníku", isOn: $scanner.settings.trendline.triangle)
+                    Toggle("Odraz od trendline", isOn: $scanner.settings.trendline.bounce)
+                    Toggle("Průraz trendline", isOn: $scanner.settings.trendline.breakout)
+                    Toggle("Týdenní graf v trendu", isOn: $scanner.settings.trendline.weeklyFilter)
+                    Toggle("Denní SMA 50 > 100 > 200", isOn: $scanner.settings.trendline.dailyFilter)
                 }
 
                 Section("Odraz od KP") {

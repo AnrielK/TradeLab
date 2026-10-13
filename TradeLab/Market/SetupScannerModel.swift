@@ -19,6 +19,8 @@ struct ScannerSettings: Codable, Equatable {
     var customTickers: [String] = []
     var breakout = BreakoutSettings()
     var maBounce = MABounceSettings()
+    var trendline = TrendlineSettings()
+    var useTrendline = true
     /// Které strategie skener hledá.
     var useBreakout = true
     var useMABounce = true
@@ -149,6 +151,7 @@ final class SetupScannerModel {
                         let hit = SetupScanner.scan(symbol: symbol, bars: bars,
                                                     breakout: settings.useBreakout ? settings.breakout : nil,
                                                     maBounce: settings.useMABounce ? settings.maBounce : nil,
+                                                    trendline: settings.useTrendline ? settings.trendline : nil,
                                                     maxAge: settings.maxAge, allowBearish: settings.allowBearish,
                                                     includeWatch: settings.includeWatch,
                                                     highVolRank: settings.highVolRank)

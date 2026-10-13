@@ -4,7 +4,8 @@ import Backtest
 /// Export strategie do QuantConnectu (LEAN, Python): skript se vloží do webového editoru
 /// na quantconnect.com a spustí na jejich datech (akcie, u opcí minutové kotace od 2012).
 ///
-/// Strategie Breakout/Breakdown a Odraz od KP jsou porty `BreakoutStrategy` a `MABounceStrategy` z `Backtest`
+/// Strategie Breakout/Breakdown, Odraz od KP a Trendlinie jsou porty `BreakoutStrategy`, `MABounceStrategy`
+/// a `TrendlineStrategy` z `Backtest`
 /// (stejné výsledky jako testy jádra).
 enum QuantConnectExport {
     static let signalsLibrary = #"""
@@ -551,6 +552,360 @@ class MaBounce:
                 distance = (bar.close - v) * d / atr
                 if 0 <= distance <= 1 and (bar.close - prev.close) * d < 0:
                     return d, period, v, distance
+        return None
+
+
+class Trendline:
+    """Trendlinie a trojúhelník: průraz trojúhelníku, odraz od trendline, průraz trendline (long i short).
+
+    Linie vedou přes potvrzené swingy (pivot ±3 svíčky) posledních `lookback` svíček; zavírací ceny je od první
+    kotvy nesmí překročit o víc než toleranci, aspoň `min_touches` swingů leží na linii.
+    Trojúhelník: klesající / plochá rezistence a rostoucí / plochý support, které se sbíhají (šířka teď nejvýš
+    60 % šířky na začátku). Průraz: zavření za linií (předtím před ní), čistá svíčka hned nebo druhý den;
+    cíl u trojúhelníku výška trojúhelníku od linie, u trendline Fibonacciho extenze od první kotvy; stop jako
+    u breakoutu. Odraz: reverzní pattern na rostoucí (klesající) trendline jako u odrazu od KP.
+    Filtry: týdenní KP 10/20/40 + PSAR ve směru, denní SMA 50 > 100 > 200 ve směru.
+    """
+    K = 3
+    ATR_N = 14
+    MAX_PIVOTS = 8
+
+    def __init__(self, triangle=True, bounce=True, breakout=True, lookback=120, min_touches=2, tolerance=0.01,
+                 flat=0.0003, weekly=True, daily=True, headroom=True, stop_atr=1.0, target_fib=1.618,
+                 min_rr=1.5, max_rr=3.0, swing_bars=20, two_candle=True, one_candle=True, allow_short=True):
+        self.use_triangle, self.use_bounce, self.use_breakout = triangle, bounce, breakout
+        self.lookback, self.min_touches, self.tol, self.flat = lookback, min_touches, tolerance, flat
+        self.use_weekly, self.use_daily, self.use_headroom = weekly, daily, headroom
+        self.stop_atr, self.target_fib = stop_atr, target_fib
+        self.min_rr, self.max_rr, self.swing_bars = min_rr, max_rr, swing_bars
+        self.two_candle, self.one_candle = two_candle, one_candle
+        self.allow_short = allow_short
+        self.bars, self.closes, self.trs, self.atr = [], [], [], []
+        self.sma = {50: [], 100: [], 200: []}
+        self.pivot_hi, self.pivot_lo = [], []
+        self.week_key, self.week = None, None
+        self.w_closes = []
+        self.w_psar = Psar()
+        self.w_up = None
+        self.w_trend = 0
+        self.position = 0
+        self.stop = self.target = 0.0
+        self.pending = {1: None, -1: None}   # (kind, line, height_or_top, other)
+        self.signals = []                    # (index, kind, direction, level, stop, target)
+
+    # ---- data ----
+    def _weekly(self, bar):
+        if self.week_key is not None and bar.week != self.week_key:
+            o, h, l, c = self.week
+            self.w_closes.append(c)
+            self.w_up = self.w_psar.update(h, l, c)
+            s10, s20, s40 = (sma_last(self.w_closes, n) for n in (10, 20, 40))
+            if s40 is None:
+                self.w_trend = 0
+            elif s10 > s20 > s40:
+                self.w_trend = 1
+            elif s10 < s20 < s40:
+                self.w_trend = -1
+            else:
+                self.w_trend = 0
+            self.week = None
+        self.week_key = bar.week
+        if self.week is None:
+            self.week = [bar.open, bar.high, bar.low, bar.close]
+        else:
+            self.week[1] = max(self.week[1], bar.high)
+            self.week[2] = min(self.week[2], bar.low)
+            self.week[3] = bar.close
+
+    def _indicators(self, bar):
+        i = len(self.bars) - 1
+        self.closes.append(bar.close)
+        if i == 0:
+            self.trs.append(bar.high - bar.low)
+        else:
+            pc = self.closes[-2]
+            self.trs.append(max(bar.high - bar.low, abs(bar.high - pc), abs(bar.low - pc)))
+        self.atr.append(sum(self.trs[-self.ATR_N:]) / self.ATR_N if i >= self.ATR_N else None)
+        for p in self.sma:
+            self.sma[p].append(sma_last(self.closes, p))
+        p = i - self.K
+        if p >= self.K:
+            hp, lp = self.bars[p].high, self.bars[p].low
+            left = self.bars[p - self.K:p]
+            right = self.bars[p + 1:i + 1]
+            if all(x.high < hp for x in left) and all(x.high <= hp for x in right):
+                self.pivot_hi.append(p)
+            if all(x.low > lp for x in left) and all(x.low >= lp for x in right):
+                self.pivot_lo.append(p)
+
+    # ---- linie ----
+    @staticmethod
+    def value(line, x):
+        p1, y1, slope = line[0], line[1], line[4]
+        return y1 + slope * (x - p1)
+
+    def _lines(self, hi, i):
+        """Nejlepší linie do svíčky i−1 podle sklonu: {-1: klesající, 0: plochá, 1: rostoucí}.
+        Linie = (p1, y1, p2, y2, slope, touches)."""
+        source = self.pivot_hi if hi else self.pivot_lo
+        piv = [p for p in source if i - self.lookback <= p <= i - 1 - self.K][-self.MAX_PIVOTS:]
+        best = {}
+        for a in range(len(piv)):
+            for b in range(a + 1, len(piv)):
+                p1, p2 = piv[a], piv[b]
+                if p2 - p1 < 5:
+                    continue
+                y1 = self.bars[p1].high if hi else self.bars[p1].low
+                y2 = self.bars[p2].high if hi else self.bars[p2].low
+                slope = (y2 - y1) / (p2 - p1)
+                ok = True
+                for j in range(p1, i):
+                    v = y1 + slope * (j - p1)
+                    c = self.bars[j].close
+                    if (hi and c > v * (1 + self.tol)) or (not hi and c < v * (1 - self.tol)):
+                        ok = False
+                        break
+                if not ok:
+                    continue
+                touches = 0
+                for q in piv:
+                    if q < p1:
+                        continue
+                    v = y1 + slope * (q - p1)
+                    y = self.bars[q].high if hi else self.bars[q].low
+                    if abs(y - v) <= self.tol * v:
+                        touches += 1
+                if touches < self.min_touches:
+                    continue
+                ref = self.closes[i - 1]
+                cls = 0 if abs(slope) <= self.flat * ref else (1 if slope > 0 else -1)
+                key = (touches, p2, p2 - p1)
+                if cls not in best or key > best[cls][0]:
+                    best[cls] = (key, (p1, y1, p2, y2, slope, touches))
+        return {k: v[1] for k, v in best.items()}
+
+    @staticmethod
+    def _pick(lines, classes):
+        chosen = None
+        for c in classes:
+            if c in lines:
+                ln = lines[c]
+                key = (ln[5], ln[2], ln[2] - ln[0])
+                if chosen is None or key > chosen[0]:
+                    chosen = (key, ln)
+        return chosen[1] if chosen else None
+
+    def _triangle(self, i, highs, lows):
+        res = self._pick(highs, (-1, 0))
+        sup = self._pick(lows, (0, 1))
+        if res is None or sup is None:
+            return None
+        if res[4] - sup[4] >= -self.flat * self.closes[i - 1]:
+            return None
+        start = min(res[0], sup[0])
+        if max(res[0], sup[0]) >= min(res[2], sup[2]):
+            return None
+        w0 = self.value(res, start) - self.value(sup, start)
+        w1 = self.value(res, i) - self.value(sup, i)
+        if w0 <= 0 or w1 <= 0 or w1 > 0.6 * w0:
+            return None
+        c = self.closes[i - 1]
+        if not (self.value(sup, i - 1) <= c <= self.value(res, i - 1)):
+            return None
+        return res, sup, w0
+
+    # ---- filtry a pomocné ----
+    def _filters(self, d):
+        i = len(self.bars) - 1
+        if d == -1 and not self.allow_short:
+            return False
+        if self.use_weekly and not (self.w_trend == d and self.w_up == (d == 1)):
+            return False
+        if self.use_daily:
+            a, b, c = self.sma[50][i], self.sma[100][i], self.sma[200][i]
+            if c is None or not ((a - b) * d > 0 and (b - c) * d > 0):
+                return False
+        return True
+
+    def _clean(self, d, level):
+        bar = self.bars[-1]
+        return (bar.open - level) * d > 0 and (bar.close - level) * d > 0 and (bar.close - bar.open) * d > 0
+
+    def _breakout_plan(self, kind, d, line, extra, atr):
+        """extra: u trojúhelníku výška, u trendline (top, other)."""
+        i = len(self.bars) - 1
+        bar, prev = self.bars[i], self.bars[i - 1]
+        close = bar.close
+        lv = self.value(line, i)
+        if d == 1:
+            stop = min(prev.low, close - self.stop_atr * atr)
+        else:
+            stop = max(prev.high, close + self.stop_atr * atr)
+        risk = (close - stop) * d
+        if kind == "triangle":
+            target = lv + d * extra
+            target = max(target, close + 1.5 * atr) if d == 1 else min(target, close - 1.5 * atr)
+        else:
+            top, other = extra
+            target = other + (top - other) * self.target_fib
+            target = max(target, close + 1.5 * atr) if d == 1 else min(target, close - 1.5 * atr)
+            if (target - close) * d < self.min_rr * risk:
+                return None
+        return stop, target
+
+    def _bounce(self, d, line, atr):
+        i = len(self.bars) - 1
+        r = i - 1
+        if r < 2:
+            return None
+        R, C = self.bars[r], self.bars[i]
+        v = self.value(line, r)
+        body_lo, body_hi = min(R.open, R.close), max(R.open, R.close)
+        body = body_hi - body_lo
+        rng = R.high - R.low
+        if d == 1:
+            if not (body_lo > v and R.low <= v * (1 + self.tol)):
+                return None
+            two = R.low < min(self.bars[r - 1].low, self.bars[r - 2].low)
+            wick = body_lo - R.low
+            pin = rng > 0 and wick >= 2 * body and wick >= 0.5 * rng
+            if not ((self.two_candle and two) or (self.one_candle and pin)):
+                return None
+            if not (C.close > C.open and C.low > R.low and C.close > R.high):
+                return None
+        else:
+            if not (body_hi < v and R.high >= v * (1 - self.tol)):
+                return None
+            two = R.high > max(self.bars[r - 1].high, self.bars[r - 2].high)
+            wick = R.high - body_hi
+            pin = rng > 0 and wick >= 2 * body and wick >= 0.5 * rng
+            if not ((self.two_candle and two) or (self.one_candle and pin)):
+                return None
+            if not (C.close < C.open and C.high < R.high and C.close < R.low):
+                return None
+        entry = C.close
+        start = max(0, r - self.swing_bars + 1)
+        if d == 1:
+            stop = min(R.low, entry - self.stop_atr * atr)
+            risk = entry - stop
+            swing = max(b.high for b in self.bars[start:r + 1])
+            fib = R.low + (swing - R.low) * self.target_fib
+            target = min(max(fib, entry + self.min_rr * risk), entry + self.max_rr * risk)
+            if self.use_headroom:
+                for p in self.pivot_hi:
+                    h = self.bars[p].high
+                    if swing < h < target:
+                        return None
+        else:
+            stop = max(R.high, entry + self.stop_atr * atr)
+            risk = stop - entry
+            swing = min(b.low for b in self.bars[start:r + 1])
+            fib = R.high - (R.high - swing) * self.target_fib
+            target = max(min(fib, entry - self.min_rr * risk), entry - self.max_rr * risk)
+            if self.use_headroom:
+                for p in self.pivot_lo:
+                    lo = self.bars[p].low
+                    if target < lo < swing:
+                        return None
+        return stop, target
+
+    # ---- hlavní krok ----
+    def update(self, bar):
+        self.bars.append(bar)
+        self._weekly(bar)
+        self._indicators(bar)
+        i = len(self.bars) - 1
+        atr = self.atr[i]
+        if atr is None or i < 3:
+            return self.position
+
+        exited = False
+        if self.position == 1 and (bar.close <= self.stop or bar.close >= self.target):
+            self.position, exited = 0, True
+        elif self.position == -1 and (bar.close >= self.stop or bar.close <= self.target):
+            self.position, exited = 0, True
+
+        highs = self._lines(True, i)
+        lows = self._lines(False, i)
+        tri = self._triangle(i, highs, lows) if self.use_triangle else None
+        cands = []   # (priority, kind, d, line, extra)
+        for d in (1, -1):
+            pend = self.pending[d]
+            self.pending[d] = None
+            if pend is not None and self._clean(d, self.value(pend[1], i)):
+                cands.append((0 if pend[0] == "triangle" else 1, pend[0], d, pend[1], pend[2]))
+            # průraz trojúhelníku
+            if tri is not None:
+                res, sup, height = tri
+                line = res if d == 1 else sup
+                if (bar.close - self.value(line, i)) * d > 0:
+                    if self._clean(d, self.value(line, i)):
+                        cands.append((0, "triangle", d, line, height))
+                    else:
+                        self.pending[d] = ("triangle", line, height)
+            # průraz trendline (klesající rezistence nahoru, rostoucí support dolů)
+            if self.use_breakout:
+                line = highs.get(-1) if d == 1 else lows.get(1)
+                if line is not None and (bar.close - self.value(line, i)) * d > 0 \
+                        and (self.closes[i - 1] - self.value(line, i - 1)) * d <= 0:
+                    seg = self.bars[line[0]:i]
+                    other = min(b.low for b in seg) if d == 1 else max(b.high for b in seg)
+                    extra = (line[1], other)
+                    if self._clean(d, self.value(line, i)):
+                        cands.append((1, "breakout", d, line, extra))
+                    elif self.pending[d] is None:
+                        self.pending[d] = ("breakout", line, extra)
+            # odraz od trendline (rostoucí support u longu, klesající rezistence u shortu)
+            if self.use_bounce:
+                line = lows.get(1) if d == 1 else highs.get(-1)
+                if line is not None:
+                    cands.append((2, "bounce", d, line, None))
+
+        if self.position == 0 and not exited:
+            for _, kind, d, line, extra in sorted(cands, key=lambda c: c[0]):
+                if not self._filters(d):
+                    continue
+                if kind == "bounce":
+                    plan = self._bounce(d, line, atr)
+                else:
+                    plan = self._breakout_plan(kind, d, line, extra, atr)
+                if plan is None:
+                    continue
+                self.position, (self.stop, self.target) = d, plan
+                self.signals.append((i, kind, d, self.value(line, i), self.stop, self.target))
+                self.pending = {1: None, -1: None}
+                break
+        return self.position
+
+    def watch(self):
+        """Kandidát na poslední svíčce: cena uvnitř trojúhelníku, nebo u trendline (do 1× ATR).
+        Vrací (druh, směr, hladina, vzdálenost v ATR)."""
+        i = len(self.bars) - 1
+        if i < 3 or self.atr[i] is None or self.position != 0:
+            return None
+        atr, close = self.atr[i], self.bars[i].close
+        highs = self._lines(True, i)
+        lows = self._lines(False, i)
+        if self.use_triangle:
+            tri = self._triangle(i, highs, lows)
+            if tri is not None:
+                res, sup, _ = tri
+                for d in (1, -1):
+                    if self._filters(d):
+                        line = res if d == 1 else sup
+                        lv = self.value(line, i)
+                        distance = (lv - close) * d / atr
+                        if distance >= 0:
+                            return "triangle", d, lv, distance
+        if self.use_bounce:
+            for d in (1, -1):
+                line = lows.get(1) if d == 1 else highs.get(-1)
+                if line is None or not self._filters(d):
+                    continue
+                lv = self.value(line, i)
+                distance = (close - lv) * d / atr
+                if 0 <= distance <= 1:
+                    return "bounce", d, lv, distance
         return None
 
 
