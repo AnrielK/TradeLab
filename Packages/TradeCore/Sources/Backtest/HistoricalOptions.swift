@@ -35,17 +35,18 @@ public struct HistoricalOptionQuote: Hashable, Sendable {
 
 /// Zdroj historických opčních řetězců.
 public protocol HistoricalOptionsSource: Sendable {
-    /// Expirace dostupné v posledním obchodním dni ≤ `date` (nejvýš týden zpět) a ten den.
-    func expirations(symbol: String, onOrBefore date: String, from: String, to: String) async throws
+    /// Expirace v prvním dni z `candidates` (od nejnovějšího), pro který má zdroj data,
+    /// omezené na `minDays…maxDays` dní do expirace.
+    func expirations(symbol: String, candidates: [String], minDays: Int, maxDays: Int) async throws
         -> (date: String, expirations: [String])?
     /// Celý řetězec jedné expirace v daném dni (striky v rozsahu).
     func chain(symbol: String, date: String, expiration: String, minStrike: Double, maxStrike: Double) async throws
         -> [HistoricalOptionQuote]
-    /// Historie vybraných kontraktů jedné expirace mezi daty.
-    func history(symbol: String, expiration: String, strikes: [Double], from: String, to: String) async throws
+    /// Kotace vybraných kontraktů jedné expirace v zadaných dnech.
+    func history(symbol: String, expiration: String, strikes: [Double], days: [String]) async throws
         -> [HistoricalOptionQuote]
     /// IV rank (0–100) po dnech, pokud ho zdroj má.
-    func ivRank(symbol: String, from: String, to: String) async throws -> [String: Double]
+    func ivRank(symbol: String, days: [String]) async throws -> [String: Double]
 }
 
 public enum HistoricalDay {
@@ -166,54 +167,65 @@ public actor DoltHubOptionsSource: HistoricalOptionsSource {
         return String(h, radix: 16)
     }
 
-    public func expirations(symbol: String, onOrBefore date: String, from: String, to: String) async throws
+    // Primární klíč tabulek začíná datem – dotazy proto vždy na konkrétní dny (date = / date IN),
+    // rozsah dat přes všechny tickery server nestihne („context deadline exceeded“).
+
+    static func dayList(_ days: [String]) -> String {
+        days.map(quote).joined(separator: ",")
+    }
+
+    public func expirations(symbol: String, candidates: [String], minDays: Int, maxDays: Int) async throws
         -> (date: String, expirations: [String])? {
         let s = Self.quote(symbol.uppercased())
-        let latest = try await query("""
-            SELECT DISTINCT date FROM option_chain WHERE act_symbol=\(s) \
-            AND date BETWEEN \(Self.quote(HistoricalDay.adding(-7, to: date))) AND \(Self.quote(date)) \
-            ORDER BY date DESC LIMIT 1
-            """)
-        guard let day = latest.first?["date"] as? String else { return nil }
-        let rows = try await query("""
-            SELECT DISTINCT expiration FROM option_chain WHERE act_symbol=\(s) AND date=\(Self.quote(day)) \
-            AND expiration BETWEEN \(Self.quote(HistoricalDay.adding(Int(HistoricalDay.days(from: date, to: from)), to: day))) \
-            AND \(Self.quote(HistoricalDay.adding(Int(HistoricalDay.days(from: date, to: to)), to: day)))
-            """)
-        return (day, rows.compactMap { $0["expiration"] as? String }.sorted())
+        for day in candidates {
+            let rows = try await query("""
+                SELECT DISTINCT expiration FROM option_chain WHERE date=\(Self.quote(day)) AND act_symbol=\(s)
+                """)
+            let all = rows.compactMap { $0["expiration"] as? String }
+            guard !all.isEmpty else { continue }
+            let within = all.filter {
+                let d = HistoricalDay.days(from: day, to: $0)
+                return d >= Double(minDays) && d <= Double(maxDays)
+            }
+            return (day, within.sorted())
+        }
+        return nil
     }
 
     public func chain(symbol: String, date: String, expiration: String, minStrike: Double, maxStrike: Double) async throws
         -> [HistoricalOptionQuote] {
         let rows = try await query("""
             SELECT date, expiration, strike, call_put, bid, ask, vol, delta FROM option_chain \
-            WHERE act_symbol=\(Self.quote(symbol.uppercased())) AND date=\(Self.quote(date)) \
+            WHERE date=\(Self.quote(date)) AND act_symbol=\(Self.quote(symbol.uppercased())) \
             AND expiration=\(Self.quote(expiration)) \
             AND strike BETWEEN \(String(format: "%.2f", minStrike)) AND \(String(format: "%.2f", maxStrike))
             """)
         return rows.compactMap(Self.parseQuote)
     }
 
-    public func history(symbol: String, expiration: String, strikes: [Double], from: String, to: String) async throws
+    public func history(symbol: String, expiration: String, strikes: [Double], days: [String]) async throws
         -> [HistoricalOptionQuote] {
         let list = Set(strikes).sorted().map { String(format: "%.2f", $0) }.joined(separator: ",")
-        let rows = try await query("""
-            SELECT date, expiration, strike, call_put, bid, ask, vol, delta FROM option_chain \
-            WHERE act_symbol=\(Self.quote(symbol.uppercased())) AND expiration=\(Self.quote(expiration)) \
-            AND strike IN (\(list)) AND date BETWEEN \(Self.quote(from)) AND \(Self.quote(to))
-            """)
-        return rows.compactMap(Self.parseQuote)
+        var quotes: [HistoricalOptionQuote] = []
+        for start in stride(from: 0, to: days.count, by: 10) {
+            let chunk = Array(days[start..<min(start + 10, days.count)])
+            let rows = try await query("""
+                SELECT date, expiration, strike, call_put, bid, ask, vol, delta FROM option_chain \
+                WHERE date IN (\(Self.dayList(chunk))) AND act_symbol=\(Self.quote(symbol.uppercased())) \
+                AND expiration=\(Self.quote(expiration)) AND strike IN (\(list))
+                """)
+            quotes += rows.compactMap(Self.parseQuote)
+        }
+        return quotes
     }
 
-    public func ivRank(symbol: String, from: String, to: String) async throws -> [String: Double] {
+    public func ivRank(symbol: String, days: [String]) async throws -> [String: Double] {
         var result: [String: Double] = [:]
-        // Po čtvrtletích, ať odpověď nenarazí na limit řádků.
-        var start = from
-        while start <= to {
-            let end = min(HistoricalDay.adding(92, to: start), to)
+        for start in stride(from: 0, to: days.count, by: 40) {
+            let chunk = Array(days[start..<min(start + 40, days.count)])
             let rows = try await query("""
                 SELECT date, iv_current, iv_year_high, iv_year_low FROM volatility_history \
-                WHERE act_symbol=\(Self.quote(symbol.uppercased())) AND date BETWEEN \(Self.quote(start)) AND \(Self.quote(end))
+                WHERE date IN (\(Self.dayList(chunk))) AND act_symbol=\(Self.quote(symbol.uppercased()))
                 """)
             for row in rows {
                 guard let day = row["date"] as? String, let iv = Self.number(row["iv_current"]),
@@ -221,7 +233,6 @@ public actor DoltHubOptionsSource: HistoricalOptionsSource {
                       high > low else { continue }
                 result[day] = min(max((iv - low) / (high - low) * 100, 0), 100)
             }
-            start = HistoricalDay.adding(93, to: start)
         }
         return result
     }
@@ -283,12 +294,14 @@ extension OptionsBacktest {
         let hv = rollingVolatility(bars.map(\.close), window: 20, periodsPerYear: Double(n) / years)
         let rankWindow = max(Int((Double(n) / years).rounded()), 20)
         await onProgress?("Načítám IV rank…")
-        let ivRanks = (try? await source.ivRank(symbol: symbol, from: HistoricalDay.string(first.date),
-                                                to: HistoricalDay.string(last.date))) ?? [:]
+        let tradingDays = bars.map { HistoricalDay.string($0.date) }
+        // IV rank stačí jednou týdně (každý 5. obchodní den), mezi tím se bere poslední známý.
+        let rankDays = stride(from: 0, to: tradingDays.count, by: 5).map { tradingDays[$0] }
+        let ivRanks = (try? await source.ivRank(symbol: symbol, days: rankDays)) ?? [:]
         func rank(at i: Int) -> Double? {
             let day = HistoricalDay.string(bars[i].date)
             if let r = ivRanks[day] { return r }
-            for back in 1...5 {
+            for back in 1...7 {
                 if let r = ivRanks[HistoricalDay.adding(-back, to: day)] { return r }
             }
             return volRank(hv, at: i, window: rankWindow)
@@ -302,6 +315,7 @@ extension OptionsBacktest {
         var blockedSignal: Int? = nil
         var pending: (play: OptionPlay, signal: Int, rank: Double)? = nil
         var skipped = 0
+        var lastFailure: Error? = nil
 
         func fill(_ quote: HistoricalOptionQuote, buying: Bool) -> Double {
             buying ? quote.mid + spreadFill * quote.halfSpread : max(quote.mid - spreadFill * quote.halfSpread, 0)
@@ -314,9 +328,19 @@ extension OptionsBacktest {
 
             if position == nil, let plan = pending {
                 await onProgress?("Obchod \(trades.count + 1): \(plan.play.name) \(day)")
-                position = try await openHistorical(plan.play, symbol: symbol, day: day, date: bar.date, spot: bar.close,
-                                                    equity: equity, signal: plan.signal, rank: plan.rank,
-                                                    config: config, source: source, fill: fill)
+                do {
+                    position = try await openHistorical(plan.play, symbol: symbol, day: day, date: bar.date, spot: bar.close,
+                                                        candidates: (max(0, i - 4)...i).reversed().map { tradingDays[$0] },
+                                                        futureDays: Array(tradingDays[i...]),
+                                                        equity: equity, signal: plan.signal, rank: plan.rank,
+                                                        config: config, source: source, fill: fill)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    // Výpadek jednoho dotazu nemá shodit celý backtest – vstup se vynechá.
+                    lastFailure = error
+                    position = nil
+                }
                 if position == nil { skipped += 1 }
             }
             pending = nil
@@ -402,6 +426,8 @@ extension OptionsBacktest {
                 impliedVol: current.iv, volRank: current.rank))
         }
 
+        if trades.isEmpty, let lastFailure { throw lastFailure }
+
         let summary = trades.map { t in
             BacktestTrade(id: t.id, side: t.play.direction == 0 ? 1 : t.play.direction, entryDate: t.entryDate,
                           entryPrice: t.entrySpot, exitDate: t.exitDate, exitPrice: t.exitSpot, returnPct: t.returnOnRisk)
@@ -419,15 +445,14 @@ extension OptionsBacktest {
     }
 
     /// Otevře pozici z historického řetězce dne `day` (nebo posledního dne před ním).
-    static func openHistorical(_ play: OptionPlay, symbol: String, day: String, date: Date, spot: Double, equity: Double,
+    static func openHistorical(_ play: OptionPlay, symbol: String, day: String, date: Date, spot: Double,
+                               candidates: [String], futureDays: [String], equity: Double,
                                signal: Int, rank: Double, config: OptionsBacktestConfig,
                                source: HistoricalOptionsSource,
                                fill: (HistoricalOptionQuote, Bool) -> Double) async throws -> HistoricalPosition? {
         let target = config.daysToExpiry
         guard let available = try await source.expirations(
-            symbol: symbol, onOrBefore: day,
-            from: HistoricalDay.adding(max(target - 14, 5), to: day),
-            to: HistoricalDay.adding(target + 21, to: day)),
+            symbol: symbol, candidates: candidates, minDays: max(target - 14, 5), maxDays: target + 21),
               let expiration = available.expirations.min(by: {
                   abs(HistoricalDay.days(from: day, to: $0) - Double(target)) < abs(HistoricalDay.days(from: day, to: $1) - Double(target))
               }) else { return nil }
@@ -510,8 +535,9 @@ extension OptionsBacktest {
         }
         guard maxLoss > 0 else { return nil }
 
+        let holdingDays = futureDays.filter { $0 <= expiration }
         let history = try await source.history(symbol: symbol, expiration: expiration, strikes: specs.map(\.strike),
-                                                from: available.date, to: expiration)
+                                                days: holdingDays)
         var byDay: [String: [String: HistoricalOptionQuote]] = [:]
         for q in history { byDay[q.date, default: [:]][q.key] = q }
         var lastQuotes: [String: HistoricalOptionQuote] = [:]

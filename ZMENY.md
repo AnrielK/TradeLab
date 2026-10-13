@@ -1,5 +1,11 @@
 # Změny
 
+## 0.14.1 – 2026-10-13
+
+- Oprava historického opčního backtestu („context deadline exceeded“): dotazy na DoltHub jdou přes konkrétní dny
+  (`date =` / `date IN`) podle primárního klíče místo rozsahů dat, historie pozice po 10 dnech, IV rank jednou týdně.
+- Výpadek jednoho dotazu už neshodí celý běh – vstup se vynechá a započítá do „vynechaných vstupů“.
+
 ## 0.14.0 – 2026-10-13
 
 - Opční backtest umí **historická data**: skutečné kotace konce dne z veřejné databáze DoltHub

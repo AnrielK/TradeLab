@@ -25,11 +25,11 @@ final class MockOptionsSource: HistoricalOptionsSource, @unchecked Sendable {
         }
     }
 
-    func expirations(symbol: String, onOrBefore date: String, from: String, to: String) async throws
+    func expirations(symbol: String, candidates: [String], minDays: Int, maxDays: Int) async throws
         -> (date: String, expirations: [String])? {
-        guard closes[date] != nil else { return nil }
-        let list = stride(from: 7, through: 70, by: 7).map { HistoricalDay.adding($0, to: date) }
-            .filter { $0 >= from && $0 <= to }
+        guard let date = candidates.first(where: { closes[$0] != nil }) else { return nil }
+        let list = stride(from: 7, through: 70, by: 7).filter { $0 >= minDays && $0 <= maxDays }
+            .map { HistoricalDay.adding($0, to: date) }
         return (date, list)
     }
 
@@ -39,13 +39,16 @@ final class MockOptionsSource: HistoricalOptionsSource, @unchecked Sendable {
         return quotes(day: date, expiration: expiration, strikes: strikes)
     }
 
-    func history(symbol: String, expiration: String, strikes: [Double], from: String, to: String) async throws
+    func history(symbol: String, expiration: String, strikes: [Double], days requested: [String]) async throws
         -> [HistoricalOptionQuote] {
-        days.filter { $0 >= from && $0 <= to }.flatMap { quotes(day: $0, expiration: expiration, strikes: strikes) }
+        requested.flatMap { quotes(day: $0, expiration: expiration, strikes: strikes) }
     }
 
-    func ivRank(symbol: String, from: String, to: String) async throws -> [String: Double] {
-        Dictionary(uniqueKeysWithValues: days.enumerated().map { ($0.element, Double(($0.offset / 40) % 2) * 80 + 10) })
+    func ivRank(symbol: String, days requested: [String]) async throws -> [String: Double] {
+        let index = Dictionary(uniqueKeysWithValues: days.enumerated().map { ($0.element, $0.offset) })
+        return Dictionary(uniqueKeysWithValues: requested.compactMap { day in
+            index[day].map { (day, Double(($0 / 40) % 2) * 80 + 10) }
+        })
     }
 }
 
