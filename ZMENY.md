@@ -1,5 +1,11 @@
 # Změny
 
+## 0.15.2 – 2026-10-13
+
+- Oprava: po výběru jiného tickeru payoff ukazoval nohy předchozího tickeru. Strategie se teď pamatují
+  zvlášť pro každý ticker – po přepnutí se načte strategie nového tickeru (nebo prázdná) a po návratu
+  se původní vrátí.
+
 ## 0.15.1 – 2026-10-13
 
 - Spodní lišta se při scrollování už nezmenšuje.

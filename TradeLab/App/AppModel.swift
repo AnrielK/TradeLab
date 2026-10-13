@@ -55,6 +55,14 @@ final class AppModel {
             strategy = OptionStrategy(underlying: "AAPL")
         }
         strategySpot = defaults.double(forKey: Self.spotKey)
+        if let data = defaults.data(forKey: Self.strategiesKey),
+           let saved = try? JSONDecoder().decode([String: OptionStrategy].self, from: data) {
+            savedStrategies = saved
+        }
+        // Strategie musí patřit k tickeru na záložce Opce.
+        if strategy.underlying.uppercased() != optionsSymbol {
+            switchStrategy(to: optionsSymbol)
+        }
     }
 
     var market: MarketContext { MarketContext(rate: riskFreeRate) }
@@ -125,6 +133,32 @@ final class AppModel {
         guard !s.isEmpty, s != optionsSymbol else { return }
         optionsSymbol = s
         UserDefaults.standard.set(s, forKey: Self.optionsSymbolKey)
+        switchStrategy(to: s)
+    }
+
+    // MARK: - Strategie po tickerech
+
+    /// Strategie ostatních tickerů (aktuální je v `strategy`).
+    private var savedStrategies: [String: OptionStrategy] = [:]
+    private static let strategiesKey = "strategiesByTicker"
+
+    /// Odloží strategii aktuálního tickeru a načte strategii nového (nebo prázdnou).
+    private func switchStrategy(to symbol: String) {
+        let current = strategy.underlying.uppercased()
+        guard current != symbol else { return }
+        if !current.isEmpty {
+            savedStrategies[current] = strategy.legs.isEmpty ? nil : strategy
+        }
+        strategy = savedStrategies.removeValue(forKey: symbol) ?? OptionStrategy(underlying: symbol)
+        strategySpot = 0
+        saveStrategy()
+        Task { await refreshStrategySpot() }
+    }
+
+    private func saveStrategies() {
+        if let data = try? JSONEncoder().encode(savedStrategies) {
+            UserDefaults.standard.set(data, forKey: Self.strategiesKey)
+        }
     }
 
     /// Expirace rozbalená v tabulce – šablony strategií se staví na ní.
@@ -424,5 +458,6 @@ final class AppModel {
             defaults.set(data, forKey: Self.strategyKey)
         }
         defaults.set(strategySpot, forKey: Self.spotKey)
+        saveStrategies()
     }
 }
