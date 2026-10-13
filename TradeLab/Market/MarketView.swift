@@ -61,7 +61,10 @@ struct MarketView: View {
             }
             .refreshable { await model.refreshQuotes() }
             .task { await model.refreshQuotes() }
-            .toolbar { EditButton() }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { EditButton() }
+                ToolbarItem(placement: .topBarTrailing) { AgentToolbarButton() }
+            }
         }
     }
 

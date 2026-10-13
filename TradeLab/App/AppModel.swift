@@ -7,7 +7,6 @@ enum AppTab: Hashable {
     case market
     case options
     case backtest
-    case agent
 }
 
 @MainActor
@@ -17,6 +16,8 @@ final class AppModel {
     let chainStore: ChainStore
 
     var selectedTab: AppTab = .market
+    /// Agent otevřený jako vysouvací okno nad libovolnou záložkou.
+    var showAgent = false
 
     // Sledované tickery
     private(set) var watchlist: [String]
@@ -400,7 +401,10 @@ final class AppModel {
         renameStrategy()
         saveStrategy()
         requestedExpiration = proposed.optionLegs.compactMap(\.expiration).min()
-        if switchTab { selectedTab = .options }
+        if switchTab {
+            selectedTab = .options
+            showAgent = false
+        }
     }
 
     func refreshStrategySpot() async {

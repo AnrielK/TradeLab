@@ -1,5 +1,11 @@
 # Změny
 
+## 0.16.0 – 2026-10-13
+
+- **Agent** už není záložka: kulaté tlačítko ✦ vpravo nahoře na Trhu, Opcích i v Backtestu ho otevře jako
+  vysouvací okno přes aktuální obrazovku. „Otevřít v Opcích“ okno zavře a přepne na Opce.
+- Trh: tlačítko Upravit je vlevo.
+
 ## 0.15.2 – 2026-10-13
 
 - Oprava: po výběru jiného tickeru payoff ukazoval nohy předchozího tickeru. Strategie se teď pamatují

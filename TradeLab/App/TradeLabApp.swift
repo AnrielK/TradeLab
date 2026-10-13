@@ -31,10 +31,26 @@ struct RootView: View {
             BacktestView()
                 .tabItem { Label("Backtest", systemImage: "testtube.2") }
                 .tag(AppTab.backtest)
-            AgentView()
-                .tabItem { Label("Agent", systemImage: "sparkles") }
-                .tag(AppTab.agent)
         }
         .task { await model.refreshRiskFreeRate() }
+        .sheet(isPresented: $model.showAgent) {
+            AgentView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+}
+
+/// Kulaté tlačítko agenta v navigační liště každé záložky.
+struct AgentToolbarButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button {
+            model.showAgent = true
+        } label: {
+            Image(systemName: "sparkles")
+        }
+        .accessibilityLabel("Agent")
     }
 }

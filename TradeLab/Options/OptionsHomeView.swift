@@ -39,6 +39,10 @@ struct OptionsHomeView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     StrategyMenuButton()
                 }
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                ToolbarItem(placement: .topBarTrailing) {
+                    AgentToolbarButton()
+                }
             }
             .fullScreenCover(isPresented: $showTradingViewChart) {
                 TVChartScreen(initialSymbol: model.optionsSymbol)

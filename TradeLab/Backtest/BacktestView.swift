@@ -268,6 +268,9 @@ struct BacktestView: View {
                 }
             }
             .navigationTitle("Backtest")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { AgentToolbarButton() }
+            }
             .onAppear {
                 if bt.symbol.isEmpty { bt.symbol = model.optionsSymbol }
             }
