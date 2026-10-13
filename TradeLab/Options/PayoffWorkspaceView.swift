@@ -10,6 +10,8 @@ struct PayoffWorkspaceView: View {
     @State private var isBusy = false
     /// Cena pro panel hodnot (vybraná v grafu); nil = aktuální cena.
     @State private var probePrice: Double?
+    /// Výsuvný panel dole (kotace, úpravy, hodnoty v bodě).
+    @AppStorage("payoff.panelExpanded") private var panelExpanded = false
 
     var body: some View {
         if model.strategy.optionLegs.isEmpty {
@@ -24,8 +26,9 @@ struct PayoffWorkspaceView: View {
                     content
                 }
                 .padding()
-                .padding(.bottom, 90)
+                .padding(.bottom, 16)
             }
+            .safeAreaInset(edge: .bottom) { bottomPanel }
             .onChange(of: model.strategy.nearestExpiryDays) { _, newValue in
                 daysForward = min(daysForward, max(newValue - 1, 0))
             }
@@ -48,9 +51,6 @@ struct PayoffWorkspaceView: View {
                         pnl: strategy.profitLoss(atSpot: point.spot, daysElapsed: daysForward, ivShift: ivShift, market: market))
         }
         let markers = strategy.optionLegs.map(marker(for:))
-
-        Text(ticketTitle(strategy, quote: strategy.netQuote))
-            .font(.subheadline.weight(.semibold))
 
         statsRow(analysis: analysis, extrinsic: strategy.extrinsicValue(spot: spot))
         breakevenRow(analysis.breakevens, spot: spot)
@@ -75,15 +75,7 @@ struct PayoffWorkspaceView: View {
 
         legend
 
-        if let quote = strategy.netQuote {
-            NetQuoteBar(quote: quote)
-                .padding(10)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-
-        controls
         sliders(maxDays: strategy.nearestExpiryDays)
-        valuesPanel(strategy: strategy, spot: spot, market: market, ivShift: ivShift)
 
         VStack(alignment: .leading, spacing: 6) {
             Text("Nohy").font(.subheadline.weight(.semibold))
@@ -241,6 +233,58 @@ struct PayoffWorkspaceView: View {
                     .disabled(!model.canAdjustFromChain || isBusy)
             }
         }
+    }
+
+    // MARK: - Výsuvný panel
+
+    private var bottomPanel: some View {
+        let strategy = model.strategy
+        let spot = model.strategySpot > 0 ? model.strategySpot : model.chainStore.underlyingPrice
+        return VStack(spacing: 0) {
+            Button {
+                withAnimation(.snappy) { panelExpanded.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "list.bullet.rectangle.portrait")
+                        .foregroundStyle(ChainTheme.itm)
+                    Text(ticketTitle(strategy, quote: strategy.netQuote))
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 4)
+                    Image(systemName: panelExpanded ? "chevron.down" : "chevron.up")
+                        .font(.footnote.weight(.bold))
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if panelExpanded {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        if let quote = strategy.netQuote {
+                            NetQuoteBar(quote: quote)
+                                .padding(.horizontal, 4)
+                        } else {
+                            Text("Bez kotací bid/ask").font(.caption).foregroundStyle(.secondary)
+                        }
+                        controls
+                        valuesPanel(strategy: strategy, spot: spot, market: model.market, ivShift: ivShiftPoints / 100)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(maxHeight: 470)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Hodnoty v bodě (dřívější kalkulačka)

@@ -1,5 +1,11 @@
 # Změny
 
+## 0.15.1 – 2026-10-13
+
+- Spodní lišta se při scrollování už nezmenšuje.
+- Payoff: kotace bid/mid/ask, úpravy (striky, šířka, počet, expirace) a hodnoty v bodě jsou ve výsuvném panelu
+  dole – stejně jako tiket v tabulce. Graf, statistiky, posuvníky a nohy zůstávají nahoře; stav panelu si aplikace pamatuje.
+
 ## 0.15.0 – 2026-10-13
 
 - Záložka **Kalkulačka** odebrána – výpočty jsou v payoffu v novém panelu **Hodnoty v bodě**:

@@ -35,7 +35,6 @@ struct RootView: View {
                 .tabItem { Label("Agent", systemImage: "sparkles") }
                 .tag(AppTab.agent)
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
         .task { await model.refreshRiskFreeRate() }
     }
 }
