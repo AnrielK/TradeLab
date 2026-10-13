@@ -5,39 +5,15 @@ import MarketData
 import Backtest
 
 enum StrategyKind: String, CaseIterable, Identifiable {
-    case sma = "SMA cross"
-    case macd = "MACD cross"
-    case rsi = "RSI reversion"
-    case breakRetest = "Break & retest"
-    case reversal = "Reversal"
-    case maBounce = "Odraz od průměru"
-    case levelBounce = "Odraz od S/R"
-    case levelBreakout = "Průraz S/R"
-    case trendlineBounce = "Odraz od trendline"
-    case trendlineBreakout = "Průraz trendline"
-    case swingPullback = "Swing pullback (TradeLab)"
+    case breakout = "Breakout / Breakdown"
     case hold = "Buy & hold"
-
-    /// Strategie nad supporty, rezistencemi a trendliniemi (sdílené parametry).
-    var isStructure: Bool {
-        [.levelBounce, .levelBreakout, .trendlineBounce, .trendlineBreakout].contains(self)
-    }
 
     var id: String { rawValue }
 
     var summary: String {
         switch self {
-        case .sma: return "Long, když je rychlý SMA nad pomalým."
-        case .macd: return "Long, když je MACD nad signální linkou."
-        case .rsi: return "Nákup při přeprodanosti, prodej při překoupenosti."
-        case .breakRetest: return "Průraz rezistence (max. high za N svíček), návrat k prolomené hladině a zavření nad ní. Stop pod hladinou, trailing výstup pod low posledních N/2 svíček."
-        case .reversal: return "Po přeprodanosti (RSI) býčí obratová svíčka – zelená a zavření nad high předchozí. Stop pod swing low, výstup při překoupenosti nebo medvědí obratové svíčce."
-        case .maBounce: return "V trendu (cena nad pomalým SMA, průměr roste) se cena dotkne průměru a zavře nad ním zelenou svíčkou. Výstup při zavření pod průměrem."
-        case .levelBounce: return "Hladiny ze swingů posledních N svíček (aspoň 2 dotyky). Dotyk supportu a zelené zavření nad ním → long. Cíl na nejbližší rezistenci (jinak R:R), stop při zavření pod supportem."
-        case .levelBreakout: return "Zavření nad rezistencí o toleranci, předchozí zavření pod ní → long. Stop při návratu pod hladinu, cíl na další rezistenci (jinak R:R)."
-        case .trendlineBounce: return "Trendlinie přes swingová minima, kterou zavření neprorazilo. Dotyk linie a zelené zavření nad ní → long. Stop pod linií (posouvá se s ní), cíl R:R."
-        case .trendlineBreakout: return "Zavření nad rezistenční trendlinií (přes swingová maxima) o toleranci → long. Stop při návratu pod linii, cíl R:R."
-        case .swingPullback: return "Vlastní swingová strategie: v trendu (nad SMA 200, EMA 50 roste) pullback do zóny 0,382–0,786 swingu nebo k EMA 20, RSI pod 45 a otáčí, zelená svíčka nad high předchozí. Stop pod minimem pullbacku, cíl na extenzi 1,272, výstup i pod EMA 50."
+        case .breakout:
+            return "Konsolidace (boční trend, aspoň 2 dotyky hladiny, KP 20 × 50 se kříží). Týdenní graf v trendu (KP 10/20/40 seřazeny, PSAR ve směru), denní KP 20/50/100 seřazeny a PSAR ve směru, trh (SPY) nad / pod SMA 200, daleko od další hladiny. Stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace."
         case .hold: return "Koupit a držet."
         }
     }
@@ -77,30 +53,10 @@ struct CurvePoint: Identifiable {
 final class BacktestModel {
     var symbol = ""
     var range: HistoryRange = .fiveYears
-    var kind: StrategyKind = .sma
-    var smaFast = 50
-    var smaSlow = 200
-    var macdFast = 12
-    var macdSlow = 26
-    var macdSignal = 9
-    var rsiPeriod = 14
-    var rsiLower = 30.0
-    var rsiUpper = 70.0
-    var breakLookback = 20
-    var retestBars = 5
-    var breakTolerancePct = 1.0
-    var reversalPeriod = 14
-    var reversalLower = 30.0
-    var reversalUpper = 70.0
-    var bouncePeriod = 20
-    var bounceTrend = 200
-    var bounceTolerancePct = 1.0
-    var bounceEMA = true
-    var structureLookback = 120
-    var structureTolerancePct = 0.5
-    var rewardRisk = 2.0
-    var pullbackTrend = 200
-    var pullbackSwing = 20
+    var kind: StrategyKind = .breakout
+    var breakout = BreakoutSettings()
+    /// Breakouty jen při trhu (SPY) nad SMA 200, breakdowny pod ní.
+    var marketFilter = true
     var instrument: BacktestInstrument = .stock
     var optionsAuto = true
     var neutralCondor = false
@@ -119,10 +75,6 @@ final class BacktestModel {
     var optionsResult: OptionsBacktestResult? = nil
     var optionsPricing: OptionsPricing = .simulated
     var progressText: String? = nil
-    var fibExit = false
-    var fibLookback = 20
-    var fibTarget = 1.272
-    var fibStop = 0.786
     var allowShort = false
     var costBps = 5.0
     var compareSPY = true
@@ -135,25 +87,7 @@ final class BacktestModel {
 
     var strategy: BacktestStrategy {
         switch kind {
-        case .sma: return .smaCross(fast: smaFast, slow: smaSlow)
-        case .macd: return .macdCross(fast: macdFast, slow: macdSlow, signal: macdSignal)
-        case .rsi: return .rsiReversion(period: rsiPeriod, lower: rsiLower, upper: rsiUpper)
-        case .breakRetest:
-            return .breakRetest(lookback: breakLookback, retestBars: retestBars, tolerance: breakTolerancePct / 100)
-        case .reversal: return .reversal(period: reversalPeriod, lower: reversalLower, upper: reversalUpper)
-        case .maBounce:
-            return .maBounce(period: bouncePeriod, trendPeriod: bounceTrend, tolerance: bounceTolerancePct / 100,
-                             exponential: bounceEMA)
-        case .levelBounce:
-            return .levelBounce(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
-        case .levelBreakout:
-            return .levelBreakout(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
-        case .trendlineBounce:
-            return .trendlineBounce(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
-        case .trendlineBreakout:
-            return .trendlineBreakout(lookback: structureLookback, tolerance: structureTolerancePct / 100, rewardRisk: rewardRisk)
-        case .swingPullback:
-            return .swingPullback(trendPeriod: pullbackTrend, swingLookback: pullbackSwing)
+        case .breakout: return .breakout(breakout)
         case .hold: return .buyAndHold
         }
     }
@@ -168,10 +102,6 @@ final class BacktestModel {
             ivMultiplier: ivMultiplier, highVolRank: highVolRank, riskPerTrade: riskPerTradePct / 100,
             creditTakeProfit: creditTakeProfitPct / 100, debitTakeProfit: debitTakeProfitPct / 100,
             creditStop: creditStopMultiple, debitStop: debitStopPct / 100, riskFreeRate: riskFreeRate)
-    }
-
-    var exitRule: ExitRule {
-        fibExit ? .fibonacci(lookback: fibLookback, target: fibTarget, stop: fibStop) : .strategy
     }
 
     func run(client: YahooFinanceClient, riskFreeRate: Double) async {
@@ -193,8 +123,19 @@ final class BacktestModel {
                 return
             }
             let config = BacktestConfig(strategy: strategy, allowShort: allowShort, costBps: costBps,
-                                        riskFreeRate: riskFreeRate, exit: exitRule)
-            // Strukturní strategie počítají hladiny v každé svíčce – mimo hlavní vlákno.
+                                        riskFreeRate: riskFreeRate)
+            // SPY pro filtr trhu i srovnání.
+            let needsSPY = (kind == .breakout && marketFilter) || compareSPY
+            var spy: BacktestSeries? = nil
+            if needsSPY {
+                spy = try? await BacktestData.load(symbol: "SPY", range: range, source: source,
+                                                   interval: interval, client: client)
+            }
+            let marketUp: [Bool?]? = kind == .breakout && marketFilter
+                ? spy.map { BreakoutStrategy.marketTrend($0.bars, for: bars) } : nil
+            if kind == .breakout && marketFilter && spy == nil {
+                errorMessage = "Nepodařilo se načíst SPY pro filtr trhu – počítám bez něj."
+            }
             if instrument == .options {
                 let optionsConfig = self.optionsConfig(riskFreeRate: riskFreeRate)
                 if historicalOptions {
@@ -202,23 +143,22 @@ final class BacktestModel {
                     defer { progressText = nil }
                     optionsResult = try await OptionsBacktest.runHistorical(
                         bars: bars, symbol: ticker, config: optionsConfig, source: HistoricalOptionsData.shared,
+                        marketUp: marketUp,
                         onProgress: { text in await MainActor.run { self.progressText = text } })
                 } else {
                     optionsResult = await Task.detached(priority: .userInitiated) {
-                        OptionsBacktest.run(bars: bars, config: optionsConfig)
+                        OptionsBacktest.run(bars: bars, config: optionsConfig, marketUp: marketUp)
                     }.value
                 }
             } else {
                 result = await Task.detached(priority: .userInitiated) {
-                    BacktestEngine.run(bars: bars, config: config)
+                    BacktestEngine.run(bars: bars, config: config, marketUp: marketUp)
                 }.value
             }
             dataLabel = series.label
 
             benchmark = []
-            if compareSPY, ticker != "SPY",
-               let spy = try? await BacktestData.load(symbol: "SPY", range: range, source: source,
-                                                      interval: interval, client: client) {
+            if compareSPY, ticker != "SPY", let spy {
                 let start = bars[0].date
                 benchmark = BacktestEngine.normalized(spy.bars, from: start)
                     .map { CurvePoint(date: $0.date, value: $0.value, series: "SPY") }
@@ -305,70 +245,10 @@ struct BacktestView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            switch bt.kind {
-            case .sma:
-                Stepper("Rychlý SMA: \(bt.smaFast)", value: $bt.smaFast, in: 2...200, step: 5)
-                Stepper("Pomalý SMA: \(bt.smaSlow)", value: $bt.smaSlow, in: 10...400, step: 10)
-            case .macd:
-                Stepper("Rychlá EMA: \(bt.macdFast)", value: $bt.macdFast, in: 2...50)
-                Stepper("Pomalá EMA: \(bt.macdSlow)", value: $bt.macdSlow, in: 5...100)
-                Stepper("Signál: \(bt.macdSignal)", value: $bt.macdSignal, in: 2...30)
-            case .rsi:
-                Stepper("Perioda RSI: \(bt.rsiPeriod)", value: $bt.rsiPeriod, in: 2...50)
-                Stepper("Nákup pod: \(Int(bt.rsiLower))", value: $bt.rsiLower, in: 5...50, step: 5)
-                Stepper("Prodej nad: \(Int(bt.rsiUpper))", value: $bt.rsiUpper, in: 50...95, step: 5)
-            case .breakRetest:
-                Stepper("Hladina z \(bt.breakLookback) svíček", value: $bt.breakLookback, in: 5...200, step: 5)
-                Stepper("Retest do \(bt.retestBars) svíček", value: $bt.retestBars, in: 1...30)
-                Stepper("Tolerance: \(bt.breakTolerancePct.fixed(2)) %", value: $bt.breakTolerancePct, in: 0...5, step: 0.25)
-            case .reversal:
-                Stepper("Perioda RSI: \(bt.reversalPeriod)", value: $bt.reversalPeriod, in: 2...50)
-                Stepper("Přeprodanost pod: \(Int(bt.reversalLower))", value: $bt.reversalLower, in: 5...50, step: 5)
-                Stepper("Překoupenost nad: \(Int(bt.reversalUpper))", value: $bt.reversalUpper, in: 50...95, step: 5)
-            case .maBounce:
-                Picker("Průměr", selection: $bt.bounceEMA) {
-                    Text("EMA").tag(true)
-                    Text("SMA").tag(false)
-                }
-                .pickerStyle(.segmented)
-                Stepper("Perioda průměru: \(bt.bouncePeriod)", value: $bt.bouncePeriod, in: 5...200, step: 5)
-                Stepper("Trend SMA: \(bt.bounceTrend)", value: $bt.bounceTrend, in: 20...400, step: 10)
-                Stepper("Tolerance: \(bt.bounceTolerancePct.fixed(2)) %", value: $bt.bounceTolerancePct, in: 0...5, step: 0.25)
-            case .levelBounce, .levelBreakout, .trendlineBounce, .trendlineBreakout:
-                Stepper("Struktura z \(bt.structureLookback) svíček", value: $bt.structureLookback, in: 30...400, step: 10)
-                Stepper("Tolerance: \(bt.structureTolerancePct.fixed(2)) %", value: $bt.structureTolerancePct, in: 0.1...3, step: 0.1)
-                Stepper("Cíl R:R \(bt.rewardRisk.fixed(1))", value: $bt.rewardRisk, in: 0.5...5, step: 0.5)
-            case .swingPullback:
-                Stepper("Trend SMA: \(bt.pullbackTrend)", value: $bt.pullbackTrend, in: 50...300, step: 10)
-                Stepper("Swing z \(bt.pullbackSwing) svíček", value: $bt.pullbackSwing, in: 10...60, step: 5)
-            case .hold:
-                EmptyView()
-            }
-
-            if bt.kind != .hold {
-                Toggle(bt.instrument == .options ? "Povolit medvědí strategie" : "Povolit short", isOn: $bt.allowShort)
-            }
-
-            if bt.instrument == .stock {
-                Toggle("Fibonacciho výstup", isOn: $bt.fibExit.animation())
-            }
-            if bt.fibExit, bt.instrument == .stock {
-                Stepper("Swing z \(bt.fibLookback) svíček", value: $bt.fibLookback, in: 5...200, step: 5)
-                Picker("Cíl (extenze)", selection: $bt.fibTarget) {
-                    Text("1.0 – předchozí extrém").tag(1.0)
-                    Text("1.272").tag(1.272)
-                    Text("1.618").tag(1.618)
-                    Text("2.0").tag(2.0)
-                }
-                Picker("Stop (retracement)", selection: $bt.fibStop) {
-                    Text("0.5").tag(0.5)
-                    Text("0.618").tag(0.618)
-                    Text("0.786").tag(0.786)
-                    Text("1.0 – počátek swingu").tag(1.0)
-                }
-                Text("Při vstupu se vezme swing (nejvyšší high a nejnižší low) z posledních svíček. Obchod skončí na zavření nad cílem nebo pod stopem – nebo dřív, když vystoupí strategie. Po výstupu se znovu vstupuje až po novém signálu.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if bt.kind == .breakout {
+                breakoutSettings
+                Toggle(bt.instrument == .options ? "Povolit medvědí strategie (breakdown)" : "Povolit short (breakdown)",
+                       isOn: $bt.allowShort)
             }
             Stepper("Náklady: \(bt.costBps.fixed(0)) bp / obchod", value: $bt.costBps, in: 0...50, step: 1)
             Toggle("Srovnat se SPY", isOn: $bt.compareSPY)
@@ -394,13 +274,39 @@ struct BacktestView: View {
         }
     }
 
+    @ViewBuilder
+    private var breakoutSettings: some View {
+        @Bindable var bt = bt
+        Toggle("1. Těsně před breakoutem (jen u absolutního vrcholu)", isOn: $bt.breakout.preBreakout)
+        Toggle("2. Po breakoutu (čistá svíčka nad hladinou)", isOn: $bt.breakout.breakout)
+        Toggle("3. První pullback PNR", isOn: $bt.breakout.pullback)
+        Stepper("Konsolidace z \(bt.breakout.lookback) svíček", value: $bt.breakout.lookback, in: 40...250, step: 10)
+        Stepper("Dotyky hladiny: aspoň \(bt.breakout.minTouches)", value: $bt.breakout.minTouches, in: 1...5)
+        Stepper("Tolerance dotyku: \((bt.breakout.tolerance * 100).fixed(2)) %", value: $bt.breakout.tolerance,
+                in: 0.0025...0.03, step: 0.0025)
+        Toggle("Týdenní graf v trendu (KP + PSAR)", isOn: $bt.breakout.weeklyFilter)
+        Toggle("Denní KP seřazeny + PSAR", isOn: $bt.breakout.dailyFilter)
+        Toggle("Konsolidace: KP 20 × 50 se kříží", isOn: $bt.breakout.requireMACross)
+        Toggle("Trh (SPY) v trendu – nad / pod SMA 200", isOn: $bt.marketFilter)
+        Stepper("Volno k další hladině: \(bt.breakout.headroomATR.fixed(1))× ATR", value: $bt.breakout.headroomATR,
+                in: 0...5, step: 0.5)
+        Stepper("Stop: \(bt.breakout.stopATR.fixed(1))× ATR nebo předchozí svíčka", value: $bt.breakout.stopATR,
+                in: 0.5...3, step: 0.5)
+        Picker("Cíl (Fibonacci)", selection: $bt.breakout.targetFib) {
+            Text("127,2 %").tag(1.272)
+            Text("161,8 %").tag(1.618)
+        }
+        Stepper("Pullback do \(bt.breakout.pullbackBars) svíček po průrazu", value: $bt.breakout.pullbackBars,
+                in: 5...40, step: 5)
+    }
+
     private var quantConnectSection: some View {
         Section {
             Button {
                 let instrument: QuantConnectExport.Instrument = bt.instrument == .options ? .options : .stock
                 let text = QuantConnectExport.script(
                     instrument: instrument, ticker: bt.symbol, range: bt.range, strategy: bt.strategy,
-                    exit: bt.exitRule, allowShort: bt.allowShort, costBps: bt.costBps,
+                    marketFilter: bt.kind == .breakout && bt.marketFilter, allowShort: bt.allowShort, costBps: bt.costBps,
                     options: bt.instrument == .options ? bt.optionsConfig(riskFreeRate: 0.04) : nil)
                 quantConnectScript = QuantConnectScript(
                     text: text, fileName: QuantConnectExport.fileName(ticker: bt.symbol, instrument: instrument),
@@ -564,7 +470,7 @@ struct BacktestView: View {
 
     private func metricsSection(_ result: BacktestResult) -> some View {
         metricsSection(name: result.config.strategy.name, m: result.metrics, h: result.buyAndHoldMetrics,
-                       footer: result.config.exit != .strategy ? result.config.title : nil)
+                       footer: nil)
     }
 
     private func metricsSection(name: String, m: BacktestMetrics, h: BacktestMetrics, footer: String?) -> some View {

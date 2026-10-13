@@ -1,5 +1,23 @@
 # Změny
 
+## 0.19.0 – 2026-10-13
+
+- **Strategie od začátku**: všechny dosavadní strategie (SMA, MACD, RSI, break & retest, reversal, odrazy
+  a průrazy S/R a trendlinií, swing pullback, Fibonacciho výstup) jsou pryč. Zůstává buy & hold jako srovnání
+  a nová **Breakout / Breakdown** podle prezentace:
+  - konsolidace (boční trend): hladina z posledních 120 svíček s aspoň 2 swingovými dotyky, KP 20 × 50 se v ní kříží;
+  - týdenní graf v trendu (KP 10/20/40 seřazeny, PSAR ve směru), denní KP 20/50/100 seřazeny a PSAR ve směru,
+    trh (SPY) nad SMA 200 pro breakout / pod pro breakdown, daleko od další hladiny (aspoň 2× ATR, nebo nový vrchol);
+  - 3 vstupy: **těsně před breakoutem** (jen u absolutního vrcholu, do 1× ATR pod ním), **po breakoutu**
+    (celá svíčka otevřela i zavřela nad hladinou, případně druhý den), **první pullback PNR** (návrat k prorazené
+    hladině do 20 svíček, zavření nad ní býčí / obratovou svíčkou);
+  - stop 1× ATR nebo pod předchozí svíčku (vzdálenější), cíl Fibonacciho extenze konsolidace 127,2 / 161,8 %
+    (aspoň 1,5× ATR). Breakdown je zrcadlově.
+- Backtest (akcie i opce), skener, agent i export do QuantConnectu používají novou strategii; Python verze
+  pro QuantConnect je ověřená proti testům jádra.
+- **Watchlist breakoutů** na Trhu: čerstvé vstupy s hladinou, stopem a cílem + kandidáti v konsolidaci těsně
+  u hladiny (do 1,5× ATR), kteří čekají na průraz. Text „nelikvidní“ je pod výstražným trojúhelníkem.
+
 ## 0.18.0 – 2026-10-13
 
 - **Watchlist opčních setupů** na Trhu pod Sledovanými: skener projde Sledované + ~65 likvidních US akcií

@@ -7,20 +7,19 @@ extension QuantConnectExport {
 
     /// Sestaví celý skript `main.py` pro QuantConnect.
     static func script(instrument: Instrument, ticker: String, range: HistoryRange,
-                       strategy: BacktestStrategy, exit: ExitRule, allowShort: Bool, costBps: Double,
+                       strategy: BacktestStrategy, marketFilter: Bool, allowShort: Bool, costBps: Double,
                        options: OptionsBacktestConfig?, now: Date = Date()) -> String {
         let symbol = ticker.trimmingCharacters(in: .whitespaces).uppercased()
         let (start, end) = dates(range: range, options: instrument == .options, now: now)
         let isOptions = instrument == .options && options != nil
 
-        var signal = constructor(strategy, allowShort: isOptions ? true : allowShort)
-        if !isOptions, case .fibonacci(let n, let target, let stop) = exit {
-            signal = "FibExit(\(signal), \(n), \(py(target)), \(py(stop)))"
-        }
+        let signal = constructor(strategy, allowShort: isOptions ? true : allowShort)
 
         var values: [String: String] = [
             "START": start, "END": end, "CASH": "10000", "TICKER": symbol, "SIGNAL": signal,
             "SLIPPAGE": py(costBps / 10_000),
+            "WARMUP_DAYS": "\(warmupDays(strategy))",
+            "MARKET": py(marketFilter),
         ]
         var template = stockTemplate
         if isOptions, let o = options {
@@ -33,7 +32,6 @@ extension QuantConnectExport {
             values.merge([
                 "MIN_DTE": "\(max(o.daysToExpiry - 10, o.exitDaysToExpiry + 1))",
                 "MAX_DTE": "\(o.daysToExpiry + 15)",
-                "WARMUP_DAYS": "\(warmupDays(strategy))",
                 "AUTO": py(auto), "CONDOR": py(condor),
                 "BULLISH": playKey(bullish),
                 "BEARISH": bearish.map { "\"\(playKey($0))\"" } ?? "None",
@@ -51,7 +49,7 @@ extension QuantConnectExport {
         }
 
         let title = isOptions ? "opce" : "akcie"
-        let exitName = (!isOptions && exit != .strategy) ? " · \(exit.name)" : ""
+        let exitName = marketFilter ? " · filtr SPY > SMA 200" : ""
         let header = """
         # TradeLab → QuantConnect (LEAN, Python) – \(title)
         # \(symbol) · \(strategy.name)\(exitName)
@@ -74,21 +72,17 @@ extension QuantConnectExport {
     // MARK: - Pomocné
 
     static func constructor(_ s: BacktestStrategy, allowShort: Bool) -> String {
-        let a = py(allowShort)
         switch s {
-        case .buyAndHold: return "BuyHold()"
-        case .smaCross(let f, let sl): return "SmaCross(\(f), \(sl), \(a))"
-        case .macdCross(let f, let sl, let g): return "MacdCross(\(f), \(sl), \(g), \(a))"
-        case .rsiReversion(let p, let lo, let hi): return "RsiReversion(\(p), \(py(lo)), \(py(hi)), \(a))"
-        case .breakRetest(let n, let r, let tol): return "BreakRetest(\(n), \(r), \(py(tol)), \(a))"
-        case .reversal(let p, let lo, let hi): return "Reversal(\(p), \(py(lo)), \(py(hi)), \(a))"
-        case .maBounce(let p, let t, let tol, let ema):
-            return "MaBounce(\(p), \(t), \(py(tol)), \(py(ema)), \(a))"
-        case .levelBounce(let n, let tol, let rr): return "LevelBounce(\(n), \(py(tol)), \(py(rr)), \(a))"
-        case .levelBreakout(let n, let tol, let rr): return "LevelBreakout(\(n), \(py(tol)), \(py(rr)), \(a))"
-        case .trendlineBounce(let n, let tol, let rr): return "TrendlineBounce(\(n), \(py(tol)), \(py(rr)), \(a))"
-        case .trendlineBreakout(let n, let tol, let rr): return "TrendlineBreakout(\(n), \(py(tol)), \(py(rr)), \(a))"
-        case .swingPullback(let t, let sw): return "SwingPullback(\(t), \(sw), \(a))"
+        case .buyAndHold:
+            return "BuyHold()"
+        case .breakout(let b):
+            return """
+            Breakout(lookback=\(b.lookback), min_touches=\(b.minTouches), tolerance=\(py(b.tolerance)), \
+            pre=\(py(b.preBreakout)), breakout=\(py(b.breakout)), pullback=\(py(b.pullback)), \
+            weekly=\(py(b.weeklyFilter)), daily=\(py(b.dailyFilter)), ma_cross=\(py(b.requireMACross)), \
+            headroom=\(py(b.headroomATR)), stop_atr=\(py(b.stopATR)), target_fib=\(py(b.targetFib)), \
+            pullback_bars=\(b.pullbackBars), allow_short=\(py(allowShort)))
+            """
         }
     }
 
@@ -104,21 +98,12 @@ extension QuantConnectExport {
         }
     }
 
-    /// Kalendářní dny zahřátí: nejdelší perioda strategie v obchodních dnech × 1,5 + rok na HV rank.
+    /// Kalendářní dny zahřátí: týdenní SMA 40 + konsolidace (svíčky × 1,5) + rezerva.
     static func warmupDays(_ s: BacktestStrategy) -> Int {
-        let bars: Int
         switch s {
-        case .buyAndHold: bars = 0
-        case .smaCross(_, let sl): bars = sl
-        case .macdCross(_, let sl, let g): bars = sl + g
-        case .rsiReversion(let p, _, _), .reversal(let p, _, _): bars = p * 3
-        case .breakRetest(let n, let r, _): bars = n + r
-        case .maBounce(let p, let t, _, _): bars = max(p, t)
-        case .levelBounce(let n, _, _), .levelBreakout(let n, _, _),
-             .trendlineBounce(let n, _, _), .trendlineBreakout(let n, _, _): bars = n
-        case .swingPullback(let t, let sw): bars = max(t, sw)
+        case .buyAndHold: return 0
+        case .breakout(let b): return max(42 * 7, Int(Double(max(b.lookback, 100)) * 1.5)) + 30
         }
-        return Int((Double(max(bars, 252)) * 1.5).rounded(.up)) + 10
     }
 
     static func dates(range: HistoryRange, options: Bool, now: Date) -> (String, String) {

@@ -281,6 +281,7 @@ extension OptionsBacktest {
     /// podle IV ranku zdroje (jinak HV rank).
     public static func runHistorical(bars: [BacktestBar], symbol: String, config: OptionsBacktestConfig,
                                      source: HistoricalOptionsSource, spreadFill: Double = 0.5,
+                                     marketUp: [Bool?]? = nil,
                                      onProgress: (@Sendable (String) async -> Void)? = nil) async throws
         -> OptionsBacktestResult {
         let n = bars.count
@@ -291,7 +292,7 @@ extension OptionsBacktest {
             throw HistoricalOptionsError.noData("Málo dat podkladu.")
         }
 
-        let signals = config.signal.targets(bars: bars, allowShort: true)
+        let signals = config.signal.targets(bars: bars, allowShort: true, marketUp: marketUp)
         let years = max(last.date.timeIntervalSince(first.date) / (365.25 * 86_400), 1 / 365)
         let hv = rollingVolatility(bars.map(\.close), window: 20, periodsPerYear: Double(n) / years)
         let rankWindow = max(Int((Double(n) / years).rounded()), 20)

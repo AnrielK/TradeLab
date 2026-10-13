@@ -104,15 +104,11 @@ final class EngineTests: XCTestCase {
     }
 
     func testStrategiesProduceTargets() {
-        let closes = (0..<120).map { 100 + 10 * sin(Double($0) / 8) }
-        for strategy in [BacktestStrategy.smaCross(fast: 5, slow: 20), .macdCross(fast: 12, slow: 26, signal: 9),
-                         .rsiReversion(period: 14, lower: 30, upper: 70), .buyAndHold] {
-            let t = strategy.targets(closes: closes, allowShort: true)
-            XCTAssertEqual(t.count, closes.count)
+        let b = bars((0..<300).map { 100 + 10 * sin(Double($0) / 8) + Double($0) * 0.05 }, stepDays: 1)
+        for strategy in [BacktestStrategy.buyAndHold, .breakout(BreakoutSettings())] {
+            let t = strategy.targets(bars: b, allowShort: true)
+            XCTAssertEqual(t.count, b.count)
             XCTAssertTrue(t.allSatisfy { [-1, 0, 1].contains($0) }, strategy.name)
         }
-        // SMA cross se na sinusovce musí přepínat.
-        let sma = BacktestStrategy.smaCross(fast: 5, slow: 20).targets(closes: closes, allowShort: false)
-        XCTAssertTrue(sma.contains(1) && sma.dropFirst(20).contains(0))
     }
 }

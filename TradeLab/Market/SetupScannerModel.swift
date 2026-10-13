@@ -17,7 +17,11 @@ enum ScanUniverse: String, CaseIterable, Codable, Identifiable {
 struct ScannerSettings: Codable, Equatable {
     var universe: ScanUniverse = .liquid
     var customTickers: [String] = []
-    var patterns: [SetupPattern] = SetupPattern.allCases
+    var breakout = BreakoutSettings()
+    /// Ukazovat i kandidáty těsně pod rezistencí / nad supportem (zatím bez vstupu).
+    var includeWatch = true
+    /// Breakouty jen při SPY nad SMA 200, breakdowny pod ní.
+    var marketFilter = true
     var maxAge: Int = 3
     var allowBearish = true
     var highVolRank: Double = 50
@@ -116,8 +120,8 @@ final class SetupScannerModel {
     func scan(watchlist: [String], rate: Double) async {
         guard !isScanning else { return }
         let symbols = universe(watchlist: watchlist)
-        guard !symbols.isEmpty, !settings.patterns.isEmpty else {
-            errorMessage = settings.patterns.isEmpty ? "Vyber aspoň jeden vzor." : "Seznam tickerů je prázdný."
+        guard !symbols.isEmpty else {
+            errorMessage = "Seznam tickerů je prázdný."
             return
         }
         isScanning = true
@@ -131,6 +135,14 @@ final class SetupScannerModel {
         var hits: [SetupHit] = []
         var failures = 0
 
+        // Trend trhu (SPY nad / pod SMA 200) pro filtr.
+        var market: [BacktestBar] = []
+        if settings.marketFilter,
+           let data = try? await client.dailyHistory(symbol: "SPY", range: .twoYears) {
+            market = BacktestData.yahooBars(data.bars)
+        }
+
+        let marketBars = market
         // Svíčky a vzory – souběžně po několika tickerech.
         await withTaskGroup(of: (SetupHit?, Bool).self) { group in
             var iterator = symbols.makeIterator()
@@ -140,9 +152,11 @@ final class SetupScannerModel {
                     do {
                         let data = try await client.dailyHistory(symbol: symbol, range: .twoYears)
                         let bars = BacktestData.yahooBars(data.bars)
-                        let hit = SetupScanner.scan(symbol: symbol, bars: bars, patterns: settings.patterns,
+                        let marketUp = marketBars.isEmpty ? nil : BreakoutStrategy.marketTrend(marketBars, for: bars)
+                        let hit = SetupScanner.scan(symbol: symbol, bars: bars, settings: settings.breakout,
                                                     maxAge: settings.maxAge, allowBearish: settings.allowBearish,
-                                                    highVolRank: settings.highVolRank)
+                                                    includeWatch: settings.includeWatch,
+                                                    highVolRank: settings.highVolRank, marketUp: marketUp)
                         return (hit, true)
                     } catch {
                         return (nil, false)
@@ -174,6 +188,8 @@ final class SetupScannerModel {
         results = hits
             .map { ScanResult(hit: $0, liquidity: liquidity[$0.symbol]) }
             .sorted { a, b in
+                let ea = a.hit.entry != nil, eb = b.hit.entry != nil
+                if ea != eb { return ea }
                 let la = a.liquidity?.isLiquid == true, lb = b.liquidity?.isLiquid == true
                 if la != lb { return la }
                 return a.hit.score > b.hit.score

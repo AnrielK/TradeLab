@@ -31,9 +31,9 @@ enum AgentToolbox {
             AgentTool(
                 name: "get_option_setups",
                 description: """
-                Výsledky skeneru opčních setupů (watchlist na záložce Trh): tickery s čerstvým signálem \
-                (odraz/průraz S/R a trendline, break & retest, odraz od EMA, swing pullback, reversal) na denních svíčkách, \
-                směr, stáří signálu, percentil HV, IV/HV, likvidita ATM opcí a navržený spread. \
+                Výsledky skeneru Breakout/Breakdown (watchlist na záložce Trh): tickery s čerstvým vstupem \
+                (těsně před breakoutem, po breakoutu, pullback PNR) nebo kandidáti v konsolidaci těsně u hladiny; \
+                směr, hladina, stop, cíl, stáří vstupu, percentil HV, IV/HV, likvidita ATM opcí a navržený spread. \
                 rescan=true spustí nový sken (trvá desítky sekund).
                 """,
                 inputSchema: Schema.object(["rescan": Schema.boolean("Spustit nový sken (výchozí false = poslední výsledky)")])
@@ -183,9 +183,9 @@ enum AgentToolbox {
                 skluz a poplatky, velikost podle rizika na obchod. Vrací metriky vs. buy & hold, rozpad podle strategií a poslední obchody. \
                 pricing historical použije skutečné historické kotace konce dne (od 2019); jinak jde o simulaci – uveď, která varianta běžela.
                 """,
-                inputSchema: Schema.object([
+                inputSchema: Schema.object(breakoutSchema.merging([
                     "symbol": Schema.string("Ticker"),
-                    "strategy": Schema.string("Pravidlo pro směr (viz run_backtest)"),
+                    "strategy": Schema.string("Pravidlo pro směr (viz run_backtest)", enum: ["breakout", "buy_and_hold"]),
                     "range": Schema.string("Období (výchozí 5y)", enum: HistoryRange.allCases.map(\.rawValue)),
                     "selection": Schema.string("auto (podle situace) nebo fixed", enum: ["auto", "fixed"]),
                     "bullish_play": Schema.string("fixed: strategie pro býčí signál", enum: OptionPlay.allCases.filter { $0.direction == 1 }.map(\.rawValue)),
@@ -200,7 +200,7 @@ enum AgentToolbox {
                     "iv_multiplier": Schema.number("simulated: IV = HV × násobek (výchozí 1.1)"),
                     "pricing": Schema.string("simulated (Black-Scholes, rychlé) nebo historical (skutečné EOD kotace z DoltHubu od 2019, pomalejší)",
                                              enum: ["simulated", "historical"]),
-                ], required: ["symbol", "strategy"])
+                ]) { a, _ in a }, required: ["symbol", "strategy"])
             ) { input in try await optionsBacktest(input, model: model) },
 
             AgentTool(
@@ -209,42 +209,18 @@ enum AgentToolbox {
                 Backtest pravidla (signál ze zavírací ceny svíčky, obchod za otevírací cenu další svíčky) a srovnání \
                 s buy & hold: výnos, CAGR, Sharpe, Sortino, max. drawdown, volatilita, počet obchodů, win rate, expozice. \
                 Zdroj dat a interval (Yahoo 1D, nebo TradingView 1D/1W/4H/1H) určuje nastavení backtestu v aplikaci. \
-                Pravidla: sma_cross, macd_cross, rsi_reversion, break_retest (průraz hladiny z lookback svíček a retest), \
-                reversal (obrat z RSI extrému potvrzený obratovou svíčkou), ma_bounce (odraz od průměru ve směru trendu), \
-                level_bounce / level_breakout (odraz od / průraz supportu a rezistence), trendline_bounce / trendline_breakout \
-                (odraz od / průraz trendové linie), swing_pullback (vlastní swingová strategie: pullback ve trendu s potvrzením), buy_and_hold. \
-                Hladiny a linie se v každé svíčce počítají jen z minulých dat.
+                Pravidla: breakout (Breakout nad rezistenci / Breakdown pod support z konsolidace – denní graf, \
+                filtr týdenního grafu; vstupy 1) těsně před průrazem absolutního vrcholu, 2) po čistém průrazu, \
+                3) první pullback PNR; stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace) \
+                a buy_and_hold. Vše se v každé svíčce počítá jen z minulých dat.
                 """,
-                inputSchema: Schema.object([
+                inputSchema: Schema.object(breakoutSchema.merging([
                     "symbol": Schema.string("Ticker"),
-                    "strategy": Schema.string("Pravidlo", enum: ["sma_cross", "macd_cross", "rsi_reversion", "break_retest",
-                                                                 "reversal", "ma_bounce", "level_bounce", "level_breakout",
-                                                                 "trendline_bounce", "trendline_breakout", "swing_pullback",
-                                                                 "buy_and_hold"]),
-                    "structure_lookback": Schema.integer("level_*/trendline_*: hladiny a linie ze swingů N svíček (výchozí 120)"),
-                    "reward_risk": Schema.number("level_*/trendline_*: cíl jako násobek rizika, když chybí další hladina (výchozí 2)"),
-                    "swing_lookback": Schema.integer("swing_pullback: swing z N svíček (výchozí 20)"),
+                    "strategy": Schema.string("Pravidlo", enum: ["breakout", "buy_and_hold"]),
                     "range": Schema.string("Období (výchozí 5y)", enum: HistoryRange.allCases.map(\.rawValue)),
-                    "fast": Schema.integer("Rychlá perioda (SMA výchozí 50, MACD 12)"),
-                    "slow": Schema.integer("Pomalá perioda (SMA výchozí 200, MACD 26)"),
-                    "signal": Schema.integer("Signální perioda MACD (výchozí 9)"),
-                    "rsi_period": Schema.integer("Perioda RSI (výchozí 14)"),
-                    "rsi_lower": Schema.number("Nákup pod RSI (výchozí 30)"),
-                    "rsi_upper": Schema.number("Prodej nad RSI (výchozí 70)"),
-                    "lookback": Schema.integer("break_retest: hladina z N svíček (výchozí 20)"),
-                    "retest_bars": Schema.integer("break_retest: retest do N svíček po průrazu (výchozí 5)"),
-                    "tolerance_pct": Schema.number("tolerance dotyku v % (break_retest, ma_bounce výchozí 1; level_*/trendline_* výchozí 0.5)"),
-                    "ma_period": Schema.integer("ma_bounce: perioda průměru (výchozí 20)"),
-                    "trend_period": Schema.integer("ma_bounce / swing_pullback: perioda trendového SMA (výchozí 200)"),
-                    "ema": Schema.boolean("ma_bounce: EMA místo SMA (výchozí true)"),
-                    "exit": Schema.string("Výstup: podle strategie, nebo Fibonacci (cíl na extenzi, stop na retracementu swingu)",
-                                          enum: ["strategy", "fibonacci"]),
-                    "fib_lookback": Schema.integer("fibonacci: swing z N svíček před vstupem (výchozí 20)"),
-                    "fib_target": Schema.number("fibonacci: cíl jako extenze swingu, 1 = předchozí extrém (výchozí 1.272)"),
-                    "fib_stop": Schema.number("fibonacci: stop jako retracement swingu, 1 = počátek swingu (výchozí 0.786)"),
-                    "allow_short": Schema.boolean("Povolit short místo hotovosti (výchozí false)"),
+                    "allow_short": Schema.boolean("Povolit short (breakdown) místo hotovosti (výchozí false)"),
                     "cost_bps": Schema.number("Náklady v bazických bodech na obchod (výchozí 5)"),
-                ], required: ["symbol", "strategy"])
+                ]) { a, _ in a }, required: ["symbol", "strategy"])
             ) { input in try await backtest(input, model: model) },
         ]
     }
@@ -330,10 +306,15 @@ enum AgentToolbox {
                 return [
                     "symbol": .string(h.symbol),
                     "direction": .string(h.direction > 0 ? "bullish" : "bearish"),
-                    "patterns": .array(h.patterns.map { .string($0.name) }),
+                    "setup": .string(h.title),
+                    "is_entry": .bool(h.entry != nil),
                     "bars_ago": .number(Double(h.barsAgo)),
+                    "level": num(h.level),
+                    "stop": num(h.stop),
+                    "target": num(h.target),
+                    "distance_atr": num(h.distanceATR),
+                    "atr": num(h.atr),
                     "close": num(h.close),
-                    "with_200sma_trend": .bool(h.withTrend),
                     "hv20": pct(h.historicalVolatility),
                     "hv_rank": num(h.volatilityRank, 0),
                     "atm_iv": pct(r.liquidity?.impliedVolatility),
@@ -875,11 +856,14 @@ enum AgentToolbox {
         let bars = historical ? series.bars.filter { $0.date >= HistoricalOptionsData.firstDay } : series.bars
         guard bars.count > 60 else { throw ToolError("Málo dat (\(bars.count) svíček).") }
         let result: OptionsBacktestResult
+        let market = await marketUp(input, strategy: signal, bars: bars, range: range, model: model)
         if historical {
             result = try await OptionsBacktest.runHistorical(bars: bars, symbol: s, config: config,
-                                                             source: HistoricalOptionsData.shared)
+                                                             source: HistoricalOptionsData.shared, marketUp: market)
         } else {
-            result = await Task.detached(priority: .userInitiated) { OptionsBacktest.run(bars: bars, config: config) }.value
+            result = await Task.detached(priority: .userInitiated) {
+                OptionsBacktest.run(bars: bars, config: config, marketUp: market)
+            }.value
         }
 
         func metrics(_ m: BacktestMetrics) -> JSONValue {
@@ -923,50 +907,56 @@ enum AgentToolbox {
         return output(.object(summary))
     }
 
+    /// Parametry strategie Breakout pro schéma nástrojů.
+    static let breakoutSchema: [String: JSONValue] = [
+        "pre_breakout": Schema.boolean("breakout: vstup 1 – těsně před průrazem absolutního vrcholu (výchozí true)"),
+        "breakout_entry": Schema.boolean("breakout: vstup 2 – po čistém průrazu (výchozí true)"),
+        "pullback": Schema.boolean("breakout: vstup 3 – první pullback PNR (výchozí true)"),
+        "lookback": Schema.integer("breakout: konsolidace z N svíček (výchozí 120)"),
+        "min_touches": Schema.integer("breakout: min. dotyků hladiny (výchozí 2)"),
+        "tolerance_pct": Schema.number("breakout: tolerance dotyku v % (výchozí 1)"),
+        "weekly_filter": Schema.boolean("breakout: týdenní KP 10/20/40 seřazeny + PSAR ve směru (výchozí true)"),
+        "daily_filter": Schema.boolean("breakout: denní SMA 20/50/100 seřazeny + PSAR ve směru (výchozí true)"),
+        "ma_cross": Schema.boolean("breakout: v konsolidaci se SMA 20 a 50 kříží (výchozí true)"),
+        "market_filter": Schema.boolean("breakout: SPY nad SMA 200 pro long, pod pro short (výchozí true)"),
+        "headroom_atr": Schema.number("breakout: min. volno k další hladině v ATR (výchozí 2)"),
+        "stop_atr": Schema.number("breakout: stop v ATR (výchozí 1)"),
+        "target_fib": Schema.number("breakout: cíl jako Fibonacciho extenze konsolidace (1.272 nebo 1.618)"),
+        "pullback_bars": Schema.integer("breakout: pullback do N svíček po průrazu (výchozí 20)"),
+    ]
+
     static func parseStrategy(_ input: JSONValue) throws -> BacktestStrategy {
-        let strategy: BacktestStrategy
         switch input["strategy"]?.stringValue {
-        case "sma_cross":
-            strategy = .smaCross(fast: input["fast"]?.intValue ?? 50, slow: input["slow"]?.intValue ?? 200)
-        case "macd_cross":
-            strategy = .macdCross(fast: input["fast"]?.intValue ?? 12, slow: input["slow"]?.intValue ?? 26,
-                                  signal: input["signal"]?.intValue ?? 9)
-        case "rsi_reversion":
-            strategy = .rsiReversion(period: input["rsi_period"]?.intValue ?? 14,
-                                     lower: input["rsi_lower"]?.doubleValue ?? 30,
-                                     upper: input["rsi_upper"]?.doubleValue ?? 70)
-        case "break_retest":
-            strategy = .breakRetest(lookback: input["lookback"]?.intValue ?? 20,
-                                    retestBars: input["retest_bars"]?.intValue ?? 5,
-                                    tolerance: (input["tolerance_pct"]?.doubleValue ?? 1) / 100)
-        case "reversal":
-            strategy = .reversal(period: input["rsi_period"]?.intValue ?? 14,
-                                 lower: input["rsi_lower"]?.doubleValue ?? 30,
-                                 upper: input["rsi_upper"]?.doubleValue ?? 70)
-        case "ma_bounce":
-            strategy = .maBounce(period: input["ma_period"]?.intValue ?? 20,
-                                 trendPeriod: input["trend_period"]?.intValue ?? 200,
-                                 tolerance: (input["tolerance_pct"]?.doubleValue ?? 1) / 100,
-                                 exponential: input["ema"]?.boolValue ?? true)
-        case "level_bounce", "level_breakout", "trendline_bounce", "trendline_breakout":
-            let lookback = input["structure_lookback"]?.intValue ?? 120
-            let tolerance = (input["tolerance_pct"]?.doubleValue ?? 0.5) / 100
-            let rr = input["reward_risk"]?.doubleValue ?? 2
-            switch input["strategy"]?.stringValue {
-            case "level_bounce": strategy = .levelBounce(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
-            case "level_breakout": strategy = .levelBreakout(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
-            case "trendline_bounce": strategy = .trendlineBounce(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
-            default: strategy = .trendlineBreakout(lookback: lookback, tolerance: tolerance, rewardRisk: rr)
-            }
-        case "swing_pullback":
-            strategy = .swingPullback(trendPeriod: input["trend_period"]?.intValue ?? 200,
-                                      swingLookback: input["swing_lookback"]?.intValue ?? 20)
+        case "breakout", nil:
+            var settings = BreakoutSettings()
+            if let v = input["pre_breakout"]?.boolValue { settings.preBreakout = v }
+            if let v = input["breakout_entry"]?.boolValue { settings.breakout = v }
+            if let v = input["pullback"]?.boolValue { settings.pullback = v }
+            if let v = input["lookback"]?.intValue { settings.lookback = max(20, v) }
+            if let v = input["min_touches"]?.intValue { settings.minTouches = max(1, v) }
+            if let v = input["tolerance_pct"]?.doubleValue { settings.tolerance = v / 100 }
+            if let v = input["weekly_filter"]?.boolValue { settings.weeklyFilter = v }
+            if let v = input["daily_filter"]?.boolValue { settings.dailyFilter = v }
+            if let v = input["ma_cross"]?.boolValue { settings.requireMACross = v }
+            if let v = input["headroom_atr"]?.doubleValue { settings.headroomATR = v }
+            if let v = input["stop_atr"]?.doubleValue { settings.stopATR = v }
+            if let v = input["target_fib"]?.doubleValue { settings.targetFib = v }
+            if let v = input["pullback_bars"]?.intValue { settings.pullbackBars = max(1, v) }
+            return .breakout(settings)
         case "buy_and_hold":
-            strategy = .buyAndHold
+            return .buyAndHold
         default:
-            throw ToolError("Neznámé pravidlo. Použij sma_cross, macd_cross, rsi_reversion, break_retest, reversal, ma_bounce nebo buy_and_hold.")
+            throw ToolError("Neznámé pravidlo. Použij breakout nebo buy_and_hold.")
         }
-        return strategy
+    }
+
+    /// Trend trhu (SPY nad / pod SMA 200) pro filtr breakoutů; `nil`, když se nepoužije.
+    static func marketUp(_ input: JSONValue, strategy: BacktestStrategy, bars: [BacktestBar], range: HistoryRange,
+                         model: AppModel) async -> [Bool?]? {
+        guard case .breakout = strategy, input["market_filter"]?.boolValue ?? true,
+              let spy = try? await BacktestData.load(symbol: "SPY", range: range, source: .yahoo, interval: .day,
+                                                     client: model.client) else { return nil }
+        return BreakoutStrategy.marketTrend(spy.bars, for: bars)
     }
 
     static func backtest(_ input: JSONValue, model: AppModel) async throws -> String {
@@ -977,15 +967,12 @@ enum AgentToolbox {
         let series = try await BacktestData.load(symbol: s, range: range, client: model.client)
         let bars = series.bars
         guard bars.count > 30 else { throw ToolError("Málo dat pro backtest (\(bars.count) svíček).") }
-        let exit: ExitRule = input["exit"]?.stringValue == "fibonacci"
-            ? .fibonacci(lookback: input["fib_lookback"]?.intValue ?? 20,
-                         target: input["fib_target"]?.doubleValue ?? 1.272,
-                         stop: input["fib_stop"]?.doubleValue ?? 0.786)
-            : .strategy
         let config = BacktestConfig(strategy: strategy, allowShort: input["allow_short"]?.boolValue ?? false,
-                                    costBps: input["cost_bps"]?.doubleValue ?? 5, riskFreeRate: model.riskFreeRate,
-                                    exit: exit)
-        let result = await Task.detached(priority: .userInitiated) { BacktestEngine.run(bars: bars, config: config) }.value
+                                    costBps: input["cost_bps"]?.doubleValue ?? 5, riskFreeRate: model.riskFreeRate)
+        let market = await marketUp(input, strategy: strategy, bars: bars, range: range, model: model)
+        let result = await Task.detached(priority: .userInitiated) {
+            BacktestEngine.run(bars: bars, config: config, marketUp: market)
+        }.value
 
         func metrics(_ m: BacktestMetrics) -> JSONValue {
             [

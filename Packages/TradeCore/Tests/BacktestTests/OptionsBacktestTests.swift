@@ -61,7 +61,7 @@ final class OptionsBacktestTests: XCTestCase {
 
     func testRunProducesTrades() {
         let b = bars(walk(count: 500, drift: 0.0008, vol: 0.03, seed: 7))
-        let config = OptionsBacktestConfig(signal: .smaCross(fast: 10, slow: 30), selection: .auto(neutralCondor: true))
+        let config = OptionsBacktestConfig(signal: .buyAndHold, selection: .auto(neutralCondor: true))
         let result = OptionsBacktest.run(bars: b, config: config)
         XCTAssertEqual(result.equity.count, b.count)
         XCTAssertFalse(result.trades.isEmpty)

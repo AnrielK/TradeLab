@@ -24,8 +24,8 @@ struct SetupWatchlistSection: View {
             }
             if scanner.visibleResults.isEmpty && !scanner.isScanning {
                 Text(scanner.lastScan == nil
-                     ? "Skener projde likvidní akcie a hledá čerstvé vzory (odrazy a průrazy S/R a trendlinií, break & retest, pullbacky) vhodné pro opční spready."
-                     : "Žádný čerstvý setup. Zkus delší stáří signálu nebo jiný seznam tickerů.")
+                     ? "Skener projde likvidní akcie a hledá breakouty nad rezistenci a breakdowny pod support z konsolidace – i akcie těsně pod hladinou, které teprve čekají na průraz."
+                     : "Žádný setup. Zkus delší stáří signálu, vypnout některý filtr nebo jiný seznam tickerů.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -57,7 +57,7 @@ struct SetupWatchlistSection: View {
             }
         } header: {
             HStack {
-                Text("Watchlist · opční setupy")
+                Text("Watchlist · breakouty")
                 Spacer()
                 Button {
                     showSettings = true
@@ -74,7 +74,7 @@ struct SetupWatchlistSection: View {
             .textCase(nil)
         } footer: {
             if let date = scanner.lastScan {
-                Text("Sken \(date.formatted(date: .abbreviated, time: .shortened)) · \(scanner.scannedCount) tickerů · denní svíčky, signál nejvýš \(scanner.settings.maxAge) sv. starý. Strategie podle percentilu HV: vysoká volatilita → kredit, nízká → debet. Nejde o doporučení k obchodu.")
+                Text("Sken \(date.formatted(date: .abbreviated, time: .shortened)) · \(scanner.scannedCount) tickerů · denní svíčky, vstup nejvýš \(scanner.settings.maxAge) sv. starý. Opční strategie podle percentilu HV: vysoká volatilita → kredit, nízká → debet. Nejde o doporučení k obchodu.")
             }
         }
         .sheet(isPresented: $showSettings) { ScannerSettingsView() }
@@ -108,61 +108,83 @@ struct SetupRow: View {
     private var color: Color { hit.direction > 0 ? .green : .red }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Image(systemName: hit.direction > 0 ? "arrow.up.right" : "arrow.down.right")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(color)
-                Text(hit.symbol).font(.headline)
-                if hit.withTrend {
-                    Text("s trendem")
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(color.opacity(0.15), in: Capsule())
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: hit.direction > 0 ? "arrow.up.right" : "arrow.down.right")
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(color)
-                }
-                Spacer()
-                if isOpening {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Text(hit.suggestedPlay.name)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(hit.suggestedPlay.isCredit ? .orange : .blue)
-                }
-            }
-            Text(hit.patterns.map(\.name).joined(separator: " · ")
-                 + (hit.barsAgo == 0 ? " · dnes" : " · před \(hit.barsAgo) sv."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            HStack(spacing: 10) {
-                Text(hit.close.usd).monospacedDigit()
-                if let change = hit.changePercent {
-                    Text(change.signedPercent)
-                        .foregroundStyle(Color.pnl(change))
-                        .monospacedDigit()
-                }
-                if let rank = hit.volatilityRank {
-                    Text("HV \(Int(rank.rounded())). pct")
-                }
-                if let ratio = result.ivToHv {
-                    Text("IV/HV \(ratio.fixed(2))")
-                }
-                Spacer()
-                if let liquidity = result.liquidity {
-                    if !liquidity.isLiquid {
-                        Label("nelikvidní", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.yellow)
+                    Text(hit.symbol).font(.headline)
+                    Text(hit.title)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background((hit.entry == nil ? Color.secondary : color).opacity(0.15), in: Capsule())
+                        .foregroundStyle(hit.entry == nil ? Color.secondary : color)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    if isOpening {
+                        ProgressView().controlSize(.small)
                     } else {
-                        Text("OI \(liquidity.atmOpenInterest.formatted())")
+                        Text(hit.suggestedPlay.name)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(hit.suggestedPlay.isCredit ? .orange : .blue)
+                            .lineLimit(1)
                     }
                 }
+                Text(levelsText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                HStack(spacing: 10) {
+                    Text(hit.close.usd)
+                    if let change = hit.changePercent {
+                        Text(change.signedPercent).foregroundStyle(Color.pnl(change))
+                    }
+                    if let rank = hit.volatilityRank {
+                        Text("HV \(Int(rank.rounded())). pct")
+                    }
+                    if let ratio = result.ivToHv {
+                        Text("IV/HV \(ratio.fixed(2))")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+            if let liquidity = result.liquidity {
+                VStack(spacing: 2) {
+                    if liquidity.isLiquid {
+                        Text("OI")
+                        Text(liquidity.atmOpenInterest.formatted(.number.notation(.compactName)))
+                    } else {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                            .font(.subheadline)
+                        Text("nelikvidní")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+            }
         }
         .padding(.vertical, 2)
+    }
+
+    private var levelsText: String {
+        let kind = hit.direction > 0 ? "R" : "S"
+        if hit.entry == nil {
+            let distance = hit.distanceATR.map { " · \($0.fixed(1))× ATR" } ?? ""
+            return "\(kind) \(hit.level.strikeLabel)\(distance)"
+        }
+        var parts = ["\(kind) \(hit.level.strikeLabel)"]
+        if let stop = hit.stop { parts.append("stop \(stop.strikeLabel)") }
+        if let target = hit.target { parts.append("cíl \(target.strikeLabel)") }
+        parts.append(hit.barsAgo == 0 ? "dnes" : "před \(hit.barsAgo) sv.")
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -198,20 +220,31 @@ struct ScannerSettingsView: View {
                          : "\(scanner.universe(watchlist: model.watchlist).count) tickerů.")
                 }
 
-                Section("Vzory") {
-                    ForEach(SetupPattern.allCases) { pattern in
-                        Toggle(pattern.name, isOn: Binding(
-                            get: { scanner.settings.patterns.contains(pattern) },
-                            set: { on in
-                                scanner.settings.patterns.removeAll { $0 == pattern }
-                                if on { scanner.settings.patterns.append(pattern) }
-                            }))
-                    }
+                Section {
+                    Toggle("1. Těsně před breakoutem", isOn: $scanner.settings.breakout.preBreakout)
+                    Toggle("2. Po breakoutu", isOn: $scanner.settings.breakout.breakout)
+                    Toggle("3. První pullback PNR", isOn: $scanner.settings.breakout.pullback)
+                    Toggle("Kandidáti těsně u hladiny", isOn: $scanner.settings.includeWatch)
+                } header: {
+                    Text("Breakout / Breakdown")
+                } footer: {
+                    Text("Kandidát = konsolidace se splněnými filtry, cena do 1,5× ATR pod rezistencí (nad supportem) – čeká na průraz.")
+                }
+
+                Section("Podmínky") {
+                    Toggle("Týdenní graf v trendu (KP + PSAR)", isOn: $scanner.settings.breakout.weeklyFilter)
+                    Toggle("Denní KP seřazeny + PSAR", isOn: $scanner.settings.breakout.dailyFilter)
+                    Toggle("Konsolidace: KP 20 × 50 se kříží", isOn: $scanner.settings.breakout.requireMACross)
+                    Toggle("Trh (SPY) v trendu – nad / pod SMA 200", isOn: $scanner.settings.marketFilter)
+                    Stepper("Konsolidace z \(scanner.settings.breakout.lookback) svíček",
+                            value: $scanner.settings.breakout.lookback, in: 40...250, step: 10)
+                    Stepper("Volno k další hladině: \(scanner.settings.breakout.headroomATR.fixed(1))× ATR",
+                            value: $scanner.settings.breakout.headroomATR, in: 0...5, step: 0.5)
                 }
 
                 Section {
-                    Stepper("Signál nejvýš \(scanner.settings.maxAge) sv. starý", value: $scanner.settings.maxAge, in: 0...10)
-                    Toggle("Hledat i medvědí setupy", isOn: $scanner.settings.allowBearish)
+                    Stepper("Vstup nejvýš \(scanner.settings.maxAge) sv. starý", value: $scanner.settings.maxAge, in: 0...10)
+                    Toggle("Hledat i breakdowny (short)", isOn: $scanner.settings.allowBearish)
                     Stepper("Kredit od \(Int(scanner.settings.highVolRank)). percentilu HV",
                             value: $scanner.settings.highVolRank, in: 20...80, step: 10)
                     Stepper("Expirace ~\(scanner.settings.daysToExpiry) dní", value: $scanner.settings.daysToExpiry,
@@ -235,7 +268,7 @@ struct ScannerSettingsView: View {
                     .disabled(scanner.isScanning)
                 }
             }
-            .navigationTitle("Skener setupů")
+            .navigationTitle("Skener breakoutů")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Hotovo") { dismiss() } }

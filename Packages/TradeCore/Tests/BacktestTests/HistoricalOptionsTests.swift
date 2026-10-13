@@ -83,7 +83,7 @@ final class HistoricalOptionsTests: XCTestCase {
             return BacktestBar(date: start.addingTimeInterval(Double(i) * 86_400), open: open,
                                high: max(open, price) * 1.002, low: min(open, price) * 0.998, close: price)
         }
-        let config = OptionsBacktestConfig(signal: .smaCross(fast: 10, slow: 30), selection: .auto(neutralCondor: false))
+        let config = OptionsBacktestConfig(signal: .buyAndHold, selection: .auto(neutralCondor: false))
         let result = try await OptionsBacktest.runHistorical(bars: bars, symbol: "TEST", config: config,
                                                              source: MockOptionsSource(bars: bars))
         XCTAssertEqual(result.equity.count, bars.count)

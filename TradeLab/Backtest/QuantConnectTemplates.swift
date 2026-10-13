@@ -4,510 +4,339 @@ import Backtest
 /// Export strategie do QuantConnectu (LEAN, Python): skript se vloží do webového editoru
 /// na quantconnect.com a spustí na jejich datech (akcie, u opcí minutové kotace od 2012).
 ///
-/// Signály jsou port Swift strategií z `Backtest` (ověřeno na stejných scénářích jako testy jádra).
+/// Strategie Breakout/Breakdown je port `BreakoutStrategy` z `Backtest` (stejné výsledky jako testy jádra).
 enum QuantConnectExport {
     static let signalsLibrary = #"""
-# ===== TradeLab signály (port ze Swiftu, inkrementálně po svíčkách) =====
+# ===== TradeLab: Breakout / Breakdown (port ze Swiftu, inkrementálně po denních svíčkách) =====
 import math
 
 
-class Ema:
-    """EMA, první hodnota = SMA prvních `period` hodnot (jako TradeLab)."""
-    def __init__(self, period):
-        self.period = period
-        self.values = []
-        self.value = None
-
-    def update(self, x):
-        if self.value is None:
-            self.values.append(x)
-            if len(self.values) == self.period:
-                self.value = sum(self.values) / self.period
-        else:
-            alpha = 2.0 / (self.period + 1)
-            self.value = alpha * x + (1 - alpha) * self.value
-        return self.value
-
-
-class Sma:
-    def __init__(self, period):
-        self.period = period
-        self.values = []
-        self.value = None
-
-    def update(self, x):
-        self.values.append(x)
-        if len(self.values) > self.period:
-            self.values.pop(0)
-        self.value = sum(self.values) / self.period if len(self.values) == self.period else None
-        return self.value
-
-
-class Rsi:
-    """RSI s Wilderovým vyhlazením."""
-    def __init__(self, period):
-        self.period = period
-        self.prev = None
-        self.count = 0
-        self.gain = 0.0
-        self.loss = 0.0
-        self.value = None
-
-    def update(self, x):
-        if self.prev is None:
-            self.prev = x
-            return None
-        change = x - self.prev
-        self.prev = x
-        self.count += 1
-        if self.count <= self.period:
-            self.gain += max(change, 0)
-            self.loss += max(-change, 0)
-            if self.count == self.period:
-                self.gain /= self.period
-                self.loss /= self.period
-                self.value = self._rsi()
-            return self.value
-        self.gain = (self.gain * (self.period - 1) + max(change, 0)) / self.period
-        self.loss = (self.loss * (self.period - 1) + max(-change, 0)) / self.period
-        self.value = self._rsi()
-        return self.value
-
-    def _rsi(self):
-        if self.loss == 0:
-            return 50.0 if self.gain == 0 else 100.0
-        return 100 - 100 / (1 + self.gain / self.loss)
-
-
 class Bar:
-    def __init__(self, o, h, l, c):
-        self.open, self.high, self.low, self.close = o, h, l, c
+    def __init__(self, o, h, l, c, week):
+        """week: libovolný klíč týdne (rok, ISO týden) – svíčky téhož týdne mají stejný klíč."""
+        self.open, self.high, self.low, self.close, self.week = o, h, l, c, week
+
+
+class Psar:
+    """Parabolic SAR (0,02 / 0,02 / 0,2). up = True / False / None (málo dat)."""
+    def __init__(self, step=0.02, maximum=0.2):
+        self.step, self.maximum = step, maximum
+        self.bars = []
+        self.up = None
+        self.sar = self.ep = self.af = 0.0
+
+    def update(self, h, l, c):
+        self.bars.append((h, l, c))
+        n = len(self.bars)
+        if n == 1:
+            return None
+        if n == 2:
+            (h0, l0, c0) = self.bars[0]
+            self.up = c > c0
+            self.af = self.step
+            if self.up:
+                self.sar, self.ep = l0, max(h, h0)
+            else:
+                self.sar, self.ep = h0, min(l, l0)
+            return self.up
+        ph, pl, _ = self.bars[-2]
+        pph, ppl, _ = self.bars[-3]
+        sar = self.sar + self.af * (self.ep - self.sar)
+        if self.up:
+            sar = min(sar, pl, ppl)
+            if l < sar:
+                self.up, sar, self.ep, self.af = False, self.ep, l, self.step
+            elif h > self.ep:
+                self.ep, self.af = h, min(self.af + self.step, self.maximum)
+        else:
+            sar = max(sar, ph, pph)
+            if h > sar:
+                self.up, sar, self.ep, self.af = True, self.ep, h, self.step
+            elif l < self.ep:
+                self.ep, self.af = l, min(self.af + self.step, self.maximum)
+        self.sar = sar
+        return self.up
+
+
+def sma_last(values, period):
+    if len(values) < period:
+        return None
+    return sum(values[-period:]) / period
+
+
+class Breakout:
+    """Breakout nad rezistenci / breakdown pod support z konsolidace.
+
+    Vstupy: 1) těsně před průrazem absolutního vrcholu, 2) po čistém průrazu (celá svíčka nad hladinou,
+    případně druhý den), 3) první pullback k prorazené hladině (PNR). Stop 1× ATR nebo pod předchozí
+    svíčku (vzdálenější), cíl Fibonacciho extenze konsolidace (min. 1,5× ATR).
+    update() vrací cílovou pozici po zavření svíčky: 1 long, -1 short, 0 bez pozice.
+    """
+    K = 3
+    ATR_N = 14
+
+    def __init__(self, lookback=120, min_touches=2, tolerance=0.01, pre=True, breakout=True, pullback=True,
+                 weekly=True, daily=True, ma_cross=True, headroom=2.0, stop_atr=1.0, target_fib=1.272,
+                 pullback_bars=20, allow_short=True):
+        self.lookback, self.min_touches, self.tol = lookback, min_touches, tolerance
+        self.use_pre, self.use_breakout, self.use_pullback = pre, breakout, pullback
+        self.use_weekly, self.use_daily, self.use_cross = weekly, daily, ma_cross
+        self.headroom, self.stop_atr, self.target_fib = headroom, stop_atr, target_fib
+        self.pullback_bars, self.allow_short = pullback_bars, allow_short
+        self.bars = []
+        self.closes = []
+        self.trs = []
+        self.atr = []
+        self.ma_diff = []          # znaménko SMA20 − SMA50 (None, 1, -1)
+        self.sma = {20: [], 50: [], 100: []}
+        self.psar = Psar()
+        self.psar_up = []
+        self.pivot_hi = []         # indexy potvrzených swingových maxim
+        self.pivot_lo = []
+        # týdenní graf
+        self.week_key = None
+        self.week = None           # [o, h, l, c] rozpracovaného týdne
+        self.w_closes = []
+        self.w_psar = Psar()
+        self.w_up = None           # True / False / None podle posledního uzavřeného týdne
+        self.w_trend = 0           # 1 KP seřazeny na long, -1 na short
+        # stav
+        self.position = 0
+        self.stop = self.target = 0.0
+        self.events = {1: None, -1: None}   # prorazená hladina: dict(level, low, index, extended)
+        self.pending = {1: None, -1: None}  # nečistý průraz – čeká se na druhý den
+        self.used = set()
+        self.market = None                  # True trh v up trendu, False v down trendu, None neznámo
+        self.signals = []                   # (index, kind, direction, level, stop, target)
+
+    # ---- indikátory ----
+    def _indicators(self, bar):
+        i = len(self.bars) - 1
+        self.closes.append(bar.close)
+        if i == 0:
+            self.trs.append(bar.high - bar.low)
+        else:
+            pc = self.closes[-2]
+            self.trs.append(max(bar.high - bar.low, abs(bar.high - pc), abs(bar.low - pc)))
+        self.atr.append(sum(self.trs[-self.ATR_N:]) / self.ATR_N if i >= self.ATR_N else None)
+        for p in self.sma:
+            self.sma[p].append(sma_last(self.closes, p))
+        a, b = self.sma[20][-1], self.sma[50][-1]
+        self.ma_diff.append(None if a is None or b is None else (1 if a > b else -1))
+        self.psar_up.append(self.psar.update(bar.high, bar.low, bar.close))
+        # pivot potvrzený na svíčce i: p = i − K
+        p = i - self.K
+        if p >= self.K:
+            hp, lp = self.bars[p].high, self.bars[p].low
+            left = self.bars[p - self.K:p]
+            right = self.bars[p + 1:i + 1]
+            if all(x.high < hp for x in left) and all(x.high <= hp for x in right):
+                self.pivot_hi.append(p)
+            if all(x.low > lp for x in left) and all(x.low >= lp for x in right):
+                self.pivot_lo.append(p)
+
+    def _weekly(self, bar):
+        if self.week_key is not None and bar.week != self.week_key:
+            o, h, l, c = self.week
+            self.w_closes.append(c)
+            self.w_up = self.w_psar.update(h, l, c)
+            s10, s20, s40 = (sma_last(self.w_closes, n) for n in (10, 20, 40))
+            if s40 is None:
+                self.w_trend = 0
+            elif s10 > s20 > s40:
+                self.w_trend = 1
+            elif s10 < s20 < s40:
+                self.w_trend = -1
+            else:
+                self.w_trend = 0
+            self.week = None
+        self.week_key = bar.week
+        if self.week is None:
+            self.week = [bar.open, bar.high, bar.low, bar.close]
+        else:
+            self.week[1] = max(self.week[1], bar.high)
+            self.week[2] = min(self.week[2], bar.low)
+            self.week[3] = bar.close
+
+    # ---- pomocné ----
+    def _filters(self, d):
+        i = len(self.bars) - 1
+        if d == -1 and not self.allow_short:
+            return False
+        if self.market is not None and self.market != (d == 1):
+            return False
+        if self.use_weekly and not (self.w_trend == d and self.w_up == (d == 1)):
+            return False
+        if self.use_daily:
+            s20, s50, s100 = self.sma[20][i], self.sma[50][i], self.sma[100][i]
+            if s100 is None or self.psar_up[i] != (d == 1):
+                return False
+            if d == 1 and not (s20 > s50 > s100):
+                return False
+            if d == -1 and not (s20 < s50 < s100):
+                return False
+        return True
+
+    def _zone(self, d):
+        """Konsolidace z předchozích `lookback` svíček: (hladina, protější kraj) nebo None."""
+        i = len(self.bars) - 1
+        start = i - self.lookback
+        if start < 0:
+            return None
+        window = self.bars[start:i]
+        if d == 1:
+            level = max(b.high for b in window)
+            other = min(b.low for b in window)
+            touches = sum(1 for p in self.pivot_hi if start <= p <= i - 1 - self.K
+                          and self.bars[p].high >= level * (1 - self.tol))
+        else:
+            level = min(b.low for b in window)
+            other = max(b.high for b in window)
+            touches = sum(1 for p in self.pivot_lo if start <= p <= i - 1 - self.K
+                          and self.bars[p].low <= level * (1 + self.tol))
+        if touches < self.min_touches:
+            return None
+        if self.use_cross:
+            signs = [s for s in self.ma_diff[start:i] if s is not None]
+            if not any(signs[j] != signs[j - 1] for j in range(1, len(signs))):
+                return None
+        return level, other
+
+    def _headroom_ok(self, d, price, atr):
+        i = len(self.bars) - 1
+        if d == 1:
+            above = [self.bars[p].high for p in self.pivot_hi if self.bars[p].high > price]
+            return not above or min(above) - price >= self.headroom * atr
+        below = [self.bars[p].low for p in self.pivot_lo if self.bars[p].low < price]
+        return not below or price - max(below) >= self.headroom * atr
+
+    def _levels(self, d, level, other, atr):
+        i = len(self.bars) - 1
+        close = self.bars[i].close
+        prev = self.bars[i - 1]
+        if d == 1:
+            stop = min(prev.low, close - self.stop_atr * atr)
+            target = max(other + (level - other) * self.target_fib, close + 1.5 * atr)
+        else:
+            stop = max(prev.high, close + self.stop_atr * atr)
+            target = min(other - (other - level) * self.target_fib, close - 1.5 * atr)
+        return stop, target
+
+    def _enter(self, kind, d, level, other, atr):
+        stop, target = self._levels(d, level, other, atr)
+        self.position, self.stop, self.target = d, stop, target
+        self.signals.append((len(self.bars) - 1, kind, d, level, stop, target))
+
+    @staticmethod
+    def _reversal(d, bar, prev):
+        body = abs(bar.close - bar.open)
+        if d == 1:
+            if bar.close > bar.open:
+                return True
+            wick = min(bar.open, bar.close) - bar.low
+            return wick >= 2 * body and wick > 0
+        if bar.close < bar.open:
+            return True
+        wick = bar.high - max(bar.open, bar.close)
+        return wick >= 2 * body and wick > 0
+
+    # ---- hlavní krok ----
+    def update(self, bar):
+        self.bars.append(bar)
+        self._weekly(bar)
+        self._indicators(bar)
+        i = len(self.bars) - 1
+        atr = self.atr[i]
+        if atr is None or i < 2:
+            return self.position
+        prev = self.bars[i - 1]
+
+        # 1) výstup na zavírací ceně
+        exited = False
+        if self.position == 1 and (bar.close <= self.stop or bar.close >= self.target):
+            self.position, exited = 0, True
+        elif self.position == -1 and (bar.close >= self.stop or bar.close <= self.target):
+            self.position, exited = 0, True
+
+        entries = []   # (priorita, kind, d, level, other)
+        for d in (1, -1):
+            s = d  # 1: nad hladinou je „ve směru“
+            zone = self._zone(d)
+            clean = lambda lv: (bar.open - lv) * s > 0 and (bar.close - lv) * s > 0 and (bar.close - bar.open) * s > 0
+
+            # 2) čekající nečistý průraz z minulé svíčky
+            pend = self.pending[d]
+            self.pending[d] = None
+            if pend is not None and clean(pend[0]):
+                entries.append((0, "breakout", d, pend[0], pend[1]))
+
+            # 3) nový průraz
+            if zone is not None:
+                level, other = zone
+                if (bar.close - level) * s > 0:
+                    self.events[d] = dict(level=level, other=other, index=i, extended=False)
+                    if clean(level):
+                        entries.append((0, "breakout", d, level, other))
+                    else:
+                        self.pending[d] = (level, other)
+                elif self.use_pre and (level - bar.close) * s <= atr and (level - bar.close) * s >= 0:
+                    # těsně pod absolutním vrcholem (nad absolutním dnem u breakdownu)
+                    extreme = max(b.high for b in self.bars[:i]) if d == 1 else min(b.low for b in self.bars[:i])
+                    if level == extreme and (d, level) not in self.used:
+                        entries.append((2, "pre", d, level, other))
+
+            # 4) PNR – první pullback k prorazené hladině
+            ev = self.events[d]
+            if ev is not None and ev["index"] < i:
+                lv = ev["level"]
+                if i - ev["index"] > self.pullback_bars or (lv - bar.close) * s > 0.5 * atr:
+                    self.events[d] = None
+                elif ev["extended"]:
+                    touched = (bar.low - lv <= 0.5 * atr) if d == 1 else (lv - bar.high <= 0.5 * atr)
+                    if touched and (bar.close - lv) * s > 0 and self._reversal(d, bar, prev):
+                        entries.append((1, "pullback", d, lv, ev["other"]))
+                if self.events[d] is not None and ((bar.high - lv >= atr) if d == 1 else (lv - bar.low >= atr)):
+                    self.events[d]["extended"] = True
+
+        if self.position == 0 and not exited:
+            for _, kind, d, level, other in sorted(entries, key=lambda e: e[0]):
+                if not self.use_breakout and kind == "breakout":
+                    continue
+                if not self.use_pullback and kind == "pullback":
+                    continue
+                if not self._filters(d) or not self._headroom_ok(d, bar.close, atr):
+                    continue
+                self._enter(kind, d, level, other, atr)
+                self.used.add((d, level))
+                if kind != "pre":
+                    self.events[d] = None
+                    self.pending[d] = None
+                break
+        return self.position
+
+    def watch(self):
+        """Konsolidace těsně pod rezistencí / nad supportem na poslední svíčce: (směr, hladina, vzdálenost v ATR)."""
+        i = len(self.bars) - 1
+        if i < 2 or self.atr[i] is None or self.position != 0:
+            return None
+        atr, close = self.atr[i], self.bars[i].close
+        best = None
+        for d in (1, -1):
+            zone = self._zone(d)
+            if zone is None or not self._filters(d):
+                continue
+            distance = (zone[0] - close) * d / atr
+            if 0 <= distance <= 1.5 and (best is None or distance < best[2]):
+                best = (d, zone[0], distance)
+        return best
 
 
 class BuyHold:
+    market = None
+
     def update(self, bar):
         return 1
 
-
-class SmaCross:
-    def __init__(self, fast, slow, allow_short):
-        self.f, self.s, self.flat = Sma(fast), Sma(slow), (-1 if allow_short else 0)
-
-    def update(self, bar):
-        a, b = self.f.update(bar.close), self.s.update(bar.close)
-        if a is None or b is None:
-            return 0
-        return 1 if a > b else self.flat
-
-
-class MacdCross:
-    def __init__(self, fast, slow, signal, allow_short):
-        self.f, self.s, self.sig = Ema(fast), Ema(slow), Ema(signal)
-        self.flat = -1 if allow_short else 0
-
-    def update(self, bar):
-        a, b = self.f.update(bar.close), self.s.update(bar.close)
-        if a is None or b is None:
-            return 0
-        line = a - b
-        sig = self.sig.update(line)
-        if sig is None:
-            return 0
-        return 1 if line > sig else self.flat
-
-
-class RsiReversion:
-    def __init__(self, period, lower, upper, allow_short):
-        self.r, self.lower, self.upper, self.allow_short = Rsi(period), lower, upper, allow_short
-        self.position = 0
-
-    def update(self, bar):
-        value = self.r.update(bar.close)
-        if value is None:
-            return 0
-        if value < self.lower:
-            self.position = 1
-        elif value > self.upper:
-            self.position = -1 if self.allow_short else 0
-        return self.position
-
-
-class BreakRetest:
-    def __init__(self, lookback, retest_bars, tolerance, allow_short):
-        self.lookback, self.retest_bars, self.tol, self.allow_short = lookback, retest_bars, tolerance, allow_short
-        self.bars, self.position, self.stop, self.armed = [], 0, 0.0, None
-
-    def update(self, bar):
-        self.bars.append(bar)
-        i = len(self.bars) - 1
-        if self.lookback < 2 or i < self.lookback:
-            return 0
-        window = self.bars[i - self.lookback:i]
-        resistance = max(b.high for b in window)
-        support = min(b.low for b in window)
-        exit_window = max(self.lookback // 2, 3)
-        recent = self.bars[max(i - exit_window, 0):i]
-        trail_low = min(b.low for b in recent)
-        trail_high = max(b.high for b in recent)
-        c = bar.close
-        if self.position == 1 and (c < self.stop or c < trail_low):
-            self.position = 0
-        elif self.position == -1 and (c > self.stop or c > trail_high):
-            self.position = 0
-        if self.position == 0 and self.armed:
-            side, level, index = self.armed
-            t = level * self.tol
-            if i - index > self.retest_bars:
-                self.armed = None
-            elif side == 1:
-                if c < level - t:
-                    self.armed = None
-                elif i > index and bar.low <= level + t and c > level:
-                    self.position, self.stop, self.armed = 1, level - t, None
-            else:
-                if c > level + t:
-                    self.armed = None
-                elif i > index and bar.high >= level - t and c < level:
-                    self.position, self.stop, self.armed = -1, level + t, None
-        if self.position == 0 and self.armed is None:
-            if c > resistance:
-                self.armed = (1, resistance, i)
-            elif self.allow_short and c < support:
-                self.armed = (-1, support, i)
-        return self.position
-
-
-class Reversal:
-    def __init__(self, period, lower, upper, allow_short):
-        self.r, self.lower, self.upper, self.allow_short = Rsi(period), lower, upper, allow_short
-        self.bars, self.rsi, self.position, self.stop = [], [], 0, 0.0
-
-    def update(self, bar):
-        self.bars.append(bar)
-        self.rsi.append(self.r.update(bar.close))
-        i = len(self.bars) - 1
-        r = self.rsi[i]
-        if i < 1 or r is None:
-            return self.position if i >= 1 else 0
-        prev = self.bars[i - 1]
-        recent = [x for x in self.rsi[max(i - 3, 0):i + 1] if x is not None]
-        oversold = any(x < self.lower for x in recent)
-        overbought = any(x > self.upper for x in recent)
-        bullish = bar.close > bar.open and bar.close > prev.high
-        bearish = bar.close < bar.open and bar.close < prev.low
-        swing = self.bars[max(i - 3, 0):i + 1]
-        if self.position == 1 and (bar.close < self.stop or r > self.upper or bearish):
-            self.position = 0
-        elif self.position == -1 and (bar.close > self.stop or r < self.lower or bullish):
-            self.position = 0
-        if self.position == 0:
-            if oversold and bullish:
-                self.position, self.stop = 1, min(b.low for b in swing)
-            elif self.allow_short and overbought and bearish:
-                self.position, self.stop = -1, max(b.high for b in swing)
-        return self.position
-
-
-class MaBounce:
-    def __init__(self, period, trend_period, tolerance, exponential, allow_short):
-        self.ma = Ema(period) if exponential else Sma(period)
-        self.trend = Sma(trend_period)
-        self.tol, self.allow_short = tolerance, allow_short
-        self.history, self.position = [], 0
-
-    def update(self, bar):
-        m = self.ma.update(bar.close)
-        t = self.trend.update(bar.close)
-        self.history.append(m)
-        if len(self.history) <= 5 or m is None or t is None or self.history[-6] is None:
-            return self.position
-        past = self.history[-6]
-        d = m * self.tol
-        c = bar.close
-        if self.position == 1 and c < m - d:
-            self.position = 0
-        if self.position == -1 and c > m + d:
-            self.position = 0
-        if self.position == 0:
-            up = c > t and m > past
-            down = c < t and m < past
-            if up and bar.low <= m + d and c > m and c > bar.open:
-                self.position = 1
-            elif self.allow_short and down and bar.high >= m - d and c < m and c < bar.open:
-                self.position = -1
-        return self.position
-
-
-# ----- Struktura: pivoty, hladiny, trendlinie (jen potvrzené pivoty) -----
-
-PIVOT_K = 3
-
-
-class Structure:
-    def __init__(self, lookback, tolerance, reward_risk, allow_short):
-        self.lookback, self.tol, self.rr, self.allow_short = lookback, tolerance, reward_risk, allow_short
-        self.bars, self.pivots, self.position = [], [], 0
-
-    def _confirm_pivot(self):
-        k = PIVOT_K
-        p = len(self.bars) - 1 - k
-        if p < k:
-            return
-        b = self.bars
-        h, l = b[p].high, b[p].low
-        if all(j == p or b[j].high < h or (j > p and b[j].high <= h) for j in range(p - k, p + k + 1)):
-            self.pivots.append((p, h, True))
-        if all(j == p or b[j].low > l or (j > p and b[j].low >= l) for j in range(p - k, p + k + 1)):
-            self.pivots.append((p, l, False))
-
-    def window(self, i):
-        return [x for x in self.pivots if i - self.lookback <= x[0] <= i - PIVOT_K]
-
-    @staticmethod
-    def levels(pivots, tol):
-        clusters = []
-        for price in sorted(x[1] for x in pivots):
-            if clusters and abs(price - sum(clusters[-1]) / len(clusters[-1])) <= tol:
-                clusters[-1].append(price)
-            else:
-                clusters.append([price])
-        return [sum(c) / len(c) for c in clusters if len(c) >= 2]
-
-    def trendline(self, pivots, kind, i, tol):
-        """Nejlepší neproražená linie (platná do i−1): (start_index, start_price, slope)."""
-        side = [x for x in pivots if x[2] == (kind == 'r')][-12:]
-        last = i - 1
-        best = None
-        for a_i in range(len(side) - 1):
-            for b_i in range(a_i + 1, len(side)):
-                a, b = side[a_i], side[b_i]
-                if b[0] - a[0] < 3:
-                    continue
-                slope = (b[1] - a[1]) / (b[0] - a[0])
-                value = lambda x: a[1] + slope * (x - a[0])
-                broken = False
-                for k in range(a[0], last + 1):
-                    c = self.bars[k].close
-                    if (c < value(k) - tol) if kind == 's' else (c > value(k) + tol):
-                        broken = True
-                        break
-                if broken:
-                    continue
-                touches = len([p for p in side[a_i:] if abs(p[1] - value(p[0])) <= tol])
-                if touches < 2:
-                    continue
-                score = touches + (last - a[0]) / max(last + 1, 1) + side[b_i][0] / max(last, 1)
-                if value(last) <= 0:
-                    continue
-                if best is None or score > best[0]:
-                    best = (score, a[0], a[1], slope)
-        return None if best is None else best[1:]
-
-    def update(self, bar):
-        self.bars.append(bar)
-        self._confirm_pivot()
-        return self.step(len(self.bars) - 1, bar)
-
-
-class LevelBounce(Structure):
-    def step(self, i, bar):
-        c = bar.close
-        if self.position == 1 and (c < self.level * (1 - self.tol) or c >= self.target):
-            self.position = 0
-        if self.position == -1 and (c > self.level * (1 + self.tol) or c <= self.target):
-            self.position = 0
-        if self.position == 0 and i > 2 * PIVOT_K:
-            t = c * self.tol
-            levels = self.levels(self.window(i), t)
-            supports = [x for x in levels if x < c]
-            resistances = [x for x in levels if x > c]
-            s = max(supports) if supports else None
-            r = min(resistances) if resistances else None
-            if s is not None and bar.low <= s + t and c > bar.open:
-                self.position, self.level = 1, s
-                self.target = r if r is not None else c + self.rr * (c - s * (1 - self.tol))
-            elif self.allow_short and r is not None and bar.high >= r - t and c < bar.open:
-                self.position, self.level = -1, r
-                self.target = s if s is not None else c - self.rr * (r * (1 + self.tol) - c)
-        return self.position
-
-
-class LevelBreakout(Structure):
-    def step(self, i, bar):
-        c = bar.close
-        if i < 1:
-            return 0
-        prev = self.bars[i - 1].close
-        if self.position == 1 and (c < self.level * (1 - self.tol) or c >= self.target):
-            self.position = 0
-        if self.position == -1 and (c > self.level * (1 + self.tol) or c <= self.target):
-            self.position = 0
-        if self.position == 0 and i > 2 * PIVOT_K:
-            t = c * self.tol
-            levels = self.levels(self.window(i), t)
-            up = [x for x in levels if prev <= x and c > x + t]
-            down = [x for x in levels if prev >= x and c < x - t]
-            if up:
-                r = max(up)
-                above = [x for x in levels if x > c + t]
-                self.position, self.level = 1, r
-                self.target = min(above) if above else c + self.rr * (c - r * (1 - self.tol))
-            elif self.allow_short and down:
-                s = min(down)
-                below = [x for x in levels if x < c - t]
-                self.position, self.level = -1, s
-                self.target = max(below) if below else c - self.rr * (s * (1 + self.tol) - c)
-        return self.position
-
-
-class TrendlineBounce(Structure):
-    def step(self, i, bar):
-        c = bar.close
-        if self.position != 0:
-            v = self.line[1] + self.line[2] * (i - self.line[0])
-            if self.position == 1 and (c < v * (1 - self.tol) or c >= self.target):
-                self.position = 0
-            if self.position == -1 and (c > v * (1 + self.tol) or c <= self.target):
-                self.position = 0
-        if self.position == 0 and i > 2 * PIVOT_K + 3:
-            t = c * self.tol
-            w = self.window(i)
-            s = self.trendline(w, 's', i, t)
-            if s:
-                v = s[1] + s[2] * (i - s[0])
-                if v > 0 and bar.low <= v + t and c > v and c > bar.open:
-                    self.position, self.line = 1, s
-                    self.target = c + self.rr * (c - v * (1 - self.tol))
-            if self.position == 0 and self.allow_short:
-                r = self.trendline(w, 'r', i, t)
-                if r:
-                    v = r[1] + r[2] * (i - r[0])
-                    if v > 0 and bar.high >= v - t and c < v and c < bar.open:
-                        self.position, self.line = -1, r
-                        self.target = c - self.rr * (v * (1 + self.tol) - c)
-        return self.position
-
-
-class TrendlineBreakout(Structure):
-    def step(self, i, bar):
-        c = bar.close
-        if self.position != 0:
-            v = self.line[1] + self.line[2] * (i - self.line[0])
-            if self.position == 1 and (c < v * (1 - self.tol) or c >= self.target):
-                self.position = 0
-            if self.position == -1 and (c > v * (1 + self.tol) or c <= self.target):
-                self.position = 0
-        if self.position == 0 and i > 2 * PIVOT_K + 3:
-            t = c * self.tol
-            w = self.window(i)
-            r = self.trendline(w, 'r', i, t)
-            if r:
-                v = r[1] + r[2] * (i - r[0])
-                if v > 0 and c > v + t:
-                    self.position, self.line = 1, r
-                    self.target = c + self.rr * (c - v * (1 - self.tol))
-            if self.position == 0 and self.allow_short:
-                s = self.trendline(w, 's', i, t)
-                if s:
-                    v = s[1] + s[2] * (i - s[0])
-                    if v > 0 and c < v - t:
-                        self.position, self.line = -1, s
-                        self.target = c - self.rr * (v * (1 + self.tol) - c)
-        return self.position
-
-
-class SwingPullback:
-    def __init__(self, trend_period, swing_lookback, allow_short):
-        self.e20, self.e50, self.trend, self.r = Ema(20), Ema(50), Sma(trend_period), Rsi(14)
-        self.swing, self.allow_short = swing_lookback, allow_short
-        self.bars, self.e50s, self.rsis = [], [], []
-        self.position, self.stop, self.target = 0, 0.0, 0.0
-
-    def update(self, bar):
-        self.bars.append(bar)
-        fast, mid = self.e20.update(bar.close), self.e50.update(bar.close)
-        t, r = self.trend.update(bar.close), self.r.update(bar.close)
-        self.e50s.append(mid)
-        self.rsis.append(r)
-        i = len(self.bars) - 1
-        if i < max(self.swing, 5):
-            return 0
-        mid_past, r_prev = self.e50s[i - 5], self.rsis[i - 1]
-        if None in (fast, mid, mid_past, t, r, r_prev):
-            return self.position
-        c = bar.close
-        if self.position == 1 and (c <= self.stop or c >= self.target or c < mid):
-            self.position = 0
-        if self.position == -1 and (c >= self.stop or c <= self.target or c > mid):
-            self.position = 0
-        if self.position == 0:
-            recent = self.bars[i - 4:i + 1]
-            recent_low, recent_high = min(b.low for b in recent), max(b.high for b in recent)
-            sw = self.bars[i - self.swing:i + 1]
-            high, low = max(b.high for b in sw), min(b.low for b in sw)
-            rng = high - low
-            rr = [x for x in self.rsis[i - 4:i + 1] if x is not None]
-            if rng <= 0:
-                return self.position
-            up = c > t and mid > t and mid > mid_past
-            long_zone = (high - 0.786 * rng <= recent_low <= high - 0.382 * rng) or recent_low <= fast * 1.005
-            long_mom = (min(rr) if rr else 50) < 45 and r > r_prev
-            long_trig = c > bar.open and c > self.bars[i - 1].high
-            down = c < t and mid < t and mid < mid_past
-            short_zone = (low + 0.382 * rng <= recent_high <= low + 0.786 * rng) or recent_high >= fast * 0.995
-            short_mom = (max(rr) if rr else 50) > 55 and r < r_prev
-            short_trig = c < bar.open and c < self.bars[i - 1].low
-            if up and long_zone and long_mom and long_trig and recent_low < c:
-                self.position, self.stop, self.target = 1, recent_low, low + 1.272 * rng
-                if self.target <= c:
-                    self.target = c + 2 * (c - self.stop)
-            elif self.allow_short and down and short_zone and short_mom and short_trig and recent_high > c:
-                self.position, self.stop, self.target = -1, recent_high, high - 1.272 * rng
-                if self.target >= c:
-                    self.target = c - 2 * (self.stop - c)
-        return self.position
-
-
-class FibExit:
-    """Fibonacciho výstup nad signálem strategie (cíl extenze, stop retracement swingu)."""
-    def __init__(self, inner, lookback, target, stop):
-        self.inner, self.lookback, self.target_ratio, self.stop_ratio = inner, lookback, target, stop
-        self.bars, self.position, self.tp, self.sl, self.blocked = [], 0, 0.0, 0.0, 0
-
-    def update(self, bar):
-        self.bars.append(bar)
-        signal = self.inner.update(bar)
-        i, c = len(self.bars) - 1, bar.close
-        if self.blocked != 0 and signal != self.blocked:
-            self.blocked = 0
-        if self.position != 0:
-            hit_t = c >= self.tp if self.position == 1 else c <= self.tp
-            hit_s = c <= self.sl if self.position == 1 else c >= self.sl
-            if hit_t or hit_s:
-                self.blocked = self.position if signal == self.position else 0
-                self.position = 0
-            elif signal != self.position:
-                self.position = 0
-        if self.position == 0 and signal != 0 and signal != self.blocked:
-            w = self.bars[max(0, i - self.lookback):i + 1]
-            high, low = max(b.high for b in w), min(b.low for b in w)
-            rng = high - low
-            if rng > 0:
-                ext = self.target_ratio - 1 if self.target_ratio - 1 > 0 else 0.272
-                if signal == 1:
-                    self.tp, self.sl = low + rng * self.target_ratio, high - rng * self.stop_ratio
-                    if self.sl >= c:
-                        self.sl = low
-                    if self.tp <= c:
-                        self.tp = c + rng * ext
-                else:
-                    self.tp, self.sl = high - rng * self.target_ratio, low + rng * self.stop_ratio
-                    if self.sl <= c:
-                        self.sl = high
-                    if self.tp >= c:
-                        self.tp = c - rng * ext
-                self.position = signal
-        return self.position
 """#
 
     static let stockTemplate = #"""
@@ -525,12 +354,23 @@ class TradeLabAlgorithm(QCAlgorithm):
         self.set_benchmark(self.symbol)
         self.signal = {{SIGNAL}}
         self.target = 0
+        self.set_warm_up(timedelta(days={{WARMUP_DAYS}}))
+        # Filtr trhu: breakouty jen při SPY nad SMA 200, breakdowny pod ní.
+        self.market_filter = {{MARKET}}
+        if self.market_filter:
+            self.spy = self.add_equity("SPY", Resolution.DAILY).symbol
+            self.spy_sma = self.sma(self.spy, 200, Resolution.DAILY)
 
     def on_data(self, data: Slice):
         bar = data.bars.get(self.symbol)
         if bar is None:
             return
-        target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close))
+        if self.market_filter and self.spy_sma.is_ready:
+            self.signal.market = self.securities[self.spy].price > self.spy_sma.current.value
+        week = tuple(bar.time.isocalendar()[:2])
+        target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close, week))
+        if self.is_warming_up:
+            return
         if target != self.target:
             self.target = target
             self.set_holdings(self.symbol, float(target))
@@ -554,6 +394,10 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
 
         self.signal = {{SIGNAL}}
         self.target = 0
+        self.market_filter = {{MARKET}}
+        if self.market_filter:
+            self.spy = self.add_equity("SPY", Resolution.DAILY).symbol
+            self.spy_sma = self.sma(self.spy, 200, Resolution.DAILY)
         self.closes = []
         self.hv = []
         self.consolidate(self.symbol, Resolution.DAILY, self.on_daily)
@@ -582,7 +426,10 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
     # ----- signál a volatilita z denních svíček -----
 
     def on_daily(self, bar):
-        self.target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close))
+        if self.market_filter and self.spy_sma.is_ready:
+            self.signal.market = self.securities[self.spy].price > self.spy_sma.current.value
+        week = tuple(bar.time.isocalendar()[:2])
+        self.target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close, week))
         self.closes.append(bar.close)
         if len(self.closes) > 21:
             rets = [math.log(self.closes[k] / self.closes[k - 1]) for k in range(len(self.closes) - 20, len(self.closes))]
