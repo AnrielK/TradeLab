@@ -1,0 +1,599 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		020D1482E852785CE1BC6A12 /* TicketBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9227781F4C154CE935A5481 /* TicketBar.swift */; };
+		04C5848B3D50256C07C5A762 /* TVChartScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930FA76F9F77D09197BFCE67 /* TVChartScreen.swift */; };
+		0547DE0BEBDB7D1D37E75374 /* ChartRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E52D921CC604C2655B84436 /* ChartRenderer.swift */; };
+		1050444E950ACA066A76429F /* TeamModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 606189AC4CDFF6BFD8376EC2 /* TeamModel.swift */; };
+		10E25232E0591DEB26CC8F50 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEDCD822B79CEC56631D5B80 /* KeychainStore.swift */; };
+		13BF54E46B248E4871F8BFB8 /* ChartCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70172DD98FA84E8BD0322407 /* ChartCore.swift */; };
+		207C0B077AF34F2CFE5AD299 /* ChainTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B615CCFC96EE77EFD9C1E12 /* ChainTableView.swift */; };
+		236CF110A42EB5F6DD6A99C2 /* TVRealtimeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03FECF0CE81D6A5F59401B13 /* TVRealtimeClient.swift */; };
+		240CFAEE0588124345760CC1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DBC5B5197505136B48C1BA6E /* Assets.xcassets */; };
+		278B57BBB6D377BDBB6AEB8D /* AgentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05879285631F4ADB5D63E87D /* AgentView.swift */; };
+		2BD6EC34EA292B291B3CE924 /* ChartViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD84F5C2C40851ACAE4DF4A4 /* ChartViewModel.swift */; };
+		2D6B93D01BB0CE7E723A86BD /* ChainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE0967A923111497EB0C2DB /* ChainStore.swift */; };
+		32A3992120C503F3018A0E63 /* SymbolResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A40BBA048511D7109879E8 /* SymbolResolver.swift */; };
+		377FB1AD918FE9267D35BE78 /* AgentTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = E150A5AE3B96B9B924188524 /* AgentTools.swift */; };
+		4327D4CC4142E12AF634C0B2 /* BacktestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85326634DBAF1DF87DDB5A18 /* BacktestView.swift */; };
+		462B393F161FF2568B8A70AB /* ChartAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */; };
+		49694428DE8971D64AEBE35F /* EmbeddedTVChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */; };
+		4A4547BF7B10B98E8DB8333C /* TeamPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E5C5D0B4C3051791AEC203 /* TeamPresets.swift */; };
+		50360633952B4F0D17BDA17E /* Timeframes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B9AED544068FF2144CBE54 /* Timeframes.swift */; };
+		534DE2598616E79D939D085D /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09174238CB29C8080FAB8F36 /* GlassStyle.swift */; };
+		56F96E98F83A2ED62EEFAC54 /* InteractivePayoffChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B7E00ED3EC66DEDA18AE9B /* InteractivePayoffChart.swift */; };
+		61EA44B983B4A14EBBCFFAD0 /* SymbolDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A5D6FCC7B49543F8C25459 /* SymbolDetailView.swift */; };
+		6578F1A65AED6A535BB1E5DB /* OptionsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8711145D01EDB5141FDAE19C /* OptionsHomeView.swift */; };
+		695E38F2148F025E8913DCB1 /* PayoffWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A3823976A16130336A58BC /* PayoffWorkspaceView.swift */; };
+		6A005CD8AAEEE52F4F0B0865 /* MarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF6B48124325C9894C0AAD9 /* MarkdownText.swift */; };
+		70822FCD9338785904F62787 /* DrawTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF049801FEAA80187F0633F /* DrawTools.swift */; };
+		714906E198FADF82FEA56B41 /* MarketData in Frameworks */ = {isa = PBXBuildFile; productRef = 3123C9E9AB2F23002425C68A /* MarketData */; };
+		75417E8B6FFB56991F730365 /* Backtest in Frameworks */ = {isa = PBXBuildFile; productRef = 46251014114CA53FCEEEE51E /* Backtest */; };
+		9501384FB800091BF03B5C03 /* IndicatorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12704F2F690463CC4BD95B7E /* IndicatorEngine.swift */; };
+		95D2984A590F00942E065C7B /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ABB7A2C520AE08A0127DC9C /* AppModel.swift */; };
+		9AE3E3A3CD9D748A66615B8C /* NativeChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DDEF1791B4B63EF7BE1DF6E /* NativeChartView.swift */; };
+		9BE57D7D5C23700E47566AA6 /* BacktestData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2E16E839D633E6E527DABD /* BacktestData.swift */; };
+		A660ECB7406D2F2F8DE6CB30 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B63859984D736D04D02001 /* AppInfo.swift */; };
+		A7F7FDEC1832DA0435F9AD39 /* VolumeProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01C5379BE4BD2E89BEA72F6 /* VolumeProfile.swift */; };
+		AD0CF9773DB8A7E990909F64 /* OptionsMath in Frameworks */ = {isa = PBXBuildFile; productRef = D830B69924E58DCED8CE1FD6 /* OptionsMath */; };
+		AFE20196359F576596BBA771 /* TradeLabApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3778FB31437AD0B081004530 /* TradeLabApp.swift */; };
+		B1D3D223FE182311982EB5B2 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5549C95496CD8F1C059C877 /* Formatting.swift */; };
+		BA678CDCB70CAA3C6908311C /* CalculatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59695CA642635A2BD94D2D21 /* CalculatorView.swift */; };
+		D21D8069B35F8CE4D24FB2A7 /* AgentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1992AB53D51D4444CE097875 /* AgentModel.swift */; };
+		D8214997B6DD392C3DAEA7FC /* MarketView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D2E5DBA0F82B5502B5A847 /* MarketView.swift */; };
+		F78A633CE3425FA9261B287E /* TeamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B4C68C24D203037B2A560A /* TeamView.swift */; };
+		FBB0AD36E23B55FC4433A75A /* ClaudeAgent in Frameworks */ = {isa = PBXBuildFile; productRef = 7F604C762DFBA195B714FE23 /* ClaudeAgent */; };
+		FBE7B249C161E0C466D6999A /* LegRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED2981986A1949B029BE1C1 /* LegRow.swift */; };
+		FDEB06CCD10B34CA759FC34F /* ChainTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD398CFE746478065DA9FB82 /* ChainTheme.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		03FECF0CE81D6A5F59401B13 /* TVRealtimeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVRealtimeClient.swift; sourceTree = "<group>"; };
+		05879285631F4ADB5D63E87D /* AgentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentView.swift; sourceTree = "<group>"; };
+		09174238CB29C8080FAB8F36 /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
+		12704F2F690463CC4BD95B7E /* IndicatorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndicatorEngine.swift; sourceTree = "<group>"; };
+		1992AB53D51D4444CE097875 /* AgentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModel.swift; sourceTree = "<group>"; };
+		19A3823976A16130336A58BC /* PayoffWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PayoffWorkspaceView.swift; sourceTree = "<group>"; };
+		2357646EE7A85EAEA159101F /* TradeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TradeCore; path = Packages/TradeCore; sourceTree = SOURCE_ROOT; };
+		26B7E00ED3EC66DEDA18AE9B /* InteractivePayoffChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractivePayoffChart.swift; sourceTree = "<group>"; };
+		2D9DC697AE2E81219A9B4886 /* TradeLab.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TradeLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DDEF1791B4B63EF7BE1DF6E /* NativeChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChartView.swift; sourceTree = "<group>"; };
+		30B63859984D736D04D02001 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
+		3778FB31437AD0B081004530 /* TradeLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeLabApp.swift; sourceTree = "<group>"; };
+		40A5D6FCC7B49543F8C25459 /* SymbolDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolDetailView.swift; sourceTree = "<group>"; };
+		42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartAnnotations.swift; sourceTree = "<group>"; };
+		4ED2981986A1949B029BE1C1 /* LegRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegRow.swift; sourceTree = "<group>"; };
+		51B9AED544068FF2144CBE54 /* Timeframes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timeframes.swift; sourceTree = "<group>"; };
+		59695CA642635A2BD94D2D21 /* CalculatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorView.swift; sourceTree = "<group>"; };
+		606189AC4CDFF6BFD8376EC2 /* TeamModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamModel.swift; sourceTree = "<group>"; };
+		66B4C68C24D203037B2A560A /* TeamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamView.swift; sourceTree = "<group>"; };
+		70172DD98FA84E8BD0322407 /* ChartCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartCore.swift; sourceTree = "<group>"; };
+		7ABB7A2C520AE08A0127DC9C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		7E2E16E839D633E6E527DABD /* BacktestData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacktestData.swift; sourceTree = "<group>"; };
+		85326634DBAF1DF87DDB5A18 /* BacktestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacktestView.swift; sourceTree = "<group>"; };
+		86E5C5D0B4C3051791AEC203 /* TeamPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamPresets.swift; sourceTree = "<group>"; };
+		8711145D01EDB5141FDAE19C /* OptionsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionsHomeView.swift; sourceTree = "<group>"; };
+		8CE0967A923111497EB0C2DB /* ChainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainStore.swift; sourceTree = "<group>"; };
+		930FA76F9F77D09197BFCE67 /* TVChartScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVChartScreen.swift; sourceTree = "<group>"; };
+		99D2E5DBA0F82B5502B5A847 /* MarketView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketView.swift; sourceTree = "<group>"; };
+		9B615CCFC96EE77EFD9C1E12 /* ChainTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainTableView.swift; sourceTree = "<group>"; };
+		9E52D921CC604C2655B84436 /* ChartRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartRenderer.swift; sourceTree = "<group>"; };
+		A01C5379BE4BD2E89BEA72F6 /* VolumeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeProfile.swift; sourceTree = "<group>"; };
+		A863CEEF685D39E91D1549C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		ADF049801FEAA80187F0633F /* DrawTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawTools.swift; sourceTree = "<group>"; };
+		C9A40BBA048511D7109879E8 /* SymbolResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolResolver.swift; sourceTree = "<group>"; };
+		D5549C95496CD8F1C059C877 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
+		D9227781F4C154CE935A5481 /* TicketBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketBar.swift; sourceTree = "<group>"; };
+		DBC5B5197505136B48C1BA6E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DD398CFE746478065DA9FB82 /* ChainTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainTheme.swift; sourceTree = "<group>"; };
+		DEDCD822B79CEC56631D5B80 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		E150A5AE3B96B9B924188524 /* AgentTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTools.swift; sourceTree = "<group>"; };
+		F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTVChart.swift; sourceTree = "<group>"; };
+		FD84F5C2C40851ACAE4DF4A4 /* ChartViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartViewModel.swift; sourceTree = "<group>"; };
+		FDF6B48124325C9894C0AAD9 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		780924FD91E9525B7752CEE3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AD0CF9773DB8A7E990909F64 /* OptionsMath in Frameworks */,
+				714906E198FADF82FEA56B41 /* MarketData in Frameworks */,
+				75417E8B6FFB56991F730365 /* Backtest in Frameworks */,
+				FBB0AD36E23B55FC4433A75A /* ClaudeAgent in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1FF6BF88A312087F7500F8E6 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				DBC5B5197505136B48C1BA6E /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		2E332B82417D318713C297E3 /* Agent */ = {
+			isa = PBXGroup;
+			children = (
+				1992AB53D51D4444CE097875 /* AgentModel.swift */,
+				E150A5AE3B96B9B924188524 /* AgentTools.swift */,
+				05879285631F4ADB5D63E87D /* AgentView.swift */,
+				42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */,
+				DEDCD822B79CEC56631D5B80 /* KeychainStore.swift */,
+				FDF6B48124325C9894C0AAD9 /* MarkdownText.swift */,
+				606189AC4CDFF6BFD8376EC2 /* TeamModel.swift */,
+				86E5C5D0B4C3051791AEC203 /* TeamPresets.swift */,
+				66B4C68C24D203037B2A560A /* TeamView.swift */,
+			);
+			path = Agent;
+			sourceTree = "<group>";
+		};
+		3654223FF7D47553E07EC091 /* Market */ = {
+			isa = PBXGroup;
+			children = (
+				F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */,
+				99D2E5DBA0F82B5502B5A847 /* MarketView.swift */,
+				40A5D6FCC7B49543F8C25459 /* SymbolDetailView.swift */,
+			);
+			path = Market;
+			sourceTree = "<group>";
+		};
+		3AC4B8132751445FDCEC76C6 /* TradeLab */ = {
+			isa = PBXGroup;
+			children = (
+				A863CEEF685D39E91D1549C7 /* Info.plist */,
+				2E332B82417D318713C297E3 /* Agent */,
+				4E2786173EB6A86D39143D0C /* App */,
+				B1A9CBBFFC82FF505CA1A394 /* Backtest */,
+				677BE43E437875C338988B37 /* Calculator */,
+				3654223FF7D47553E07EC091 /* Market */,
+				EDB42301B83A9F4737141E84 /* Options */,
+				1FF6BF88A312087F7500F8E6 /* Resources */,
+				DEEEF380BFC2BF71F41933A8 /* Shared */,
+				E06F6B0907E6D414CABF22C5 /* TVChart */,
+			);
+			path = TradeLab;
+			sourceTree = "<group>";
+		};
+		3C0602BF4378EFF48BA141EF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2D9DC697AE2E81219A9B4886 /* TradeLab.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4E2786173EB6A86D39143D0C /* App */ = {
+			isa = PBXGroup;
+			children = (
+				7ABB7A2C520AE08A0127DC9C /* AppModel.swift */,
+				3778FB31437AD0B081004530 /* TradeLabApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		677BE43E437875C338988B37 /* Calculator */ = {
+			isa = PBXGroup;
+			children = (
+				59695CA642635A2BD94D2D21 /* CalculatorView.swift */,
+			);
+			path = Calculator;
+			sourceTree = "<group>";
+		};
+		9DA797640B44530B21B9433F = {
+			isa = PBXGroup;
+			children = (
+				C2F9825DA811254A0A8390E6 /* Packages */,
+				3AC4B8132751445FDCEC76C6 /* TradeLab */,
+				3C0602BF4378EFF48BA141EF /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B1A9CBBFFC82FF505CA1A394 /* Backtest */ = {
+			isa = PBXGroup;
+			children = (
+				7E2E16E839D633E6E527DABD /* BacktestData.swift */,
+				85326634DBAF1DF87DDB5A18 /* BacktestView.swift */,
+			);
+			path = Backtest;
+			sourceTree = "<group>";
+		};
+		C2F9825DA811254A0A8390E6 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				2357646EE7A85EAEA159101F /* TradeCore */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		DEEEF380BFC2BF71F41933A8 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				D5549C95496CD8F1C059C877 /* Formatting.swift */,
+				26B7E00ED3EC66DEDA18AE9B /* InteractivePayoffChart.swift */,
+				4ED2981986A1949B029BE1C1 /* LegRow.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		E06F6B0907E6D414CABF22C5 /* TVChart */ = {
+			isa = PBXGroup;
+			children = (
+				30B63859984D736D04D02001 /* AppInfo.swift */,
+				70172DD98FA84E8BD0322407 /* ChartCore.swift */,
+				9E52D921CC604C2655B84436 /* ChartRenderer.swift */,
+				FD84F5C2C40851ACAE4DF4A4 /* ChartViewModel.swift */,
+				ADF049801FEAA80187F0633F /* DrawTools.swift */,
+				09174238CB29C8080FAB8F36 /* GlassStyle.swift */,
+				12704F2F690463CC4BD95B7E /* IndicatorEngine.swift */,
+				2DDEF1791B4B63EF7BE1DF6E /* NativeChartView.swift */,
+				C9A40BBA048511D7109879E8 /* SymbolResolver.swift */,
+				51B9AED544068FF2144CBE54 /* Timeframes.swift */,
+				930FA76F9F77D09197BFCE67 /* TVChartScreen.swift */,
+				03FECF0CE81D6A5F59401B13 /* TVRealtimeClient.swift */,
+				A01C5379BE4BD2E89BEA72F6 /* VolumeProfile.swift */,
+			);
+			path = TVChart;
+			sourceTree = "<group>";
+		};
+		EDB42301B83A9F4737141E84 /* Options */ = {
+			isa = PBXGroup;
+			children = (
+				8CE0967A923111497EB0C2DB /* ChainStore.swift */,
+				9B615CCFC96EE77EFD9C1E12 /* ChainTableView.swift */,
+				DD398CFE746478065DA9FB82 /* ChainTheme.swift */,
+				8711145D01EDB5141FDAE19C /* OptionsHomeView.swift */,
+				19A3823976A16130336A58BC /* PayoffWorkspaceView.swift */,
+				D9227781F4C154CE935A5481 /* TicketBar.swift */,
+			);
+			path = Options;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0B8393710D87306FE75FCE93 /* TradeLab */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70A090785E71B3624674DD6B /* Build configuration list for PBXNativeTarget "TradeLab" */;
+			buildPhases = (
+				08BB147BBF15AEDA30649097 /* Sources */,
+				65C3ED16864C376CA448F9CD /* Resources */,
+				780924FD91E9525B7752CEE3 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TradeLab;
+			packageProductDependencies = (
+				D830B69924E58DCED8CE1FD6 /* OptionsMath */,
+				3123C9E9AB2F23002425C68A /* MarketData */,
+				46251014114CA53FCEEEE51E /* Backtest */,
+				7F604C762DFBA195B714FE23 /* ClaudeAgent */,
+			);
+			productName = TradeLab;
+			productReference = 2D9DC697AE2E81219A9B4886 /* TradeLab.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0850205F263399DDA6130AD1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					0B8393710D87306FE75FCE93 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 09EACCB71B91CCD542E66A9B /* Build configuration list for PBXProject "TradeLab" */;
+			developmentRegion = cs;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				cs,
+			);
+			mainGroup = 9DA797640B44530B21B9433F;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DF449A770D31B18DDAAC7D72 /* XCLocalSwiftPackageReference "Packages/TradeCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3C0602BF4378EFF48BA141EF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0B8393710D87306FE75FCE93 /* TradeLab */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		65C3ED16864C376CA448F9CD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				240CFAEE0588124345760CC1 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		08BB147BBF15AEDA30649097 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D21D8069B35F8CE4D24FB2A7 /* AgentModel.swift in Sources */,
+				377FB1AD918FE9267D35BE78 /* AgentTools.swift in Sources */,
+				278B57BBB6D377BDBB6AEB8D /* AgentView.swift in Sources */,
+				A660ECB7406D2F2F8DE6CB30 /* AppInfo.swift in Sources */,
+				95D2984A590F00942E065C7B /* AppModel.swift in Sources */,
+				9BE57D7D5C23700E47566AA6 /* BacktestData.swift in Sources */,
+				4327D4CC4142E12AF634C0B2 /* BacktestView.swift in Sources */,
+				BA678CDCB70CAA3C6908311C /* CalculatorView.swift in Sources */,
+				2D6B93D01BB0CE7E723A86BD /* ChainStore.swift in Sources */,
+				207C0B077AF34F2CFE5AD299 /* ChainTableView.swift in Sources */,
+				FDEB06CCD10B34CA759FC34F /* ChainTheme.swift in Sources */,
+				462B393F161FF2568B8A70AB /* ChartAnnotations.swift in Sources */,
+				13BF54E46B248E4871F8BFB8 /* ChartCore.swift in Sources */,
+				0547DE0BEBDB7D1D37E75374 /* ChartRenderer.swift in Sources */,
+				2BD6EC34EA292B291B3CE924 /* ChartViewModel.swift in Sources */,
+				70822FCD9338785904F62787 /* DrawTools.swift in Sources */,
+				49694428DE8971D64AEBE35F /* EmbeddedTVChart.swift in Sources */,
+				B1D3D223FE182311982EB5B2 /* Formatting.swift in Sources */,
+				534DE2598616E79D939D085D /* GlassStyle.swift in Sources */,
+				9501384FB800091BF03B5C03 /* IndicatorEngine.swift in Sources */,
+				56F96E98F83A2ED62EEFAC54 /* InteractivePayoffChart.swift in Sources */,
+				10E25232E0591DEB26CC8F50 /* KeychainStore.swift in Sources */,
+				FBE7B249C161E0C466D6999A /* LegRow.swift in Sources */,
+				6A005CD8AAEEE52F4F0B0865 /* MarkdownText.swift in Sources */,
+				D8214997B6DD392C3DAEA7FC /* MarketView.swift in Sources */,
+				9AE3E3A3CD9D748A66615B8C /* NativeChartView.swift in Sources */,
+				6578F1A65AED6A535BB1E5DB /* OptionsHomeView.swift in Sources */,
+				695E38F2148F025E8913DCB1 /* PayoffWorkspaceView.swift in Sources */,
+				61EA44B983B4A14EBBCFFAD0 /* SymbolDetailView.swift in Sources */,
+				32A3992120C503F3018A0E63 /* SymbolResolver.swift in Sources */,
+				04C5848B3D50256C07C5A762 /* TVChartScreen.swift in Sources */,
+				236CF110A42EB5F6DD6A99C2 /* TVRealtimeClient.swift in Sources */,
+				1050444E950ACA066A76429F /* TeamModel.swift in Sources */,
+				4A4547BF7B10B98E8DB8333C /* TeamPresets.swift in Sources */,
+				F78A633CE3425FA9261B287E /* TeamView.swift in Sources */,
+				020D1482E852785CE1BC6A12 /* TicketBar.swift in Sources */,
+				50360633952B4F0D17BDA17E /* Timeframes.swift in Sources */,
+				AFE20196359F576596BBA771 /* TradeLabApp.swift in Sources */,
+				A7F7FDEC1832DA0435F9AD39 /* VolumeProfile.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1653B681302B514DF07E22BD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		C56F5604D71F44ADE90BE997 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CDEFAFDF7912D49DCFD5FBCA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = TradeLab/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.anriel.tradelab;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		EC2077422AA4E884139979DF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = TradeLab/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.anriel.tradelab;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		09EACCB71B91CCD542E66A9B /* Build configuration list for PBXProject "TradeLab" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C56F5604D71F44ADE90BE997 /* Debug */,
+				1653B681302B514DF07E22BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		70A090785E71B3624674DD6B /* Build configuration list for PBXNativeTarget "TradeLab" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EC2077422AA4E884139979DF /* Debug */,
+				CDEFAFDF7912D49DCFD5FBCA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		DF449A770D31B18DDAAC7D72 /* XCLocalSwiftPackageReference "Packages/TradeCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/TradeCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3123C9E9AB2F23002425C68A /* MarketData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MarketData;
+		};
+		46251014114CA53FCEEEE51E /* Backtest */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Backtest;
+		};
+		7F604C762DFBA195B714FE23 /* ClaudeAgent */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ClaudeAgent;
+		};
+		D830B69924E58DCED8CE1FD6 /* OptionsMath */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OptionsMath;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0850205F263399DDA6130AD1 /* Project object */;
+}
