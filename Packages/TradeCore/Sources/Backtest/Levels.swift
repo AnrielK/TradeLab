@@ -180,7 +180,7 @@ public enum LevelFinder {
 
                 let touches = pivots[i...].filter { abs($0.price - value($0.index)) <= tolerance }.count
                 guard touches >= 2 else { continue }
-                let span = Double(lastIndex - a.index) / Double(max(bars.count, 1))
+                let span = Double(lastIndex - a.index) / Double(max(lastIndex + 1, 1))
                 let recency = Double(pivots[j].index) / Double(max(lastIndex, 1))
                 let score = Double(touches) + span + recency
                 let now = value(lastIndex)

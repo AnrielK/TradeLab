@@ -1,5 +1,15 @@
 # Změny
 
+## 0.17.0 – 2026-10-13
+
+- **Export pro QuantConnect** v Backtestu: tlačítko vygeneruje Python skript (LEAN) s aktuálním tickerem,
+  obdobím, strategií, Fib výstupem a u opcí i s nastavením výběru spreadů. Skript jde zkopírovat nebo
+  sdílet jako `.py`, vloží se do `main.py` ve webovém editoru QuantConnectu (stačí free plán) a backtest
+  poběží na jejich datech – u opcí skutečné minutové kotace od 2012. Výsledky zůstávají v QuantConnectu
+  (free plán nemá API, takže se nevracejí do aplikace).
+- Signály strategií jsou přeportované do Pythonu a ověřené proti Swift testům.
+- Skóre trendových linií nezávisí na délce celé řady (stejný výsledek při výpočtu po svíčkách).
+
 ## 0.16.1 – 2026-10-13
 
 - Tlačítko agenta i v detailu tickeru.

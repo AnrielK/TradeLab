@@ -237,6 +237,7 @@ final class BacktestModel {
 struct BacktestView: View {
     @Environment(AppModel.self) private var model
     @State private var bt = BacktestModel()
+    @State private var quantConnectScript: QuantConnectScript? = nil
     @AppStorage(BacktestSource.defaultsKey) private var source: BacktestSource = .yahoo
     @AppStorage(BacktestInterval.defaultsKey) private var interval: BacktestInterval = .day
 
@@ -248,6 +249,7 @@ struct BacktestView: View {
                 settingsSection
                 if bt.instrument == .options { optionsSection }
                 dataSection
+                quantConnectSection
                 if let error = bt.errorMessage {
                     Section { Text(error).foregroundStyle(.red) }
                 }
@@ -268,6 +270,7 @@ struct BacktestView: View {
                 }
             }
             .navigationTitle("Backtest")
+            .sheet(item: $quantConnectScript) { QuantConnectExportSheet(script: $0) }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { AgentToolbarButton() }
             }
@@ -388,6 +391,26 @@ struct BacktestView: View {
             Text("Nastavení")
         } footer: {
             Text("Signál se počítá ze zavírací ceny svíčky a obchod proběhne za otevírací cenu další svíčky.")
+        }
+    }
+
+    private var quantConnectSection: some View {
+        Section {
+            Button {
+                let instrument: QuantConnectExport.Instrument = bt.instrument == .options ? .options : .stock
+                let text = QuantConnectExport.script(
+                    instrument: instrument, ticker: bt.symbol, range: bt.range, strategy: bt.strategy,
+                    exit: bt.exitRule, allowShort: bt.allowShort, costBps: bt.costBps,
+                    options: bt.instrument == .options ? bt.optionsConfig(riskFreeRate: 0.04) : nil)
+                quantConnectScript = QuantConnectScript(
+                    text: text, fileName: QuantConnectExport.fileName(ticker: bt.symbol, instrument: instrument),
+                    isOptions: instrument == .options)
+            } label: {
+                Label("Export pro QuantConnect", systemImage: "square.and.arrow.up.on.square")
+            }
+            .disabled(bt.symbol.isEmpty)
+        } footer: {
+            Text("Vygeneruje Python skript (LEAN) s aktuální strategií a nastavením k ověření na datech QuantConnectu – stačí free plán a webový editor.")
         }
     }
 
