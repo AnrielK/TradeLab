@@ -170,10 +170,11 @@ public actor DoltHubOptionsSource: HistoricalOptionsSource {
         -> (date: String, expirations: [String])? {
         let s = Self.quote(symbol.uppercased())
         let latest = try await query("""
-            SELECT MAX(date) AS d FROM option_chain WHERE act_symbol=\(s) \
-            AND date BETWEEN \(Self.quote(HistoricalDay.adding(-7, to: date))) AND \(Self.quote(date))
+            SELECT DISTINCT date FROM option_chain WHERE act_symbol=\(s) \
+            AND date BETWEEN \(Self.quote(HistoricalDay.adding(-7, to: date))) AND \(Self.quote(date)) \
+            ORDER BY date DESC LIMIT 1
             """)
-        guard let day = latest.first?["d"] as? String else { return nil }
+        guard let day = latest.first?["date"] as? String else { return nil }
         let rows = try await query("""
             SELECT DISTINCT expiration FROM option_chain WHERE act_symbol=\(s) AND date=\(Self.quote(day)) \
             AND expiration BETWEEN \(Self.quote(HistoricalDay.adding(Int(HistoricalDay.days(from: date, to: from)), to: day))) \
