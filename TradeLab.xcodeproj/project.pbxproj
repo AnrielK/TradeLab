@@ -13,6 +13,7 @@
 		1050444E950ACA066A76429F /* TeamModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 606189AC4CDFF6BFD8376EC2 /* TeamModel.swift */; };
 		10E25232E0591DEB26CC8F50 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEDCD822B79CEC56631D5B80 /* KeychainStore.swift */; };
 		13BF54E46B248E4871F8BFB8 /* ChartCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70172DD98FA84E8BD0322407 /* ChartCore.swift */; };
+		1B3E121354A9AD5C915DF498 /* QuantConnectTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1D63A20FF951C1A9192A9C /* QuantConnectTemplates.swift */; };
 		207C0B077AF34F2CFE5AD299 /* ChainTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B615CCFC96EE77EFD9C1E12 /* ChainTableView.swift */; };
 		236CF110A42EB5F6DD6A99C2 /* TVRealtimeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03FECF0CE81D6A5F59401B13 /* TVRealtimeClient.swift */; };
 		240CFAEE0588124345760CC1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DBC5B5197505136B48C1BA6E /* Assets.xcassets */; };
@@ -20,6 +21,7 @@
 		2BD6EC34EA292B291B3CE924 /* ChartViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD84F5C2C40851ACAE4DF4A4 /* ChartViewModel.swift */; };
 		2D6B93D01BB0CE7E723A86BD /* ChainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE0967A923111497EB0C2DB /* ChainStore.swift */; };
 		32A3992120C503F3018A0E63 /* SymbolResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A40BBA048511D7109879E8 /* SymbolResolver.swift */; };
+		35034C3BC7FA945F73EF97B5 /* QuantConnectExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FBE1A5EB79CBBEDEC290D2 /* QuantConnectExportSheet.swift */; };
 		377FB1AD918FE9267D35BE78 /* AgentTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = E150A5AE3B96B9B924188524 /* AgentTools.swift */; };
 		4327D4CC4142E12AF634C0B2 /* BacktestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85326634DBAF1DF87DDB5A18 /* BacktestView.swift */; };
 		462B393F161FF2568B8A70AB /* ChartAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */; };
@@ -46,6 +48,7 @@
 		B1D3D223FE182311982EB5B2 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5549C95496CD8F1C059C877 /* Formatting.swift */; };
 		D21D8069B35F8CE4D24FB2A7 /* AgentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1992AB53D51D4444CE097875 /* AgentModel.swift */; };
 		D8214997B6DD392C3DAEA7FC /* MarketView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D2E5DBA0F82B5502B5A847 /* MarketView.swift */; };
+		E8282CA5F05353CEB48DF4DF /* QuantConnectExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E4DB1284D7F61B64217C910 /* QuantConnectExport.swift */; };
 		F78A633CE3425FA9261B287E /* TeamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B4C68C24D203037B2A560A /* TeamView.swift */; };
 		FBB0AD36E23B55FC4433A75A /* ClaudeAgent in Frameworks */ = {isa = PBXBuildFile; productRef = 7F604C762DFBA195B714FE23 /* ClaudeAgent */; };
 		FBE7B249C161E0C466D6999A /* LegRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED2981986A1949B029BE1C1 /* LegRow.swift */; };
@@ -67,10 +70,12 @@
 		3778FB31437AD0B081004530 /* TradeLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeLabApp.swift; sourceTree = "<group>"; };
 		40A5D6FCC7B49543F8C25459 /* SymbolDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolDetailView.swift; sourceTree = "<group>"; };
 		42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartAnnotations.swift; sourceTree = "<group>"; };
+		43FBE1A5EB79CBBEDEC290D2 /* QuantConnectExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuantConnectExportSheet.swift; sourceTree = "<group>"; };
 		4ED2981986A1949B029BE1C1 /* LegRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegRow.swift; sourceTree = "<group>"; };
 		51B9AED544068FF2144CBE54 /* Timeframes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timeframes.swift; sourceTree = "<group>"; };
 		606189AC4CDFF6BFD8376EC2 /* TeamModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamModel.swift; sourceTree = "<group>"; };
 		66B4C68C24D203037B2A560A /* TeamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamView.swift; sourceTree = "<group>"; };
+		6E4DB1284D7F61B64217C910 /* QuantConnectExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuantConnectExport.swift; sourceTree = "<group>"; };
 		70172DD98FA84E8BD0322407 /* ChartCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartCore.swift; sourceTree = "<group>"; };
 		7ABB7A2C520AE08A0127DC9C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		7E2E16E839D633E6E527DABD /* BacktestData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacktestData.swift; sourceTree = "<group>"; };
@@ -85,6 +90,7 @@
 		A01C5379BE4BD2E89BEA72F6 /* VolumeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeProfile.swift; sourceTree = "<group>"; };
 		A863CEEF685D39E91D1549C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		ADF049801FEAA80187F0633F /* DrawTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawTools.swift; sourceTree = "<group>"; };
+		BC1D63A20FF951C1A9192A9C /* QuantConnectTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuantConnectTemplates.swift; sourceTree = "<group>"; };
 		C9A40BBA048511D7109879E8 /* SymbolResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolResolver.swift; sourceTree = "<group>"; };
 		D5549C95496CD8F1C059C877 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
 		D9227781F4C154CE935A5481 /* TicketBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketBar.swift; sourceTree = "<group>"; };
@@ -193,6 +199,9 @@
 			children = (
 				7E2E16E839D633E6E527DABD /* BacktestData.swift */,
 				85326634DBAF1DF87DDB5A18 /* BacktestView.swift */,
+				6E4DB1284D7F61B64217C910 /* QuantConnectExport.swift */,
+				43FBE1A5EB79CBBEDEC290D2 /* QuantConnectExportSheet.swift */,
+				BC1D63A20FF951C1A9192A9C /* QuantConnectTemplates.swift */,
 			);
 			path = Backtest;
 			sourceTree = "<group>";
@@ -354,6 +363,9 @@
 				9AE3E3A3CD9D748A66615B8C /* NativeChartView.swift in Sources */,
 				6578F1A65AED6A535BB1E5DB /* OptionsHomeView.swift in Sources */,
 				695E38F2148F025E8913DCB1 /* PayoffWorkspaceView.swift in Sources */,
+				E8282CA5F05353CEB48DF4DF /* QuantConnectExport.swift in Sources */,
+				35034C3BC7FA945F73EF97B5 /* QuantConnectExportSheet.swift in Sources */,
+				1B3E121354A9AD5C915DF498 /* QuantConnectTemplates.swift in Sources */,
 				61EA44B983B4A14EBBCFFAD0 /* SymbolDetailView.swift in Sources */,
 				32A3992120C503F3018A0E63 /* SymbolResolver.swift in Sources */,
 				04C5848B3D50256C07C5A762 /* TVChartScreen.swift in Sources */,
@@ -420,7 +432,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.1;
+				MARKETING_VERSION = 0.17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -486,7 +498,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.16.1;
+				MARKETING_VERSION = 0.17.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
