@@ -24,7 +24,7 @@ struct SetupWatchlistSection: View {
             }
             if scanner.visibleResults.isEmpty && !scanner.isScanning {
                 Text(scanner.lastScan == nil
-                     ? "Skener projde likvidní akcie a hledá breakouty nad rezistenci a breakdowny pod support z konsolidace – i akcie těsně pod hladinou, které teprve čekají na průraz."
+                     ? "Skener projde likvidní akcie a hledá breakouty a breakdowny z konsolidace a odrazy od klouzavých průměrů 20/50/100/200 – i kandidáty, kteří na signál teprve čekají."
                      : "Žádný setup. Zkus delší stáří signálu, vypnout některý filtr nebo jiný seznam tickerů.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -57,7 +57,7 @@ struct SetupWatchlistSection: View {
             }
         } header: {
             HStack {
-                Text("Watchlist · breakouty")
+                Text("Watchlist · setupy")
                 Spacer()
                 Button {
                     showSettings = true
@@ -119,8 +119,8 @@ struct SetupRow: View {
                         .font(.caption2.weight(.semibold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
-                        .background((hit.entry == nil ? Color.secondary : color).opacity(0.15), in: Capsule())
-                        .foregroundStyle(hit.entry == nil ? Color.secondary : color)
+                        .background((hit.isEntry ? color : Color.secondary).opacity(0.15), in: Capsule())
+                        .foregroundStyle(hit.isEntry ? color : Color.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     if isOpening {
@@ -175,8 +175,8 @@ struct SetupRow: View {
     }
 
     private var levelsText: String {
-        let kind = hit.direction > 0 ? "R" : "S"
-        if hit.entry == nil {
+        let kind = hit.levelName
+        if !hit.isEntry {
             let distance = hit.distanceATR.map { " · \($0.fixed(1))× ATR" } ?? ""
             return "\(kind) \(hit.level.strikeLabel)\(distance)"
         }
@@ -221,17 +221,35 @@ struct ScannerSettingsView: View {
                 }
 
                 Section {
+                    Toggle("Breakout / Breakdown", isOn: $scanner.settings.useBreakout)
+                    Toggle("Odraz od klouzavých průměrů", isOn: $scanner.settings.useMABounce)
+                    Toggle("Kandidáti (čekají na signál)", isOn: $scanner.settings.includeWatch)
+                } header: {
+                    Text("Strategie")
+                } footer: {
+                    Text("Kandidát u breakoutu = konsolidace se splněnými filtry do 1,5× ATR pod rezistencí (nad supportem). U odrazu = cena se v trendu vrací k průměru (do 1× ATR).")
+                }
+
+                Section("Odraz od KP") {
+                    Toggle("SMA 20", isOn: $scanner.settings.maBounce.ma20)
+                    Toggle("SMA 50", isOn: $scanner.settings.maBounce.ma50)
+                    Toggle("SMA 100", isOn: $scanner.settings.maBounce.ma100)
+                    Toggle("SMA 200", isOn: $scanner.settings.maBounce.ma200)
+                    Toggle("Průměr testovaný už dřív", isOn: $scanner.settings.maBounce.priorTest)
+                    Toggle("20 MA: týdenní trend", isOn: $scanner.settings.maBounce.weeklyFilter)
+                    Toggle("50 MA: stochastic pod 30", isOn: $scanner.settings.maBounce.stochasticFilter)
+                    Toggle("Žádná rezistence před cílem", isOn: $scanner.settings.maBounce.headroom)
+                }
+
+                Section {
                     Toggle("1. Těsně před breakoutem", isOn: $scanner.settings.breakout.preBreakout)
                     Toggle("2. Po breakoutu", isOn: $scanner.settings.breakout.breakout)
                     Toggle("3. První pullback PNR", isOn: $scanner.settings.breakout.pullback)
-                    Toggle("Kandidáti těsně u hladiny", isOn: $scanner.settings.includeWatch)
                 } header: {
                     Text("Breakout / Breakdown")
-                } footer: {
-                    Text("Kandidát = konsolidace se splněnými filtry, cena do 1,5× ATR pod rezistencí (nad supportem) – čeká na průraz.")
                 }
 
-                Section("Podmínky") {
+                Section("Breakout – podmínky") {
                     Toggle("Týdenní graf v trendu (KP + PSAR)", isOn: $scanner.settings.breakout.weeklyFilter)
                     Toggle("Denní KP seřazeny + PSAR", isOn: $scanner.settings.breakout.dailyFilter)
                     Toggle("Konsolidace: KP 20 × 50 se kříží", isOn: $scanner.settings.breakout.requireMACross)
@@ -267,7 +285,7 @@ struct ScannerSettingsView: View {
                     .disabled(scanner.isScanning)
                 }
             }
-            .navigationTitle("Skener breakoutů")
+            .navigationTitle("Skener setupů")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Hotovo") { dismiss() } }

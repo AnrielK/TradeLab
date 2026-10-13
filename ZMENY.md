@@ -1,5 +1,20 @@
 # Změny
 
+## 0.20.0 – 2026-10-14
+
+- Nová strategie **Odraz od klouzavých průměrů** (SMA 20/50/100/200, long i short) podle prezentace:
+  - reverzní svíčka má tělo nad průměrem a spodní stín skrz něj; je buď níž než předchozí dvě svíčky
+    (2svíčkový pattern), nebo pinbar (1svíčkový); potvrzující svíčka je býčí, má vyšší dno a zavře nad
+    reverzní svíčkou – vstup na jejím zavření;
+  - 20 a 50 MA: KP 20 > 50 > 100 > 200, 100 MA: 50 > 100 > 200, 200 MA: 100 > 200;
+  - průměr testovaný už dřív (60 svíček), u 20 MA týdenní cena nad 10 MA a týdenní KP rostou,
+    u 50 MA stochastic (21, 3) pod 30, žádná rezistence mezi swingem pullbacku a cílem;
+  - stop pod reverzní svíčku, aspoň 1× ATR; cíl Fibonacciho extenze pullbacku 161,8 % (nebo 127,2 %),
+    omezená na 1,5–3 R. Short zrcadlově.
+- Strategie je v Backtestu (akcie i opce), ve skeneru na Trhu (vstupy „Odraz od KP 50“ i kandidáti „Test KP 50“,
+  kteří se v trendu vrací k průměru), u agenta (`ma_bounce`) i v exportu do QuantConnectu.
+- Skener hledá obě strategie (dají se vypnout) a u každého tickeru ukáže lepší setup.
+
 ## 0.19.1 – 2026-10-13
 
 - Breakout / Breakdown: odstraněna podmínka trhu (SPY nad / pod SMA 200) – v backtestu, skeneru, agentovi

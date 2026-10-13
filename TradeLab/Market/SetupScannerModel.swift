@@ -18,6 +18,10 @@ struct ScannerSettings: Codable, Equatable {
     var universe: ScanUniverse = .liquid
     var customTickers: [String] = []
     var breakout = BreakoutSettings()
+    var maBounce = MABounceSettings()
+    /// Které strategie skener hledá.
+    var useBreakout = true
+    var useMABounce = true
     /// Ukazovat i kandidáty těsně pod rezistencí / nad supportem (zatím bez vstupu).
     var includeWatch = true
     var maxAge: Int = 3
@@ -142,7 +146,9 @@ final class SetupScannerModel {
                     do {
                         let data = try await client.dailyHistory(symbol: symbol, range: .twoYears)
                         let bars = BacktestData.yahooBars(data.bars)
-                        let hit = SetupScanner.scan(symbol: symbol, bars: bars, settings: settings.breakout,
+                        let hit = SetupScanner.scan(symbol: symbol, bars: bars,
+                                                    breakout: settings.useBreakout ? settings.breakout : nil,
+                                                    maBounce: settings.useMABounce ? settings.maBounce : nil,
                                                     maxAge: settings.maxAge, allowBearish: settings.allowBearish,
                                                     includeWatch: settings.includeWatch,
                                                     highVolRank: settings.highVolRank)
@@ -177,7 +183,7 @@ final class SetupScannerModel {
         results = hits
             .map { ScanResult(hit: $0, liquidity: liquidity[$0.symbol]) }
             .sorted { a, b in
-                let ea = a.hit.entry != nil, eb = b.hit.entry != nil
+                let ea = a.hit.isEntry, eb = b.hit.isEntry
                 if ea != eb { return ea }
                 let la = a.liquidity?.isLiquid == true, lb = b.liquidity?.isLiquid == true
                 if la != lb { return la }

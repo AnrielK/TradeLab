@@ -4,7 +4,8 @@ import Backtest
 /// Export strategie do QuantConnectu (LEAN, Python): skript se vloží do webového editoru
 /// na quantconnect.com a spustí na jejich datech (akcie, u opcí minutové kotace od 2012).
 ///
-/// Strategie Breakout/Breakdown je port `BreakoutStrategy` z `Backtest` (stejné výsledky jako testy jádra).
+/// Strategie Breakout/Breakdown a Odraz od KP jsou porty `BreakoutStrategy` a `MABounceStrategy` z `Backtest`
+/// (stejné výsledky jako testy jádra).
 enum QuantConnectExport {
     static let signalsLibrary = #"""
 # ===== TradeLab: Breakout / Breakdown (port ze Swiftu, inkrementálně po denních svíčkách) =====
@@ -326,6 +327,231 @@ class Breakout:
             if 0 <= distance <= 1.5 and (best is None or distance < best[2]):
                 best = (d, zone[0], distance)
         return best
+
+
+class MaBounce:
+    """Odraz od klouzavých průměrů (SMA 20/50/100/200), long i short.
+
+    Reverzní svíčka (předposlední) má tělo nad průměrem a spodní stín skrz něj, potvrzující svíčka (poslední)
+    je býčí, má vyšší dno a zavře nad reverzní svíčkou. Reverzní svíčka je buď níž než předchozí dvě
+    (2svíčkový pattern), nebo pinbar (1svíčkový). Podmínky podle průměru: 20 a 50 – KP 20 > 50 > 100 > 200,
+    100 – 50 > 100 > 200, 200 – 100 > 200; průměr byl testovaný už dřív; u 20 týdenní cena nad 10 MA a týdenní
+    KP rostou; u 50 stochastic pod 30. Stop pod reverzní svíčku, aspoň 1× ATR; cíl Fibonacciho extenze
+    pullbacku v rozmezí 1,5–3 R; mezi swingem a cílem žádná rezistence. Short zrcadlově.
+    """
+    K = 3
+    ATR_N = 14
+    PERIODS = (20, 50, 100, 200)
+
+    def __init__(self, ma20=True, ma50=True, ma100=True, ma200=True, two_candle=True, one_candle=True,
+                 prior_test=True, prior_bars=60, weekly=True, stochastic=True, headroom=True,
+                 stop_atr=1.0, target_fib=1.618, min_rr=1.5, max_rr=3.0, swing_bars=20, allow_short=True):
+        self.enabled = {20: ma20, 50: ma50, 100: ma100, 200: ma200}
+        self.two_candle, self.one_candle = two_candle, one_candle
+        self.prior_test, self.prior_bars = prior_test, prior_bars
+        self.use_weekly, self.use_stoch, self.use_headroom = weekly, stochastic, headroom
+        self.stop_atr, self.target_fib = stop_atr, target_fib
+        self.min_rr, self.max_rr, self.swing_bars = min_rr, max_rr, swing_bars
+        self.allow_short = allow_short
+        self.bars, self.closes, self.trs, self.atr = [], [], [], []
+        self.ma = {p: [] for p in self.PERIODS}
+        self.raw_k, self.slow_k = [], []
+        self.pivot_hi, self.pivot_lo = [], []
+        self.week_key, self.week_close = None, None
+        self.w_closes = []
+        self.w_state = 0          # 1 cena nad 10 MA a týdenní KP rostou, -1 zrcadlově
+        self.position = 0
+        self.stop = self.target = 0.0
+        self.signals = []         # (index, period, direction, stop, target)
+
+    def _weekly(self, bar):
+        if self.week_key is not None and bar.week != self.week_key:
+            self.w_closes.append(self.week_close)
+            self.w_state = 0
+            if len(self.w_closes) >= 41:
+                now = [sma_last(self.w_closes, n) for n in (10, 20, 40)]
+                prev = [sma_last(self.w_closes[:-1], n) for n in (10, 20, 40)]
+                c = self.w_closes[-1]
+                if c > now[0] and all(a > b for a, b in zip(now, prev)):
+                    self.w_state = 1
+                elif c < now[0] and all(a < b for a, b in zip(now, prev)):
+                    self.w_state = -1
+        self.week_key = bar.week
+        self.week_close = bar.close
+
+    def _indicators(self, bar):
+        i = len(self.bars) - 1
+        self.closes.append(bar.close)
+        if i == 0:
+            self.trs.append(bar.high - bar.low)
+        else:
+            pc = self.closes[-2]
+            self.trs.append(max(bar.high - bar.low, abs(bar.high - pc), abs(bar.low - pc)))
+        self.atr.append(sum(self.trs[-self.ATR_N:]) / self.ATR_N if i >= self.ATR_N else None)
+        for p in self.PERIODS:
+            self.ma[p].append(sma_last(self.closes, p))
+        if i >= 20:
+            window = self.bars[i - 20:i + 1]
+            hh = max(b.high for b in window)
+            ll = min(b.low for b in window)
+            self.raw_k.append(100.0 * (bar.close - ll) / (hh - ll) if hh > ll else 50.0)
+        else:
+            self.raw_k.append(None)
+        last3 = self.raw_k[-3:]
+        self.slow_k.append(sum(last3) / 3 if len(last3) == 3 and None not in last3 else None)
+        p = i - self.K
+        if p >= self.K:
+            hp, lp = self.bars[p].high, self.bars[p].low
+            left = self.bars[p - self.K:p]
+            right = self.bars[p + 1:i + 1]
+            if all(x.high < hp for x in left) and all(x.high <= hp for x in right):
+                self.pivot_hi.append(p)
+            if all(x.low > lp for x in left) and all(x.low >= lp for x in right):
+                self.pivot_lo.append(p)
+
+    def _aligned(self, period, i, d):
+        m = self.ma
+        need = {20: (20, 50, 100, 200), 50: (20, 50, 100, 200), 100: (50, 100, 200), 200: (100, 200)}[period]
+        values = [m[p][i] for p in need]
+        if None in values:
+            return False
+        return all((values[k] - values[k + 1]) * d > 0 for k in range(len(values) - 1))
+
+    def _tested_before(self, period, r, d):
+        start = max(0, r - self.prior_bars)
+        for j in range(start, r - 4):
+            v = self.ma[period][j]
+            if v is None:
+                continue
+            b = self.bars[j]
+            if d == 1 and b.low <= v and b.close > v:
+                return True
+            if d == -1 and b.high >= v and b.close < v:
+                return True
+        return False
+
+    def _pattern(self, period, i, d):
+        r = i - 1
+        R, C = self.bars[r], self.bars[i]
+        v = self.ma[period][r]
+        if v is None or r < 2:
+            return False
+        body_lo, body_hi = min(R.open, R.close), max(R.open, R.close)
+        body = body_hi - body_lo
+        rng = R.high - R.low
+        if d == 1:
+            if not (body_lo > v and R.low < v):
+                return False
+            two = R.low < min(self.bars[r - 1].low, self.bars[r - 2].low)
+            wick = body_lo - R.low
+            pin = rng > 0 and wick >= 2 * body and wick >= 0.5 * rng
+            if not ((self.two_candle and two) or (self.one_candle and pin)):
+                return False
+            return C.close > C.open and C.low > R.low and C.close > R.high
+        if not (body_hi < v and R.high > v):
+            return False
+        two = R.high > max(self.bars[r - 1].high, self.bars[r - 2].high)
+        wick = R.high - body_hi
+        pin = rng > 0 and wick >= 2 * body and wick >= 0.5 * rng
+        if not ((self.two_candle and two) or (self.one_candle and pin)):
+            return False
+        return C.close < C.open and C.high < R.high and C.close < R.low
+
+    def _filters(self, period, i, d):
+        if not self._aligned(period, i, d):
+            return False
+        if self.prior_test and not self._tested_before(period, i - 1, d):
+            return False
+        if period == 20 and self.use_weekly and self.w_state != d:
+            return False
+        if period == 50 and self.use_stoch:
+            ks = [k for k in self.slow_k[max(0, i - 3):i + 1] if k is not None]
+            if not ks:
+                return False
+            if d == 1 and min(ks) >= 30:
+                return False
+            if d == -1 and max(ks) <= 70:
+                return False
+        return True
+
+    def _plan(self, i, d, atr):
+        r = i - 1
+        R = self.bars[r]
+        entry = self.bars[i].close
+        start = max(0, r - self.swing_bars + 1)
+        if d == 1:
+            stop = min(R.low, entry - self.stop_atr * atr)
+            risk = entry - stop
+            swing = max(b.high for b in self.bars[start:r + 1])
+            fib = R.low + (swing - R.low) * self.target_fib
+            target = min(max(fib, entry + self.min_rr * risk), entry + self.max_rr * risk)
+            if self.use_headroom:
+                for p in self.pivot_hi:
+                    h = self.bars[p].high
+                    if swing < h < target:
+                        return None
+        else:
+            stop = max(R.high, entry + self.stop_atr * atr)
+            risk = stop - entry
+            swing = min(b.low for b in self.bars[start:r + 1])
+            fib = R.high - (R.high - swing) * self.target_fib
+            target = max(min(fib, entry - self.min_rr * risk), entry - self.max_rr * risk)
+            if self.use_headroom:
+                for p in self.pivot_lo:
+                    lo = self.bars[p].low
+                    if target < lo < swing:
+                        return None
+        return stop, target
+
+    def update(self, bar):
+        self.bars.append(bar)
+        self._weekly(bar)
+        self._indicators(bar)
+        i = len(self.bars) - 1
+        atr = self.atr[i]
+        if atr is None or i < 3:
+            return self.position
+        exited = False
+        if self.position == 1 and (bar.close <= self.stop or bar.close >= self.target):
+            self.position, exited = 0, True
+        elif self.position == -1 and (bar.close >= self.stop or bar.close <= self.target):
+            self.position, exited = 0, True
+        if self.position == 0 and not exited:
+            for d in ((1, -1) if self.allow_short else (1,)):
+                done = False
+                for period in self.PERIODS:
+                    if not self.enabled[period]:
+                        continue
+                    if self._pattern(period, i, d) and self._filters(period, i, d):
+                        plan = self._plan(i, d, atr)
+                        if plan is not None:
+                            self.position, (self.stop, self.target) = d, plan
+                            self.signals.append((i, period, d, self.stop, self.target))
+                            done = True
+                        break
+                if done:
+                    break
+        return self.position
+
+    def watch(self):
+        """Cena se v trendu vrací k průměru (do 1× ATR nad ním / pod ním): (směr, perioda, hladina, vzdálenost v ATR)."""
+        i = len(self.bars) - 1
+        if i < 3 or self.atr[i] is None or self.position != 0:
+            return None
+        atr, bar, prev = self.atr[i], self.bars[i], self.bars[i - 1]
+        for d in ((1, -1) if self.allow_short else (1,)):
+            for period in self.PERIODS:
+                v = self.ma[period][i]
+                if not self.enabled[period] or v is None:
+                    continue
+                if not self._aligned(period, i, d):
+                    continue
+                if period == 20 and self.use_weekly and self.w_state != d:
+                    continue
+                distance = (bar.close - v) * d / atr
+                if 0 <= distance <= 1 and (bar.close - prev.close) * d < 0:
+                    return d, period, v, distance
+        return None
 
 
 class BuyHold:

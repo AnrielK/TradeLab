@@ -6,6 +6,7 @@ import Backtest
 
 enum StrategyKind: String, CaseIterable, Identifiable {
     case breakout = "Breakout / Breakdown"
+    case maBounce = "Odraz od klouzavých průměrů"
     case hold = "Buy & hold"
 
     var id: String { rawValue }
@@ -14,6 +15,8 @@ enum StrategyKind: String, CaseIterable, Identifiable {
         switch self {
         case .breakout:
             return "Konsolidace (boční trend, aspoň 2 dotyky hladiny, KP 20 × 50 se kříží). Týdenní graf v trendu (KP 10/20/40 seřazeny, PSAR ve směru), denní KP 20/50/100 seřazeny a PSAR ve směru, daleko od další hladiny. Stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace."
+        case .maBounce:
+            return "V trendu (KP seřazeny) se cena vrátí k SMA 20, 50, 100 nebo 200 a vytvoří reverzní pattern: reverzní svíčka s tělem nad průměrem a stínem skrz něj (níž než předchozí svíčky, nebo pinbar), potvrzující býčí svíčka s vyšším dnem zavře nad ní. Průměr testovaný už dřív; u 20 MA týdenní graf v trendu, u 50 MA stochastic pod 30. Stop pod reverzní svíčku (aspoň 1× ATR), cíl Fibonacciho extenze pullbacku v rozmezí 1,5–3 R. Short zrcadlově."
         case .hold: return "Koupit a držet."
         }
     }
@@ -55,6 +58,7 @@ final class BacktestModel {
     var range: HistoryRange = .fiveYears
     var kind: StrategyKind = .breakout
     var breakout = BreakoutSettings()
+    var maBounce = MABounceSettings()
     var instrument: BacktestInstrument = .stock
     var optionsAuto = true
     var neutralCondor = false
@@ -86,6 +90,7 @@ final class BacktestModel {
     var strategy: BacktestStrategy {
         switch kind {
         case .breakout: return .breakout(breakout)
+        case .maBounce: return .maBounce(maBounce)
         case .hold: return .buyAndHold
         }
     }
@@ -232,6 +237,11 @@ struct BacktestView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            if bt.kind == .maBounce {
+                maBounceSettings
+                Toggle(bt.instrument == .options ? "Povolit medvědí strategie (short odrazy)" : "Povolit short (odraz dolů)",
+                       isOn: $bt.allowShort)
+            }
             if bt.kind == .breakout {
                 breakoutSettings
                 Toggle(bt.instrument == .options ? "Povolit medvědí strategie (breakdown)" : "Povolit short (breakdown)",
@@ -259,6 +269,32 @@ struct BacktestView: View {
         } footer: {
             Text("Signál se počítá ze zavírací ceny svíčky a obchod proběhne za otevírací cenu další svíčky.")
         }
+    }
+
+    @ViewBuilder
+    private var maBounceSettings: some View {
+        @Bindable var bt = bt
+        Toggle("SMA 20 (20 > 50 > 100 > 200, týdenní trend)", isOn: $bt.maBounce.ma20)
+        Toggle("SMA 50 (20 > 50 > 100 > 200, stochastic)", isOn: $bt.maBounce.ma50)
+        Toggle("SMA 100 (50 > 100 > 200)", isOn: $bt.maBounce.ma100)
+        Toggle("SMA 200 (100 > 200)", isOn: $bt.maBounce.ma200)
+        Toggle("2svíčkový reverzní pattern", isOn: $bt.maBounce.twoCandle)
+        Toggle("1svíčkový pattern (pinbar)", isOn: $bt.maBounce.oneCandle)
+        Toggle("Průměr testovaný už dřív", isOn: $bt.maBounce.priorTest)
+        if bt.maBounce.priorTest {
+            Stepper("Předchozí test do \(bt.maBounce.priorBars) svíček", value: $bt.maBounce.priorBars, in: 20...200, step: 10)
+        }
+        Toggle("20 MA: týdenní cena nad 10 MA, KP rostou", isOn: $bt.maBounce.weeklyFilter)
+        Toggle("50 MA: stochastic pod 30 (short nad 70)", isOn: $bt.maBounce.stochasticFilter)
+        Toggle("Žádná rezistence před cílem", isOn: $bt.maBounce.headroom)
+        Stepper("Stop: pod reverzní svíčku, aspoň \(bt.maBounce.stopATR.fixed(1))× ATR", value: $bt.maBounce.stopATR,
+                in: 0.5...2, step: 0.25)
+        Picker("Cíl (Fibonacciho extenze)", selection: $bt.maBounce.targetFib) {
+            Text("127,2 %").tag(1.272)
+            Text("161,8 %").tag(1.618)
+        }
+        Stepper("Cíl nejméně \(bt.maBounce.minRR.fixed(1)) R", value: $bt.maBounce.minRR, in: 1...3, step: 0.5)
+        Stepper("Cíl nejvýš \(bt.maBounce.maxRR.fixed(1)) R", value: $bt.maBounce.maxRR, in: 1.5...6, step: 0.5)
     }
 
     @ViewBuilder

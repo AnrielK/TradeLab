@@ -81,6 +81,14 @@ extension QuantConnectExport {
             headroom=\(py(b.headroomATR)), stop_atr=\(py(b.stopATR)), target_fib=\(py(b.targetFib)), \
             pullback_bars=\(b.pullbackBars), allow_short=\(py(allowShort)))
             """
+        case .maBounce(let m):
+            return """
+            MaBounce(ma20=\(py(m.ma20)), ma50=\(py(m.ma50)), ma100=\(py(m.ma100)), ma200=\(py(m.ma200)), \
+            two_candle=\(py(m.twoCandle)), one_candle=\(py(m.oneCandle)), prior_test=\(py(m.priorTest)), \
+            prior_bars=\(m.priorBars), weekly=\(py(m.weeklyFilter)), stochastic=\(py(m.stochasticFilter)), \
+            headroom=\(py(m.headroom)), stop_atr=\(py(m.stopATR)), target_fib=\(py(m.targetFib)), \
+            min_rr=\(py(m.minRR)), max_rr=\(py(m.maxRR)), swing_bars=\(m.swingBars), allow_short=\(py(allowShort)))
+            """
         }
     }
 
@@ -101,6 +109,7 @@ extension QuantConnectExport {
         switch s {
         case .buyAndHold: return 0
         case .breakout(let b): return max(42 * 7, Int(Double(max(b.lookback, 100)) * 1.5)) + 30
+        case .maBounce: return 42 * 7 + 30
         }
     }
 

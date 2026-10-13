@@ -7,6 +7,8 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
     case buyAndHold
     /// Breakout nad rezistenci / breakdown pod support z konsolidace.
     case breakout(BreakoutSettings)
+    /// Odraz od klouzavých průměrů 20/50/100/200 s reverzním svíčkovým patternem.
+    case maBounce(MABounceSettings)
 
     public var name: String {
         switch self {
@@ -17,6 +19,8 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
             if s.breakout { entries.append("průraz") }
             if s.pullback { entries.append("PNR") }
             return "Breakout/Breakdown (\(entries.joined(separator: ", ")))"
+        case .maBounce(let s):
+            return "Odraz od KP \(s.enabledPeriods.map(String.init).joined(separator: "/"))"
         }
     }
 
@@ -27,6 +31,8 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
             return bars.map { _ in 1 }
         case .breakout(let settings):
             return BreakoutStrategy.evaluate(bars, settings: settings, allowShort: allowShort).targets
+        case .maBounce(let settings):
+            return MABounceStrategy.evaluate(bars, settings: settings, allowShort: allowShort).targets
         }
     }
 }

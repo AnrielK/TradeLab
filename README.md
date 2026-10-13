@@ -12,8 +12,8 @@ Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a o
   graf P/L při expiraci i „dnes / za N dní“ s posunem IV, max. zisk/ztráta, break-even,
   pravděpodobnost zisku, Greeks celé pozice; panel „Hodnoty v bodě“ (teoretická hodnota a P/L nohou, greeks pro vybranou cenu, den a IV).
 - **Graf TradingView** – převzatý TVChart (real-time data, indikátory, kreslení) na celou obrazovku.
-- **Watchlist breakoutů** – skener strategie Breakout/Breakdown na likvidních akciích: čerstvé vstupy i kandidáti v konsolidaci těsně u hladiny, s hladinou, stopem, cílem a návrhem spreadu podle volatility a likvidity opcí.
-- **Backtest** – strategie Breakout/Breakdown (3 vstupy: těsně před průrazem, po průrazu, pullback PNR; filtr týdenního grafu, denních KP a PSAR; stop ATR, cíl Fibonacci) a buy & hold na datech z Yahoo nebo TradingView (1D–1H), metriky, křivka kapitálu vs. SPY, drawdown, obchody. Export strategie jako Python skript pro QuantConnect (free plán, copy & paste).
+- **Watchlist setupů** – skener strategií Breakout/Breakdown a Odraz od KP na likvidních akciích: čerstvé vstupy i kandidáti v konsolidaci těsně u hladiny, s hladinou, stopem, cílem a návrhem spreadu podle volatility a likvidity opcí.
+- **Backtest** – strategie Odraz od klouzavých průměrů 20/50/100/200 (reverzní svíčkový pattern, ATR stop, Fibonacci cíl 1,5–3 R) a Breakout/Breakdown (3 vstupy: těsně před průrazem, po průrazu, pullback PNR; filtr týdenního grafu, denních KP a PSAR; stop ATR, cíl Fibonacci) a buy & hold na datech z Yahoo nebo TradingView (1D–1H), metriky, křivka kapitálu vs. SPY, drawdown, obchody. Export strategie jako Python skript pro QuantConnect (free plán, copy & paste).
 - **Agent** – chat s Claude, ChatGPT nebo Gemini (vlastní API klíč v Keychainu), který si sám volá nástroje aplikace:
   ceny, statistiky historie, opční řetězce, ocenění, analýzu strategií z reálných kontraktů a backtest.
 - **Týmy agentů** – investiční výbor, opční desk, kontrola pozice a přehled watchlistu: role ve fázích, závěrečný verdikt.

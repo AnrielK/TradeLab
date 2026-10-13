@@ -31,8 +31,9 @@ enum AgentToolbox {
             AgentTool(
                 name: "get_option_setups",
                 description: """
-                Výsledky skeneru Breakout/Breakdown (watchlist na záložce Trh): tickery s čerstvým vstupem \
-                (těsně před breakoutem, po breakoutu, pullback PNR) nebo kandidáti v konsolidaci těsně u hladiny; \
+                Výsledky skeneru setupů (watchlist na záložce Trh): tickery s čerstvým vstupem Breakout/Breakdown \
+                (těsně před breakoutem, po breakoutu, pullback PNR) nebo Odraz od KP 20/50/100/200, případně kandidáti \
+                těsně u hladiny / průměru; \
                 směr, hladina, stop, cíl, stáří vstupu, percentil HV, IV/HV, likvidita ATM opcí a navržený spread. \
                 rescan=true spustí nový sken (trvá desítky sekund).
                 """,
@@ -185,7 +186,7 @@ enum AgentToolbox {
                 """,
                 inputSchema: Schema.object(breakoutSchema.merging([
                     "symbol": Schema.string("Ticker"),
-                    "strategy": Schema.string("Pravidlo pro směr (viz run_backtest)", enum: ["breakout", "buy_and_hold"]),
+                    "strategy": Schema.string("Pravidlo pro směr (viz run_backtest)", enum: ["breakout", "ma_bounce", "buy_and_hold"]),
                     "range": Schema.string("Období (výchozí 5y)", enum: HistoryRange.allCases.map(\.rawValue)),
                     "selection": Schema.string("auto (podle situace) nebo fixed", enum: ["auto", "fixed"]),
                     "bullish_play": Schema.string("fixed: strategie pro býčí signál", enum: OptionPlay.allCases.filter { $0.direction == 1 }.map(\.rawValue)),
@@ -212,11 +213,13 @@ enum AgentToolbox {
                 Pravidla: breakout (Breakout nad rezistenci / Breakdown pod support z konsolidace – denní graf, \
                 filtr týdenního grafu; vstupy 1) těsně před průrazem absolutního vrcholu, 2) po čistém průrazu, \
                 3) první pullback PNR; stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace) \
-                a buy_and_hold. Vše se v každé svíčce počítá jen z minulých dat.
+                ma_bounce (odraz od SMA 20/50/100/200 v trendu s reverzním svíčkovým patternem – reverzní svíčka \
+                s tělem za průměrem a stínem skrz něj, potvrzující svíčka; stop za reverzní svíčku aspoň 1× ATR, \
+                cíl Fibonacciho extenze pullbacku v 1,5–3 R) a buy_and_hold. Vše se v každé svíčce počítá jen z minulých dat.
                 """,
                 inputSchema: Schema.object(breakoutSchema.merging([
                     "symbol": Schema.string("Ticker"),
-                    "strategy": Schema.string("Pravidlo", enum: ["breakout", "buy_and_hold"]),
+                    "strategy": Schema.string("Pravidlo", enum: ["breakout", "ma_bounce", "buy_and_hold"]),
                     "range": Schema.string("Období (výchozí 5y)", enum: HistoryRange.allCases.map(\.rawValue)),
                     "allow_short": Schema.boolean("Povolit short (breakdown) místo hotovosti (výchozí false)"),
                     "cost_bps": Schema.number("Náklady v bazických bodech na obchod (výchozí 5)"),
@@ -307,7 +310,9 @@ enum AgentToolbox {
                     "symbol": .string(h.symbol),
                     "direction": .string(h.direction > 0 ? "bullish" : "bearish"),
                     "setup": .string(h.title),
-                    "is_entry": .bool(h.entry != nil),
+                    "is_entry": .bool(h.isEntry),
+                    "strategy": .string(h.strategy.rawValue),
+                    "ma_period": h.maPeriod.map { .number(Double($0)) } ?? .null,
                     "bars_ago": .number(Double(h.barsAgo)),
                     "level": num(h.level),
                     "stop": num(h.stop),
@@ -921,6 +926,15 @@ enum AgentToolbox {
         "stop_atr": Schema.number("breakout: stop v ATR (výchozí 1)"),
         "target_fib": Schema.number("breakout: cíl jako Fibonacciho extenze konsolidace (1.272 nebo 1.618)"),
         "pullback_bars": Schema.integer("breakout: pullback do N svíček po průrazu (výchozí 20)"),
+        "ma_periods": Schema.string("ma_bounce: obchodované průměry oddělené čárkou (výchozí 20,50,100,200)"),
+        "two_candle": Schema.boolean("ma_bounce: 2svíčkový reverzní pattern (výchozí true)"),
+        "one_candle": Schema.boolean("ma_bounce: 1svíčkový pattern – pinbar (výchozí true)"),
+        "prior_test": Schema.boolean("ma_bounce: průměr testovaný už dřív (výchozí true)"),
+        "ma_weekly_filter": Schema.boolean("ma_bounce: u 20 MA týdenní cena nad 10 MA a KP rostou (výchozí true)"),
+        "stochastic_filter": Schema.boolean("ma_bounce: u 50 MA stochastic pod 30 / nad 70 (výchozí true)"),
+        "headroom": Schema.boolean("ma_bounce: žádná rezistence mezi swingem a cílem (výchozí true)"),
+        "min_rr": Schema.number("ma_bounce: cíl nejméně N × riziko (výchozí 1.5)"),
+        "max_rr": Schema.number("ma_bounce: cíl nejvýš N × riziko (výchozí 3)"),
     ]
 
     static func parseStrategy(_ input: JSONValue) throws -> BacktestStrategy {
@@ -941,10 +955,32 @@ enum AgentToolbox {
             if let v = input["target_fib"]?.doubleValue { settings.targetFib = v }
             if let v = input["pullback_bars"]?.intValue { settings.pullbackBars = max(1, v) }
             return .breakout(settings)
+        case "ma_bounce":
+            var settings = MABounceSettings()
+            if let list = input["ma_periods"]?.stringValue {
+                let periods = Set(list.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) })
+                if !periods.isEmpty {
+                    settings.ma20 = periods.contains(20)
+                    settings.ma50 = periods.contains(50)
+                    settings.ma100 = periods.contains(100)
+                    settings.ma200 = periods.contains(200)
+                }
+            }
+            if let v = input["two_candle"]?.boolValue { settings.twoCandle = v }
+            if let v = input["one_candle"]?.boolValue { settings.oneCandle = v }
+            if let v = input["prior_test"]?.boolValue { settings.priorTest = v }
+            if let v = input["ma_weekly_filter"]?.boolValue { settings.weeklyFilter = v }
+            if let v = input["stochastic_filter"]?.boolValue { settings.stochasticFilter = v }
+            if let v = input["headroom"]?.boolValue { settings.headroom = v }
+            if let v = input["stop_atr"]?.doubleValue { settings.stopATR = v }
+            if let v = input["target_fib"]?.doubleValue { settings.targetFib = v }
+            if let v = input["min_rr"]?.doubleValue { settings.minRR = v }
+            if let v = input["max_rr"]?.doubleValue { settings.maxRR = max(v, settings.minRR) }
+            return .maBounce(settings)
         case "buy_and_hold":
             return .buyAndHold
         default:
-            throw ToolError("Neznámé pravidlo. Použij breakout nebo buy_and_hold.")
+            throw ToolError("Neznámé pravidlo. Použij breakout, ma_bounce nebo buy_and_hold.")
         }
     }
 
