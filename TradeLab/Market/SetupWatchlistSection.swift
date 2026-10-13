@@ -235,7 +235,6 @@ struct ScannerSettingsView: View {
                     Toggle("Týdenní graf v trendu (KP + PSAR)", isOn: $scanner.settings.breakout.weeklyFilter)
                     Toggle("Denní KP seřazeny + PSAR", isOn: $scanner.settings.breakout.dailyFilter)
                     Toggle("Konsolidace: KP 20 × 50 se kříží", isOn: $scanner.settings.breakout.requireMACross)
-                    Toggle("Trh (SPY) v trendu – nad / pod SMA 200", isOn: $scanner.settings.marketFilter)
                     Stepper("Konsolidace z \(scanner.settings.breakout.lookback) svíček",
                             value: $scanner.settings.breakout.lookback, in: 40...250, step: 10)
                     Stepper("Volno k další hladině: \(scanner.settings.breakout.headroomATR.fixed(1))× ATR",

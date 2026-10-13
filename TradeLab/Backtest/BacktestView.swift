@@ -13,7 +13,7 @@ enum StrategyKind: String, CaseIterable, Identifiable {
     var summary: String {
         switch self {
         case .breakout:
-            return "Konsolidace (boční trend, aspoň 2 dotyky hladiny, KP 20 × 50 se kříží). Týdenní graf v trendu (KP 10/20/40 seřazeny, PSAR ve směru), denní KP 20/50/100 seřazeny a PSAR ve směru, trh (SPY) nad / pod SMA 200, daleko od další hladiny. Stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace."
+            return "Konsolidace (boční trend, aspoň 2 dotyky hladiny, KP 20 × 50 se kříží). Týdenní graf v trendu (KP 10/20/40 seřazeny, PSAR ve směru), denní KP 20/50/100 seřazeny a PSAR ve směru, daleko od další hladiny. Stop 1× ATR nebo pod předchozí svíčku, cíl Fibonacciho extenze konsolidace."
         case .hold: return "Koupit a držet."
         }
     }
@@ -55,8 +55,6 @@ final class BacktestModel {
     var range: HistoryRange = .fiveYears
     var kind: StrategyKind = .breakout
     var breakout = BreakoutSettings()
-    /// Breakouty jen při trhu (SPY) nad SMA 200, breakdowny pod ní.
-    var marketFilter = true
     var instrument: BacktestInstrument = .stock
     var optionsAuto = true
     var neutralCondor = false
@@ -124,18 +122,6 @@ final class BacktestModel {
             }
             let config = BacktestConfig(strategy: strategy, allowShort: allowShort, costBps: costBps,
                                         riskFreeRate: riskFreeRate)
-            // SPY pro filtr trhu i srovnání.
-            let needsSPY = (kind == .breakout && marketFilter) || compareSPY
-            var spy: BacktestSeries? = nil
-            if needsSPY {
-                spy = try? await BacktestData.load(symbol: "SPY", range: range, source: source,
-                                                   interval: interval, client: client)
-            }
-            let marketUp: [Bool?]? = kind == .breakout && marketFilter
-                ? spy.map { BreakoutStrategy.marketTrend($0.bars, for: bars) } : nil
-            if kind == .breakout && marketFilter && spy == nil {
-                errorMessage = "Nepodařilo se načíst SPY pro filtr trhu – počítám bez něj."
-            }
             if instrument == .options {
                 let optionsConfig = self.optionsConfig(riskFreeRate: riskFreeRate)
                 if historicalOptions {
@@ -143,22 +129,23 @@ final class BacktestModel {
                     defer { progressText = nil }
                     optionsResult = try await OptionsBacktest.runHistorical(
                         bars: bars, symbol: ticker, config: optionsConfig, source: HistoricalOptionsData.shared,
-                        marketUp: marketUp,
                         onProgress: { text in await MainActor.run { self.progressText = text } })
                 } else {
                     optionsResult = await Task.detached(priority: .userInitiated) {
-                        OptionsBacktest.run(bars: bars, config: optionsConfig, marketUp: marketUp)
+                        OptionsBacktest.run(bars: bars, config: optionsConfig)
                     }.value
                 }
             } else {
                 result = await Task.detached(priority: .userInitiated) {
-                    BacktestEngine.run(bars: bars, config: config, marketUp: marketUp)
+                    BacktestEngine.run(bars: bars, config: config)
                 }.value
             }
             dataLabel = series.label
 
             benchmark = []
-            if compareSPY, ticker != "SPY", let spy {
+            if compareSPY, ticker != "SPY",
+               let spy = try? await BacktestData.load(symbol: "SPY", range: range, source: source,
+                                                      interval: interval, client: client) {
                 let start = bars[0].date
                 benchmark = BacktestEngine.normalized(spy.bars, from: start)
                     .map { CurvePoint(date: $0.date, value: $0.value, series: "SPY") }
@@ -287,7 +274,6 @@ struct BacktestView: View {
         Toggle("Týdenní graf v trendu (KP + PSAR)", isOn: $bt.breakout.weeklyFilter)
         Toggle("Denní KP seřazeny + PSAR", isOn: $bt.breakout.dailyFilter)
         Toggle("Konsolidace: KP 20 × 50 se kříží", isOn: $bt.breakout.requireMACross)
-        Toggle("Trh (SPY) v trendu – nad / pod SMA 200", isOn: $bt.marketFilter)
         Stepper("Volno k další hladině: \(bt.breakout.headroomATR.fixed(1))× ATR", value: $bt.breakout.headroomATR,
                 in: 0...5, step: 0.5)
         Stepper("Stop: \(bt.breakout.stopATR.fixed(1))× ATR nebo předchozí svíčka", value: $bt.breakout.stopATR,
@@ -306,7 +292,7 @@ struct BacktestView: View {
                 let instrument: QuantConnectExport.Instrument = bt.instrument == .options ? .options : .stock
                 let text = QuantConnectExport.script(
                     instrument: instrument, ticker: bt.symbol, range: bt.range, strategy: bt.strategy,
-                    marketFilter: bt.kind == .breakout && bt.marketFilter, allowShort: bt.allowShort, costBps: bt.costBps,
+                    allowShort: bt.allowShort, costBps: bt.costBps,
                     options: bt.instrument == .options ? bt.optionsConfig(riskFreeRate: 0.04) : nil)
                 quantConnectScript = QuantConnectScript(
                     text: text, fileName: QuantConnectExport.fileName(ticker: bt.symbol, instrument: instrument),

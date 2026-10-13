@@ -7,7 +7,7 @@ extension QuantConnectExport {
 
     /// Sestaví celý skript `main.py` pro QuantConnect.
     static func script(instrument: Instrument, ticker: String, range: HistoryRange,
-                       strategy: BacktestStrategy, marketFilter: Bool, allowShort: Bool, costBps: Double,
+                       strategy: BacktestStrategy, allowShort: Bool, costBps: Double,
                        options: OptionsBacktestConfig?, now: Date = Date()) -> String {
         let symbol = ticker.trimmingCharacters(in: .whitespaces).uppercased()
         let (start, end) = dates(range: range, options: instrument == .options, now: now)
@@ -19,7 +19,6 @@ extension QuantConnectExport {
             "START": start, "END": end, "CASH": "10000", "TICKER": symbol, "SIGNAL": signal,
             "SLIPPAGE": py(costBps / 10_000),
             "WARMUP_DAYS": "\(warmupDays(strategy))",
-            "MARKET": py(marketFilter),
         ]
         var template = stockTemplate
         if isOptions, let o = options {
@@ -49,10 +48,9 @@ extension QuantConnectExport {
         }
 
         let title = isOptions ? "opce" : "akcie"
-        let exitName = marketFilter ? " · filtr SPY > SMA 200" : ""
         let header = """
         # TradeLab → QuantConnect (LEAN, Python) – \(title)
-        # \(symbol) · \(strategy.name)\(exitName)
+        # \(symbol) · \(strategy.name)
         # Období \(start.replacingOccurrences(of: ", ", with: "-")) až \(end.replacingOccurrences(of: ", ", with: "-")), kapitál 10 000 USD.
         # Vlož celé do main.py nového Python projektu na quantconnect.com a spusť Backtest.
 

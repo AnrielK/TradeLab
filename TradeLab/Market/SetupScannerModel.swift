@@ -20,8 +20,6 @@ struct ScannerSettings: Codable, Equatable {
     var breakout = BreakoutSettings()
     /// Ukazovat i kandidáty těsně pod rezistencí / nad supportem (zatím bez vstupu).
     var includeWatch = true
-    /// Breakouty jen při SPY nad SMA 200, breakdowny pod ní.
-    var marketFilter = true
     var maxAge: Int = 3
     var allowBearish = true
     var highVolRank: Double = 50
@@ -135,14 +133,6 @@ final class SetupScannerModel {
         var hits: [SetupHit] = []
         var failures = 0
 
-        // Trend trhu (SPY nad / pod SMA 200) pro filtr.
-        var market: [BacktestBar] = []
-        if settings.marketFilter,
-           let data = try? await client.dailyHistory(symbol: "SPY", range: .twoYears) {
-            market = BacktestData.yahooBars(data.bars)
-        }
-
-        let marketBars = market
         // Svíčky a vzory – souběžně po několika tickerech.
         await withTaskGroup(of: (SetupHit?, Bool).self) { group in
             var iterator = symbols.makeIterator()
@@ -152,11 +142,10 @@ final class SetupScannerModel {
                     do {
                         let data = try await client.dailyHistory(symbol: symbol, range: .twoYears)
                         let bars = BacktestData.yahooBars(data.bars)
-                        let marketUp = marketBars.isEmpty ? nil : BreakoutStrategy.marketTrend(marketBars, for: bars)
                         let hit = SetupScanner.scan(symbol: symbol, bars: bars, settings: settings.breakout,
                                                     maxAge: settings.maxAge, allowBearish: settings.allowBearish,
                                                     includeWatch: settings.includeWatch,
-                                                    highVolRank: settings.highVolRank, marketUp: marketUp)
+                                                    highVolRank: settings.highVolRank)
                         return (hit, true)
                     } catch {
                         return (nil, false)

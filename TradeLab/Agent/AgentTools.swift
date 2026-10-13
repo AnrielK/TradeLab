@@ -856,13 +856,12 @@ enum AgentToolbox {
         let bars = historical ? series.bars.filter { $0.date >= HistoricalOptionsData.firstDay } : series.bars
         guard bars.count > 60 else { throw ToolError("Málo dat (\(bars.count) svíček).") }
         let result: OptionsBacktestResult
-        let market = await marketUp(input, strategy: signal, bars: bars, range: range, model: model)
         if historical {
             result = try await OptionsBacktest.runHistorical(bars: bars, symbol: s, config: config,
-                                                             source: HistoricalOptionsData.shared, marketUp: market)
+                                                             source: HistoricalOptionsData.shared)
         } else {
             result = await Task.detached(priority: .userInitiated) {
-                OptionsBacktest.run(bars: bars, config: config, marketUp: market)
+                OptionsBacktest.run(bars: bars, config: config)
             }.value
         }
 
@@ -918,7 +917,6 @@ enum AgentToolbox {
         "weekly_filter": Schema.boolean("breakout: týdenní KP 10/20/40 seřazeny + PSAR ve směru (výchozí true)"),
         "daily_filter": Schema.boolean("breakout: denní SMA 20/50/100 seřazeny + PSAR ve směru (výchozí true)"),
         "ma_cross": Schema.boolean("breakout: v konsolidaci se SMA 20 a 50 kříží (výchozí true)"),
-        "market_filter": Schema.boolean("breakout: SPY nad SMA 200 pro long, pod pro short (výchozí true)"),
         "headroom_atr": Schema.number("breakout: min. volno k další hladině v ATR (výchozí 2)"),
         "stop_atr": Schema.number("breakout: stop v ATR (výchozí 1)"),
         "target_fib": Schema.number("breakout: cíl jako Fibonacciho extenze konsolidace (1.272 nebo 1.618)"),
@@ -950,15 +948,6 @@ enum AgentToolbox {
         }
     }
 
-    /// Trend trhu (SPY nad / pod SMA 200) pro filtr breakoutů; `nil`, když se nepoužije.
-    static func marketUp(_ input: JSONValue, strategy: BacktestStrategy, bars: [BacktestBar], range: HistoryRange,
-                         model: AppModel) async -> [Bool?]? {
-        guard case .breakout = strategy, input["market_filter"]?.boolValue ?? true,
-              let spy = try? await BacktestData.load(symbol: "SPY", range: range, source: .yahoo, interval: .day,
-                                                     client: model.client) else { return nil }
-        return BreakoutStrategy.marketTrend(spy.bars, for: bars)
-    }
-
     static func backtest(_ input: JSONValue, model: AppModel) async throws -> String {
         let s = try symbol(input)
         let range = input["range"]?.stringValue.flatMap(HistoryRange.init(rawValue:)) ?? .fiveYears
@@ -969,9 +958,8 @@ enum AgentToolbox {
         guard bars.count > 30 else { throw ToolError("Málo dat pro backtest (\(bars.count) svíček).") }
         let config = BacktestConfig(strategy: strategy, allowShort: input["allow_short"]?.boolValue ?? false,
                                     costBps: input["cost_bps"]?.doubleValue ?? 5, riskFreeRate: model.riskFreeRate)
-        let market = await marketUp(input, strategy: strategy, bars: bars, range: range, model: model)
         let result = await Task.detached(priority: .userInitiated) {
-            BacktestEngine.run(bars: bars, config: config, marketUp: market)
+            BacktestEngine.run(bars: bars, config: config)
         }.value
 
         func metrics(_ m: BacktestMetrics) -> JSONValue {

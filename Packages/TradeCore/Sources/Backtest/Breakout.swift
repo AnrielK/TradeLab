@@ -100,29 +100,15 @@ public enum BreakoutStrategy {
     static let pivotWindow = 3
     static let atrPeriod = 14
 
-    /// - Parameter marketUp: trend celého trhu pro každou svíčku (`true` up, `false` down, `nil` neznámo).
-    public static func evaluate(_ bars: [BacktestBar], settings s: BreakoutSettings, allowShort: Bool,
-                                marketUp: [Bool?]? = nil) -> BreakoutEvaluation {
+    public static func evaluate(_ bars: [BacktestBar], settings s: BreakoutSettings, allowShort: Bool) -> BreakoutEvaluation {
         var state = State(settings: s, allowShort: allowShort)
         var targets: [Int] = []
         targets.reserveCapacity(bars.count)
-        for (i, bar) in bars.enumerated() {
-            state.market = marketUp.flatMap { i < $0.count ? $0[i] : nil }
+        for bar in bars {
             targets.append(state.update(bar))
         }
         return BreakoutEvaluation(targets: targets, signals: state.signals, watch: state.watch(),
                                   atr: state.atr.last ?? nil)
-    }
-
-    /// Trend trhu (např. SPY nad / pod SMA 200) zarovnaný na data svíček.
-    public static func marketTrend(_ market: [BacktestBar], for bars: [BacktestBar], period: Int = 200) -> [Bool?] {
-        let sma = TA.sma(market.map(\.close), period)
-        var j = -1
-        return bars.map { bar in
-            while j + 1 < market.count && market[j + 1].date <= bar.date.addingTimeInterval(12 * 3600) { j += 1 }
-            guard j >= 0, let average = sma[j] else { return nil }
-            return market[j].close > average
-        }
     }
 
     /// Klíč týdne (ISO rok × 100 + týden) v UTC.
@@ -222,7 +208,6 @@ public enum BreakoutStrategy {
         var events: [Int: Event] = [:]
         var pending: [Int: (level: Double, other: Double)] = [:]
         var used: Set<String> = []
-        var market: Bool? = nil
         var signals: [BreakoutSignal] = []
 
         init(settings: BreakoutSettings, allowShort: Bool) {
@@ -284,7 +269,6 @@ public enum BreakoutStrategy {
         func filters(_ d: Int) -> Bool {
             let i = bars.count - 1
             if d == -1 && !allowShort { return false }
-            if let market, market != (d == 1) { return false }
             if s.weeklyFilter && !(weeklyTrend == d && weeklyUp == (d == 1)) { return false }
             if s.dailyFilter {
                 guard let a = sma20[i], let b = sma50[i], let c = sma100[i], psarUp[i] == (d == 1) else { return false }

@@ -106,7 +106,6 @@ class Breakout:
         self.events = {1: None, -1: None}   # prorazená hladina: dict(level, low, index, extended)
         self.pending = {1: None, -1: None}  # nečistý průraz – čeká se na druhý den
         self.used = set()
-        self.market = None                  # True trh v up trendu, False v down trendu, None neznámo
         self.signals = []                   # (index, kind, direction, level, stop, target)
 
     # ---- indikátory ----
@@ -162,8 +161,6 @@ class Breakout:
     def _filters(self, d):
         i = len(self.bars) - 1
         if d == -1 and not self.allow_short:
-            return False
-        if self.market is not None and self.market != (d == 1):
             return False
         if self.use_weekly and not (self.w_trend == d and self.w_up == (d == 1)):
             return False
@@ -332,8 +329,6 @@ class Breakout:
 
 
 class BuyHold:
-    market = None
-
     def update(self, bar):
         return 1
 
@@ -355,18 +350,11 @@ class TradeLabAlgorithm(QCAlgorithm):
         self.signal = {{SIGNAL}}
         self.target = 0
         self.set_warm_up(timedelta(days={{WARMUP_DAYS}}))
-        # Filtr trhu: breakouty jen při SPY nad SMA 200, breakdowny pod ní.
-        self.market_filter = {{MARKET}}
-        if self.market_filter:
-            self.spy = self.add_equity("SPY", Resolution.DAILY).symbol
-            self.spy_sma = self.sma(self.spy, 200, Resolution.DAILY)
 
     def on_data(self, data: Slice):
         bar = data.bars.get(self.symbol)
         if bar is None:
             return
-        if self.market_filter and self.spy_sma.is_ready:
-            self.signal.market = self.securities[self.spy].price > self.spy_sma.current.value
         week = tuple(bar.time.isocalendar()[:2])
         target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close, week))
         if self.is_warming_up:
@@ -394,10 +382,6 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
 
         self.signal = {{SIGNAL}}
         self.target = 0
-        self.market_filter = {{MARKET}}
-        if self.market_filter:
-            self.spy = self.add_equity("SPY", Resolution.DAILY).symbol
-            self.spy_sma = self.sma(self.spy, 200, Resolution.DAILY)
         self.closes = []
         self.hv = []
         self.consolidate(self.symbol, Resolution.DAILY, self.on_daily)
@@ -426,8 +410,6 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
     # ----- signál a volatilita z denních svíček -----
 
     def on_daily(self, bar):
-        if self.market_filter and self.spy_sma.is_ready:
-            self.signal.market = self.securities[self.spy].price > self.spy_sma.current.value
         week = tuple(bar.time.isocalendar()[:2])
         self.target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close, week))
         self.closes.append(bar.close)

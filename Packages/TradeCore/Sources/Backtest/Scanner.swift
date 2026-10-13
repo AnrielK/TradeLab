@@ -40,10 +40,10 @@ public enum SetupScanner {
     ///   - highVolRank: od jakého percentilu HV se volí kreditní spread místo debetního.
     public static func scan(symbol: String, bars: [BacktestBar], settings: BreakoutSettings = BreakoutSettings(),
                             maxAge: Int = 3, allowBearish: Bool = true, includeWatch: Bool = true,
-                            highVolRank: Double = 50, marketUp: [Bool?]? = nil) -> SetupHit? {
+                            highVolRank: Double = 50) -> SetupHit? {
         let n = bars.count
         guard n >= 60, let last = bars.last else { return nil }
-        let evaluation = BreakoutStrategy.evaluate(bars, settings: settings, allowShort: allowBearish, marketUp: marketUp)
+        let evaluation = BreakoutStrategy.evaluate(bars, settings: settings, allowShort: allowBearish)
 
         let closes = bars.map(\.close)
         let hv = OptionsBacktest.rollingVolatility(closes, window: 20, periodsPerYear: 252)

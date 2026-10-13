@@ -90,13 +90,6 @@ final class BreakoutTests: XCTestCase {
         XCTAssertEqual(w.distanceATR, 0.255364, accuracy: 1e-5)
     }
 
-    func testMarketFilterBlocksLongs() {
-        let b = Self.series(seed: 9)
-        let down = [Bool?](repeating: false, count: b.count)
-        let s = BreakoutStrategy.evaluate(b, settings: BreakoutSettings(), allowShort: true, marketUp: down).signals
-        XCTAssertFalse(s.contains { $0.direction == 1 })
-    }
-
     func testScannerFreshEntry() throws {
         let b = Array(Self.series(seed: 9).prefix(675))
         let hit = try XCTUnwrap(SetupScanner.scan(symbol: "TEST", bars: b))

@@ -1,5 +1,10 @@
 # Změny
 
+## 0.19.1 – 2026-10-13
+
+- Breakout / Breakdown: odstraněna podmínka trhu (SPY nad / pod SMA 200) – v backtestu, skeneru, agentovi
+  i v exportu do QuantConnectu.
+
 ## 0.19.0 – 2026-10-13
 
 - **Strategie od začátku**: všechny dosavadní strategie (SMA, MACD, RSI, break & retest, reversal, odrazy
@@ -7,7 +12,7 @@
   a nová **Breakout / Breakdown** podle prezentace:
   - konsolidace (boční trend): hladina z posledních 120 svíček s aspoň 2 swingovými dotyky, KP 20 × 50 se v ní kříží;
   - týdenní graf v trendu (KP 10/20/40 seřazeny, PSAR ve směru), denní KP 20/50/100 seřazeny a PSAR ve směru,
-    trh (SPY) nad SMA 200 pro breakout / pod pro breakdown, daleko od další hladiny (aspoň 2× ATR, nebo nový vrchol);
+    daleko od další hladiny (aspoň 2× ATR, nebo nový vrchol);
   - 3 vstupy: **těsně před breakoutem** (jen u absolutního vrcholu, do 1× ATR pod ním), **po breakoutu**
     (celá svíčka otevřela i zavřela nad hladinou, případně druhý den), **první pullback PNR** (návrat k prorazené
     hladině do 20 svíček, zavření nad ní býčí / obratovou svíčkou);

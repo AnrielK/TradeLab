@@ -199,8 +199,7 @@ public enum OptionsBacktest {
         var rank: Double
     }
 
-    public static func run(bars: [BacktestBar], config: OptionsBacktestConfig,
-                           marketUp: [Bool?]? = nil) -> OptionsBacktestResult {
+    public static func run(bars: [BacktestBar], config: OptionsBacktestConfig) -> OptionsBacktestResult {
         let n = bars.count
         let hold = BacktestEngine.run(bars: bars, config: BacktestConfig(strategy: .buyAndHold, costBps: 0,
                                                                        riskFreeRate: config.riskFreeRate,
@@ -210,7 +209,7 @@ public enum OptionsBacktest {
                                          buyAndHold: hold.buyAndHold, buyAndHoldMetrics: hold.buyAndHoldMetrics)
         }
 
-        let signals = config.signal.targets(bars: bars, allowShort: true, marketUp: marketUp)
+        let signals = config.signal.targets(bars: bars, allowShort: true)
         let years = max(last.date.timeIntervalSince(first.date) / (365.25 * 86_400), 1 / 365)
         let barsPerYear = Double(n) / years
         let hv = rollingVolatility(bars.map(\.close), window: 20, periodsPerYear: barsPerYear)

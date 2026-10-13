@@ -21,13 +21,12 @@ public enum BacktestStrategy: Hashable, Codable, Sendable {
     }
 
     /// Cílová pozice po zavření každého baru.
-    /// - Parameter marketUp: trend celého trhu pro každou svíčku (filtr breakoutů), viz `BreakoutStrategy.marketTrend`.
-    public func targets(bars: [BacktestBar], allowShort: Bool, marketUp: [Bool?]? = nil) -> [Int] {
+    public func targets(bars: [BacktestBar], allowShort: Bool) -> [Int] {
         switch self {
         case .buyAndHold:
             return bars.map { _ in 1 }
         case .breakout(let settings):
-            return BreakoutStrategy.evaluate(bars, settings: settings, allowShort: allowShort, marketUp: marketUp).targets
+            return BreakoutStrategy.evaluate(bars, settings: settings, allowShort: allowShort).targets
         }
     }
 }
