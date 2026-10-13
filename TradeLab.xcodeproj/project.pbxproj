@@ -27,6 +27,7 @@
 		462B393F161FF2568B8A70AB /* ChartAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */; };
 		49694428DE8971D64AEBE35F /* EmbeddedTVChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */; };
 		4A4547BF7B10B98E8DB8333C /* TeamPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E5C5D0B4C3051791AEC203 /* TeamPresets.swift */; };
+		4BD13FD5BB6043321AEC942E /* SetupWatchlistSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA195AE9992D5EACDB1CC35 /* SetupWatchlistSection.swift */; };
 		50360633952B4F0D17BDA17E /* Timeframes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B9AED544068FF2144CBE54 /* Timeframes.swift */; };
 		534DE2598616E79D939D085D /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09174238CB29C8080FAB8F36 /* GlassStyle.swift */; };
 		56F96E98F83A2ED62EEFAC54 /* InteractivePayoffChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B7E00ED3EC66DEDA18AE9B /* InteractivePayoffChart.swift */; };
@@ -52,6 +53,7 @@
 		F78A633CE3425FA9261B287E /* TeamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B4C68C24D203037B2A560A /* TeamView.swift */; };
 		FBB0AD36E23B55FC4433A75A /* ClaudeAgent in Frameworks */ = {isa = PBXBuildFile; productRef = 7F604C762DFBA195B714FE23 /* ClaudeAgent */; };
 		FBE7B249C161E0C466D6999A /* LegRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED2981986A1949B029BE1C1 /* LegRow.swift */; };
+		FCEFD9D1997894A1BDF857D4 /* SetupScannerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27B16483E61C8724ED6FE4D9 /* SetupScannerModel.swift */; };
 		FDEB06CCD10B34CA759FC34F /* ChainTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD398CFE746478065DA9FB82 /* ChainTheme.swift */; };
 /* End PBXBuildFile section */
 
@@ -64,6 +66,7 @@
 		19A3823976A16130336A58BC /* PayoffWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PayoffWorkspaceView.swift; sourceTree = "<group>"; };
 		2357646EE7A85EAEA159101F /* TradeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TradeCore; path = Packages/TradeCore; sourceTree = SOURCE_ROOT; };
 		26B7E00ED3EC66DEDA18AE9B /* InteractivePayoffChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractivePayoffChart.swift; sourceTree = "<group>"; };
+		27B16483E61C8724ED6FE4D9 /* SetupScannerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupScannerModel.swift; sourceTree = "<group>"; };
 		2D9DC697AE2E81219A9B4886 /* TradeLab.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TradeLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DDEF1791B4B63EF7BE1DF6E /* NativeChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChartView.swift; sourceTree = "<group>"; };
 		30B63859984D736D04D02001 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
@@ -98,6 +101,7 @@
 		DD398CFE746478065DA9FB82 /* ChainTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainTheme.swift; sourceTree = "<group>"; };
 		DEDCD822B79CEC56631D5B80 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		E150A5AE3B96B9B924188524 /* AgentTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTools.swift; sourceTree = "<group>"; };
+		EAA195AE9992D5EACDB1CC35 /* SetupWatchlistSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupWatchlistSection.swift; sourceTree = "<group>"; };
 		F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTVChart.swift; sourceTree = "<group>"; };
 		FD84F5C2C40851ACAE4DF4A4 /* ChartViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartViewModel.swift; sourceTree = "<group>"; };
 		FDF6B48124325C9894C0AAD9 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
@@ -147,6 +151,8 @@
 			children = (
 				F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */,
 				99D2E5DBA0F82B5502B5A847 /* MarketView.swift */,
+				27B16483E61C8724ED6FE4D9 /* SetupScannerModel.swift */,
+				EAA195AE9992D5EACDB1CC35 /* SetupWatchlistSection.swift */,
 				40A5D6FCC7B49543F8C25459 /* SymbolDetailView.swift */,
 			);
 			path = Market;
@@ -366,6 +372,8 @@
 				E8282CA5F05353CEB48DF4DF /* QuantConnectExport.swift in Sources */,
 				35034C3BC7FA945F73EF97B5 /* QuantConnectExportSheet.swift in Sources */,
 				1B3E121354A9AD5C915DF498 /* QuantConnectTemplates.swift in Sources */,
+				FCEFD9D1997894A1BDF857D4 /* SetupScannerModel.swift in Sources */,
+				4BD13FD5BB6043321AEC942E /* SetupWatchlistSection.swift in Sources */,
 				61EA44B983B4A14EBBCFFAD0 /* SymbolDetailView.swift in Sources */,
 				32A3992120C503F3018A0E63 /* SymbolResolver.swift in Sources */,
 				04C5848B3D50256C07C5A762 /* TVChartScreen.swift in Sources */,
@@ -432,7 +440,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.17.0;
+				MARKETING_VERSION = 0.18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -498,7 +506,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.17.0;
+				MARKETING_VERSION = 0.18.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
