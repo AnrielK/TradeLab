@@ -1,12 +1,11 @@
-# Xcode (projekt generuje XcodeGen)
-*.xcodeproj/
+# Xcode – TradeLab.xcodeproj je v repu (generuje ho XcodeGen v CI), uživatelská data ne
+xcuserdata/
 *.xcworkspace/
 DerivedData/
 build/
 Payload/
 *.ipa
 xcodebuild.log
-TradeLab/Info.plist
 
 # SwiftPM
 .build/

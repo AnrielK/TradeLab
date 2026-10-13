@@ -36,13 +36,14 @@ CLAUDE.md                   konvence projektu pro další sezení
 
 ## Build
 
-Lokálně:
+`TradeLab.xcodeproj` je v repu – stačí naklonovat a otevřít v Xcode:
 
 ```bash
-brew install xcodegen
-xcodegen generate
 open TradeLab.xcodeproj
 ```
+
+Projekt se generuje z `project.yml` (XcodeGen). Po pushi na `main` ho CI přegeneruje a změny commitne samo.
+Při úpravě `project.yml` nebo přidání souborů lokálně: `brew install xcodegen && xcodegen generate`.
 
 Testy jádra: `swift test --package-path Packages/TradeCore`
 
