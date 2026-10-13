@@ -35,13 +35,10 @@ public struct HistoricalOptionQuote: Hashable, Sendable {
 
 /// Zdroj historických opčních řetězců.
 public protocol HistoricalOptionsSource: Sendable {
-    /// Expirace v prvním dni z `candidates` (od nejnovějšího), pro který má zdroj data,
-    /// omezené na `minDays…maxDays` dní do expirace.
-    func expirations(symbol: String, candidates: [String], minDays: Int, maxDays: Int) async throws
-        -> (date: String, expirations: [String])?
-    /// Celý řetězec jedné expirace v daném dni (striky v rozsahu).
-    func chain(symbol: String, date: String, expiration: String, minStrike: Double, maxStrike: Double) async throws
-        -> [HistoricalOptionQuote]
+    /// Řetězec (všechny expirace, striky v rozsahu) v prvním dni z `candidates` (od nejnovějšího),
+    /// pro který má zdroj data – jeden dotaz na den.
+    func chain(symbol: String, candidates: [String], minStrike: Double, maxStrike: Double) async throws
+        -> (date: String, quotes: [HistoricalOptionQuote])?
     /// Kotace vybraných kontraktů jedné expirace v zadaných dnech.
     func history(symbol: String, expiration: String, strikes: [Double], days: [String]) async throws
         -> [HistoricalOptionQuote]
@@ -174,65 +171,70 @@ public actor DoltHubOptionsSource: HistoricalOptionsSource {
         days.map(quote).joined(separator: ",")
     }
 
-    public func expirations(symbol: String, candidates: [String], minDays: Int, maxDays: Int) async throws
-        -> (date: String, expirations: [String])? {
-        let s = Self.quote(symbol.uppercased())
+    public func chain(symbol: String, candidates: [String], minStrike: Double, maxStrike: Double) async throws
+        -> (date: String, quotes: [HistoricalOptionQuote])? {
         for day in candidates {
             let rows = try await query("""
-                SELECT DISTINCT expiration FROM option_chain WHERE date=\(Self.quote(day)) AND act_symbol=\(s)
+                SELECT date, expiration, strike, call_put, bid, ask, vol, delta FROM option_chain \
+                WHERE date=\(Self.quote(day)) AND act_symbol=\(Self.quote(symbol.uppercased())) \
+                AND strike BETWEEN \(String(format: "%.2f", minStrike)) AND \(String(format: "%.2f", maxStrike))
                 """)
-            let all = rows.compactMap { $0["expiration"] as? String }
-            guard !all.isEmpty else { continue }
-            let within = all.filter {
-                let d = HistoricalDay.days(from: day, to: $0)
-                return d >= Double(minDays) && d <= Double(maxDays)
-            }
-            return (day, within.sorted())
+            let quotes = rows.compactMap(Self.parseQuote)
+            if !quotes.isEmpty { return (day, quotes) }
         }
         return nil
-    }
-
-    public func chain(symbol: String, date: String, expiration: String, minStrike: Double, maxStrike: Double) async throws
-        -> [HistoricalOptionQuote] {
-        let rows = try await query("""
-            SELECT date, expiration, strike, call_put, bid, ask, vol, delta FROM option_chain \
-            WHERE date=\(Self.quote(date)) AND act_symbol=\(Self.quote(symbol.uppercased())) \
-            AND expiration=\(Self.quote(expiration)) \
-            AND strike BETWEEN \(String(format: "%.2f", minStrike)) AND \(String(format: "%.2f", maxStrike))
-            """)
-        return rows.compactMap(Self.parseQuote)
     }
 
     public func history(symbol: String, expiration: String, strikes: [Double], days: [String]) async throws
         -> [HistoricalOptionQuote] {
         let list = Set(strikes).sorted().map { String(format: "%.2f", $0) }.joined(separator: ",")
-        var quotes: [HistoricalOptionQuote] = []
-        for start in stride(from: 0, to: days.count, by: 10) {
-            let chunk = Array(days[start..<min(start + 10, days.count)])
-            let rows = try await query("""
-                SELECT date, expiration, strike, call_put, bid, ask, vol, delta FROM option_chain \
-                WHERE date IN (\(Self.dayList(chunk))) AND act_symbol=\(Self.quote(symbol.uppercased())) \
-                AND expiration=\(Self.quote(expiration)) AND strike IN (\(list))
-                """)
-            quotes += rows.compactMap(Self.parseQuote)
+        let s = Self.quote(symbol.uppercased())
+        let queries = Self.chunks(days, size: 25).map { chunk in
+            """
+            SELECT date, expiration, strike, call_put, bid, ask, vol, delta FROM option_chain \
+            WHERE date IN (\(Self.dayList(chunk))) AND act_symbol=\(s) \
+            AND expiration=\(Self.quote(expiration)) AND strike IN (\(list))
+            """
         }
-        return quotes
+        return try await concurrentRows(queries).compactMap(Self.parseQuote)
+    }
+
+    static func chunks(_ days: [String], size: Int) -> [[String]] {
+        stride(from: 0, to: days.count, by: size).map { Array(days[$0..<min($0 + size, days.count)]) }
+    }
+
+    /// Víc dotazů najednou (nejvýš 4 souběžně), výsledky spojené.
+    func concurrentRows(_ queries: [String]) async throws -> [[String: Any]] {
+        if queries.isEmpty { return [] }
+        if queries.count == 1 { return try await query(queries[0]) }
+        var all: [[String: Any]] = []
+        for batch in stride(from: 0, to: queries.count, by: 4).map({ Array(queries[$0..<min($0 + 4, queries.count)]) }) {
+            let results = try await withThrowingTaskGroup(of: Int.self) { group -> Int in
+                for sql in batch {
+                    group.addTask { _ = try await self.query(sql); return 0 }
+                }
+                return try await group.reduce(0, +)
+            }
+            _ = results
+            for sql in batch { all += memory[sql] ?? [] }
+        }
+        return all
     }
 
     public func ivRank(symbol: String, days: [String]) async throws -> [String: Double] {
+        let s = Self.quote(symbol.uppercased())
+        let queries = Self.chunks(days, size: 40).map { chunk in
+            """
+            SELECT date, iv_current, iv_year_high, iv_year_low FROM volatility_history \
+            WHERE date IN (\(Self.dayList(chunk))) AND act_symbol=\(s)
+            """
+        }
         var result: [String: Double] = [:]
-        for start in stride(from: 0, to: days.count, by: 40) {
-            let chunk = Array(days[start..<min(start + 40, days.count)])
-            let rows = try await query("""
-                SELECT date, iv_current, iv_year_high, iv_year_low FROM volatility_history \
-                WHERE date IN (\(Self.dayList(chunk))) AND act_symbol=\(Self.quote(symbol.uppercased()))
-                """)
-            for row in rows {
-                guard let day = row["date"] as? String, let iv = Self.number(row["iv_current"]),
-                      let high = Self.number(row["iv_year_high"]), let low = Self.number(row["iv_year_low"]),
-                      high > low else { continue }
-                result[day] = min(max((iv - low) / (high - low) * 100, 0), 100)
-            }
+        for row in try await concurrentRows(queries) {
+            guard let day = row["date"] as? String, let iv = Self.number(row["iv_current"]),
+                  let high = Self.number(row["iv_year_high"]), let low = Self.number(row["iv_year_low"]),
+                  high > low else { continue }
+            result[day] = min(max((iv - low) / (high - low) * 100, 0), 100)
         }
         return result
     }
@@ -451,14 +453,16 @@ extension OptionsBacktest {
                                source: HistoricalOptionsSource,
                                fill: (HistoricalOptionQuote, Bool) -> Double) async throws -> HistoricalPosition? {
         let target = config.daysToExpiry
-        guard let available = try await source.expirations(
-            symbol: symbol, candidates: candidates, minDays: max(target - 14, 5), maxDays: target + 21),
-              let expiration = available.expirations.min(by: {
-                  abs(HistoricalDay.days(from: day, to: $0) - Double(target)) < abs(HistoricalDay.days(from: day, to: $1) - Double(target))
-              }) else { return nil }
-
-        let quotes = try await source.chain(symbol: symbol, date: available.date, expiration: expiration,
-                                            minStrike: spot * 0.6, maxStrike: spot * 1.4)
+        guard let available = try await source.chain(symbol: symbol, candidates: candidates,
+                                                     minStrike: spot * 0.6, maxStrike: spot * 1.4) else { return nil }
+        let expirations = Set(available.quotes.map(\.expiration)).filter {
+            let d = HistoricalDay.days(from: available.date, to: $0)
+            return d >= Double(max(target - 14, 5)) && d <= Double(target + 21)
+        }
+        guard let expiration = expirations.min(by: {
+            abs(HistoricalDay.days(from: day, to: $0) - Double(target)) < abs(HistoricalDay.days(from: day, to: $1) - Double(target))
+        }) else { return nil }
+        let quotes = available.quotes.filter { $0.expiration == expiration }
         let calls = quotes.filter { $0.type == .call && $0.ask > 0 }.sorted { $0.strike < $1.strike }
         let puts = quotes.filter { $0.type == .put && $0.ask > 0 }.sorted { $0.strike < $1.strike }
         let width = spot * config.widthPct

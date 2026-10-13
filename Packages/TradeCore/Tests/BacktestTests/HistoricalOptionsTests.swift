@@ -25,18 +25,14 @@ final class MockOptionsSource: HistoricalOptionsSource, @unchecked Sendable {
         }
     }
 
-    func expirations(symbol: String, candidates: [String], minDays: Int, maxDays: Int) async throws
-        -> (date: String, expirations: [String])? {
+    func chain(symbol: String, candidates: [String], minStrike: Double, maxStrike: Double) async throws
+        -> (date: String, quotes: [HistoricalOptionQuote])? {
         guard let date = candidates.first(where: { closes[$0] != nil }) else { return nil }
-        let list = stride(from: 7, through: 70, by: 7).filter { $0 >= minDays && $0 <= maxDays }
-            .map { HistoricalDay.adding($0, to: date) }
-        return (date, list)
-    }
-
-    func chain(symbol: String, date: String, expiration: String, minStrike: Double, maxStrike: Double) async throws
-        -> [HistoricalOptionQuote] {
         let strikes = stride(from: (minStrike / 5).rounded(.up) * 5, through: maxStrike, by: 5).map { $0 }
-        return quotes(day: date, expiration: expiration, strikes: strikes)
+        let quotes = stride(from: 7, through: 70, by: 7).flatMap {
+            self.quotes(day: date, expiration: HistoricalDay.adding($0, to: date), strikes: strikes)
+        }
+        return (date, quotes)
     }
 
     func history(symbol: String, expiration: String, strikes: [Double], days requested: [String]) async throws

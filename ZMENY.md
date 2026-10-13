@@ -1,5 +1,11 @@
 # Změny
 
+## 0.14.2 – 2026-10-13
+
+- Rychlejší historický opční backtest: na vstup jeden dotaz (celý řetězec tickeru pro daný den, výběr expirace
+  a striků v telefonu), historie pozice jedním dotazem (po 25 dnech), IV rank souběžně (4 dotazy najednou).
+  Zhruba 2 dotazy na obchod místo ~5.
+
 ## 0.14.1 – 2026-10-13
 
 - Oprava historického opčního backtestu („context deadline exceeded“): dotazy na DoltHub jdou přes konkrétní dny
