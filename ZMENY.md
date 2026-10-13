@@ -1,5 +1,9 @@
 # Změny
 
+## 0.16.1 – 2026-10-13
+
+- Tlačítko agenta i v detailu tickeru.
+
 ## 0.16.0 – 2026-10-13
 
 - **Agent** už není záložka: kulaté tlačítko ✦ vpravo nahoře na Trhu, Opcích i v Backtestu ho otevře jako

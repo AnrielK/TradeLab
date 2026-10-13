@@ -60,6 +60,9 @@ struct SymbolDetailView: View {
         }
         .navigationTitle(symbol)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { AgentToolbarButton() }
+        }
         .task(id: range) { await load() }
         .onAppear { model.selectOptionsSymbol(symbol) }
         .refreshable {
