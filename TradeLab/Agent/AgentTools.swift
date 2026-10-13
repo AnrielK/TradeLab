@@ -29,6 +29,17 @@ enum AgentToolbox {
             ) { _ in await watchlist(model: model) },
 
             AgentTool(
+                name: "get_option_setups",
+                description: """
+                Výsledky skeneru opčních setupů (watchlist na záložce Trh): tickery s čerstvým signálem \
+                (odraz/průraz S/R a trendline, break & retest, odraz od EMA, swing pullback, reversal) na denních svíčkách, \
+                směr, stáří signálu, percentil HV, IV/HV, likvidita ATM opcí a navržený spread. \
+                rescan=true spustí nový sken (trvá desítky sekund).
+                """,
+                inputSchema: Schema.object(["rescan": Schema.boolean("Spustit nový sken (výchozí false = poslední výsledky)")])
+            ) { input in await optionSetups(input, model: model) },
+
+            AgentTool(
                 name: "get_price_history",
                 description: """
                 Statistiky denní historie ceny (upravené o dividendy): výnosy 1M/3M/6M/YTD/1R, \
@@ -304,6 +315,36 @@ enum AgentToolbox {
             let q = model.quotes[s]
             return ["symbol": .string(s), "price": num(q?.price), "change_pct": pct(q?.changePercent)]
         }))
+    }
+
+    static func optionSetups(_ input: JSONValue, model: AppModel) async -> String {
+        let scanner = model.scanner
+        if input["rescan"]?.boolValue == true || scanner.lastScan == nil {
+            await scanner.scan(watchlist: model.watchlist, rate: model.riskFreeRate)
+        }
+        return output(.object([
+            "scanned_at": scanner.lastScan.map { .string(day($0)) } ?? .null,
+            "tickers_scanned": .number(Double(scanner.scannedCount)),
+            "setups": .array(scanner.results.map { r in
+                let h = r.hit
+                return [
+                    "symbol": .string(h.symbol),
+                    "direction": .string(h.direction > 0 ? "bullish" : "bearish"),
+                    "patterns": .array(h.patterns.map { .string($0.name) }),
+                    "bars_ago": .number(Double(h.barsAgo)),
+                    "close": num(h.close),
+                    "with_200sma_trend": .bool(h.withTrend),
+                    "hv20": pct(h.historicalVolatility),
+                    "hv_rank": num(h.volatilityRank, 0),
+                    "atm_iv": pct(r.liquidity?.impliedVolatility),
+                    "iv_to_hv": num(r.ivToHv),
+                    "atm_open_interest": r.liquidity.map { .number(Double($0.atmOpenInterest)) } ?? .null,
+                    "atm_spread_pct": pct(r.liquidity?.atmSpread),
+                    "liquid": .bool(r.liquidity?.isLiquid == true),
+                    "suggested_play": .string(h.suggestedPlay.name),
+                ]
+            }),
+        ]))
     }
 
     static func priceHistory(_ input: JSONValue, model: AppModel) async throws -> String {

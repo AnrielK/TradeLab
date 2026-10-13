@@ -49,6 +49,8 @@ struct MarketView: View {
                     .onDelete { model.removeFromWatchlist(at: $0) }
                     .onMove { model.moveWatchlist(from: $0, to: $1) }
                 }
+
+                SetupWatchlistSection()
             }
             .navigationTitle("Trh")
             .navigationDestination(for: String.self) { symbol in

@@ -1,5 +1,18 @@
 # Změny
 
+## 0.18.0 – 2026-10-13
+
+- **Watchlist opčních setupů** na Trhu pod Sledovanými: skener projde Sledované + ~65 likvidních US akcií
+  a ETF (nebo jen Sledované / vlastní seznam) na denních svíčkách a hledá čerstvé vzory – break & retest,
+  odraz a průraz S/R i trendlinie, odraz od EMA 20, swing pullback, reversal RSI. U každého tickeru směr,
+  vzory, stáří signálu, souhlas s trendem SMA 200, percentil HV, IV/HV a likvidita ATM opcí (OI, spread).
+- Navržená strategie podle volatility: vysoká → kreditní spread, nízká → debetní. Swipe „Opce“ sestaví
+  spread z reálných kontraktů (short ~30Δ, šířka ~5 %, striky s OI ≥ 1 000) a otevře ho v payoffu;
+  swipe doleva přidá ticker do Sledovaných.
+- Sken se spustí sám, když je starší než den; nastavení (vzory, stáří signálu, medvědí setupy, hranice
+  volatility, expirace, skrytí nelikvidních) pod ikonou posuvníků.
+- Agent má nástroj `get_option_setups` a tým „Přehled watchlistu“ ho používá.
+
 ## 0.17.0 – 2026-10-13
 
 - **Export pro QuantConnect** v Backtestu: tlačítko vygeneruje Python skript (LEAN) s aktuálním tickerem,

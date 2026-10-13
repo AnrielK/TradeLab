@@ -187,9 +187,10 @@ enum TeamPresets {
                     instructions: """
                     Načti watchlist a u každého tickeru historii (1y). Seřaď podle zajímavosti (silný trend, extrémní RSI, \
                     blízkost 52týdenního maxima/minima, skok volatility) a vyber 3 nejzajímavější s krátkým zdůvodněním. \
-                    Přidej jednořádkovou tabulku všech tickerů (cena, změna dne, výnos 1M, RSI).
+                    Přidej jednořádkovou tabulku všech tickerů (cena, změna dne, výnos 1M, RSI). \
+                    Zahrň i výsledky skeneru opčních setupů (get_option_setups) – likvidní setupy mají přednost.
                     """,
-                    tools: ["get_watchlist", "get_price_history"], maxTurns: 14),
+                    tools: ["get_watchlist", "get_price_history", "get_option_setups"], maxTurns: 14),
             ]),
             TeamStage([
                 TeamRole(

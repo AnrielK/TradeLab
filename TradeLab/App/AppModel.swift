@@ -22,6 +22,8 @@ final class AppModel {
     // Sledované tickery
     private(set) var watchlist: [String]
     var quotes: [String: QuoteSnapshot] = [:]
+    /// Skener opčních setupů (watchlist na záložce Trh).
+    let scanner = SetupScannerModel()
 
     // Sazba pro ocenění
     var riskFreeRate: Double = 0.04
