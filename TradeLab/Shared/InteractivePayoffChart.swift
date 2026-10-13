@@ -26,6 +26,8 @@ struct InteractivePayoffChart: View {
     /// Tažení striku: id nohy a cena pod prstem (aplikace ji přichytí na dostupný strike).
     var onDragMarker: ((UUID, Double) -> Void)? = nil
     var onDragMarkerEnded: ((UUID) -> Void)? = nil
+    /// Vybraná cena při posunu prstem po grafu (pro panel hodnot).
+    var onSelectPrice: ((Double) -> Void)? = nil
 
     @State private var selectedPrice: Double?
     @State private var draggingMarker: UUID?
@@ -270,7 +272,9 @@ struct InteractivePayoffChart: View {
                 if let id = draggingMarker {
                     onDragMarker?(id, price)
                 } else {
-                    selectedPrice = min(max(price, domain.lowerBound), domain.upperBound)
+                    let clamped = min(max(price, domain.lowerBound), domain.upperBound)
+                    selectedPrice = clamped
+                    onSelectPrice?(clamped)
                 }
             }
             .onEnded { _ in

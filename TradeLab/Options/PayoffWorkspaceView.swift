@@ -8,6 +8,8 @@ struct PayoffWorkspaceView: View {
     @State private var daysForward: Double = 0
     @State private var ivShiftPoints: Double = 0
     @State private var isBusy = false
+    /// Cena pro panel hodnot (vybraná v grafu); nil = aktuální cena.
+    @State private var probePrice: Double?
 
     var body: some View {
         if model.strategy.optionLegs.isEmpty {
@@ -66,7 +68,8 @@ struct PayoffWorkspaceView: View {
                  strategy.profitLoss(atSpot: price, daysElapsed: daysForward, ivShift: ivShift, market: market))
             },
             onDragMarker: { id, price in model.dragLeg(id: id, toPrice: price) },
-            onDragMarkerEnded: { _ in model.finishLegDrag() }
+            onDragMarkerEnded: { _ in model.finishLegDrag() },
+            onSelectPrice: { probePrice = $0 }
         )
         .frame(height: 330)
 
@@ -80,6 +83,7 @@ struct PayoffWorkspaceView: View {
 
         controls
         sliders(maxDays: strategy.nearestExpiryDays)
+        valuesPanel(strategy: strategy, spot: spot, market: market, ivShift: ivShift)
 
         VStack(alignment: .leading, spacing: 6) {
             Text("Nohy").font(.subheadline.weight(.semibold))
@@ -237,6 +241,114 @@ struct PayoffWorkspaceView: View {
                     .disabled(!model.canAdjustFromChain || isBusy)
             }
         }
+    }
+
+    // MARK: - Hodnoty v bodě (dřívější kalkulačka)
+
+    @ViewBuilder
+    private func valuesPanel(strategy: OptionStrategy, spot: Double, market: MarketContext, ivShift: Double) -> some View {
+        let price = probePrice ?? spot
+        let greeks = strategy.greeks(atSpot: price, daysElapsed: daysForward, ivShift: ivShift, market: market)
+        let pnl = strategy.profitLoss(atSpot: price, daysElapsed: daysForward, ivShift: ivShift, market: market)
+        let expiryPnl = strategy.expiryProfitLoss(atSpot: price, market: market)
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Hodnoty v bodě").font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(scenarioLabel).font(.caption).foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
+                Button { probePrice = price * 0.99 } label: { Text("−1 %") }
+                    .buttonStyle(.glass)
+                VStack(spacing: 1) {
+                    Text(price.fixed(2)).font(.headline).monospacedDigit()
+                    Text(probePrice == nil ? "aktuální cena" : "\((price / spot - 1).signedPercent) od aktuální")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                Button { probePrice = price * 1.01 } label: { Text("+1 %") }
+                    .buttonStyle(.glass)
+                if probePrice != nil {
+                    Button { probePrice = nil } label: { Image(systemName: "arrow.uturn.backward") }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                }
+            }
+            .font(.caption.weight(.semibold))
+
+            Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 6) {
+                GridRow {
+                    Text("Noha").gridColumnAlignment(.leading)
+                    Text("Vstup")
+                    Text("Hodnota")
+                    Text("P/L")
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                ForEach(strategy.legs) { leg in
+                    let value = strategy.legValue(leg, spot: price, daysElapsed: daysForward, ivShift: ivShift, market: market)
+                    let legPnl = leg.side.sign * Double(leg.quantity) * strategy.multiplier * (value - leg.entryPrice)
+                    GridRow {
+                        Text(legLabel(leg))
+                            .foregroundStyle(leg.side == .long ? ChainTheme.long : ChainTheme.short)
+                            .gridColumnAlignment(.leading)
+                        Text(leg.entryPrice.fixed(2)).foregroundStyle(.secondary)
+                        Text(value.fixed(2))
+                        Text(legPnl.signedUSDWhole).foregroundStyle(Color.pnl(legPnl))
+                    }
+                }
+                Divider()
+                GridRow {
+                    Text(currentLabel).gridColumnAlignment(.leading)
+                    Text("")
+                    Text("")
+                    Text(pnl.signedUSDWhole).fontWeight(.semibold).foregroundStyle(Color.pnl(pnl))
+                }
+                GridRow {
+                    Text("Při expiraci").gridColumnAlignment(.leading).foregroundStyle(.secondary)
+                    Text("")
+                    Text("")
+                    Text(expiryPnl.signedUSDWhole).foregroundStyle(Color.pnl(expiryPnl))
+                }
+            }
+            .font(.caption)
+            .monospacedDigit()
+
+            HStack(spacing: 0) {
+                greek("Δ", greeks.delta.fixed(1), "akcií")
+                greek("Γ", greeks.gamma.fixed(2), "/ 1 $")
+                greek("Θ", greeks.theta.signedUSDWhole, "/ den")
+                greek("Vega", greeks.vega.signedUSDWhole, "/ 1 p. b.")
+            }
+        }
+        .padding(12)
+        .background(ChainTheme.row, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var scenarioLabel: String {
+        var parts = [currentLabel]
+        if ivShiftPoints != 0 { parts.append("IV \(ivShiftPoints > 0 ? "+" : "")\(Int(ivShiftPoints)) p. b.") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func legLabel(_ leg: StrategyLeg) -> String {
+        let sign = leg.side == .long ? "+" : "−"
+        switch leg.instrument {
+        case .stock: return "\(sign)\(leg.quantity * 100) akcií"
+        case .call: return "\(sign)\(leg.quantity) C \(leg.strike.strikeLabel)"
+        case .put: return "\(sign)\(leg.quantity) P \(leg.strike.strikeLabel)"
+        }
+    }
+
+    private func greek(_ symbol: String, _ value: String, _ unit: String) -> some View {
+        VStack(spacing: 1) {
+            Text(symbol).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            Text(value).font(.caption.weight(.semibold)).monospacedDigit()
+            Text(unit).font(.system(size: 9)).foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func run(_ action: @escaping () async -> Void) {

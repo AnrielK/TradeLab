@@ -1,5 +1,12 @@
 # Změny
 
+## 0.15.0 – 2026-10-13
+
+- Záložka **Kalkulačka** odebrána – výpočty jsou v payoffu v novém panelu **Hodnoty v bodě**:
+  pro cenu vybranou posunem prstu po grafu (nebo ±1 %, návrat na aktuální) a zvolený posun v čase a IV
+  ukáže vstupní a teoretickou hodnotu každé nohy, její P/L, P/L pozice ve scénáři i při expiraci
+  a greeks pozice (Δ v akciích, Γ, Θ za den, vega za 1 p. b.).
+
 ## 0.14.2 – 2026-10-13
 
 - Rychlejší historický opční backtest: na vstup jeden dotaz (celý řetězec tickeru pro daný den, výběr expirace

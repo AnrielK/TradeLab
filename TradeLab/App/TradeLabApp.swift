@@ -34,9 +34,6 @@ struct RootView: View {
             AgentView()
                 .tabItem { Label("Agent", systemImage: "sparkles") }
                 .tag(AppTab.agent)
-            CalculatorView()
-                .tabItem { Label("Kalkulačka", systemImage: "function") }
-                .tag(AppTab.calculator)
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .task { await model.refreshRiskFreeRate() }

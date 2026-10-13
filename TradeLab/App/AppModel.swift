@@ -8,7 +8,6 @@ enum AppTab: Hashable {
     case options
     case backtest
     case agent
-    case calculator
 }
 
 @MainActor
