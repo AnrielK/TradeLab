@@ -92,6 +92,7 @@ final class BacktestModel {
     var benchmark: [CurvePoint] = []
     /// Ticker posledního běhu (pro graf obchodů) a stav zakreslení.
     var chartSymbol: String = ""
+    var chartStart: Date = Date()
     var chartStatus: String? = nil
     var dataLabel: String = ""
     var isRunning = false
@@ -159,6 +160,7 @@ final class BacktestModel {
             }
             dataLabel = series.label
             chartSymbol = ticker
+            chartStart = bars.first?.date ?? Date()
             if UserDefaults.standard.object(forKey: BacktestTradeChart.enabledKey) as? Bool ?? true {
                 await drawTrades(bars: bars, client: client)
             }
@@ -500,8 +502,8 @@ struct BacktestView: View {
         Section {
             Toggle("Zakreslit obchody do grafu", isOn: $drawTradesInChart)
             if !bt.chartSymbol.isEmpty {
-                EmbeddedTVChart(symbol: bt.chartSymbol)
-                    .id(bt.chartSymbol)
+                BacktestTVChart(symbol: bt.chartSymbol, start: bt.chartStart)
+                    .id("\(bt.chartSymbol)-\(bt.chartStart.timeIntervalSince1970)")
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
             }
         } header: {

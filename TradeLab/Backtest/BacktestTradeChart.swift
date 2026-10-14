@@ -51,13 +51,21 @@ enum BacktestTradeChart {
                 drawings.append(Drawing(tool: "rect", points: [DrawPoint(time: t0, price: entry), DrawPoint(time: t1, price: stop)],
                                         colorHex: "#E0566B", width: 0.5, dash: 0, text: nil, locked: true))
                 for shape in plan.shapes {
+                    // Hladiny a trendlinie se protáhnou až do výstupu obchodu (průměr ne).
+                    let ts = shape.startDate.timeIntervalSince1970
+                    let te = shape.endDate.timeIntervalSince1970
+                    var endTime = te
+                    var endPrice = shape.endPrice
+                    if shape.role != .movingAverage, t1 > te, te > ts {
+                        endPrice = shape.startPrice + (shape.endPrice - shape.startPrice) * (t1 - ts) / (te - ts)
+                        endTime = t1
+                    }
+                    let endDate = Date(timeIntervalSince1970: endTime)
                     drawings.append(Drawing(
                         tool: "trend",
-                        points: [DrawPoint(time: shape.startDate.timeIntervalSince1970,
-                                           price: scale(shape.startDate, shape.startPrice)),
-                                 DrawPoint(time: shape.endDate.timeIntervalSince1970,
-                                           price: scale(shape.endDate, shape.endPrice))],
-                        colorHex: color(shape.role), width: 1.2, dash: 0, text: nil, locked: true))
+                        points: [DrawPoint(time: ts, price: scale(shape.startDate, shape.startPrice)),
+                                 DrawPoint(time: endTime, price: scale(endDate, endPrice))],
+                        colorHex: color(shape.role), width: 1.4, dash: 0, text: nil, locked: true))
                 }
             }
             drawings.append(Drawing(tool: "trend", points: [DrawPoint(time: t0, price: entry), DrawPoint(time: t1, price: exit)],

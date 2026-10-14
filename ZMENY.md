@@ -1,5 +1,14 @@
 # Změny
 
+## 0.23.1 – 2026-10-14
+
+- **Graf obchodů v Backtestu** má vlastní období: historie o 10 % delší než backtest (celé období je vidět
+  hned) a přepínač svíček 1D / 1W přímo nad grafem (u období do ~2 let i 4H), bez otevírání velkého grafu.
+  Na víc než 3 roky se otevře na týdenních svíčkách.
+- Ke každému obchodu se kreslí, co se obchoduje: u Breakoutu obě hladiny konsolidace (rezistence i support),
+  u Trendlinie trendline nebo obě linie trojúhelníku, u Odrazu od KP průměr. Hladiny a linie pokračují až
+  do výstupu z obchodu.
+
 ## 0.23.0 – 2026-10-14
 
 - **Opce: každý signál jen jednou.** Po zavření opční pozice (výstup strategie, 7 dní před expirací,

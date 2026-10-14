@@ -184,12 +184,17 @@ extension SetupGeometry {
         case .breakout(let s):
             let e = BreakoutStrategy.evaluate(bars, settings: s, allowShort: allowShort)
             return e.signals.map { sig in
-                let role: SetupShape.Role = sig.direction > 0 ? .resistance : .support
-                let level = segment(role, sig.direction > 0 ? "R" : "S", from: sig.index - s.lookback, sig.level,
-                                    to: sig.index, sig.level)
+                // Konsolidace: prorazená hladina a protější kraj přes okno, ze kterého hladina vznikla.
+                let start = max(0, sig.index - s.lookback)
+                let window = bars[start..<max(start + 1, min(sig.index, bars.count))]
+                let other = sig.direction > 0 ? window.map(\.low).min()! : window.map(\.high).max()!
+                let level = segment(sig.direction > 0 ? .resistance : .support, sig.direction > 0 ? "R" : "S",
+                                    from: start, sig.level, to: sig.index, sig.level)
+                let opposite = segment(sig.direction > 0 ? .support : .resistance, sig.direction > 0 ? "S" : "R",
+                                       from: start, other, to: sig.index, other)
                 return TradePlan(signalIndex: sig.index, direction: sig.direction,
                                  title: sig.entry.name(direction: sig.direction), stop: sig.stop, target: sig.target,
-                                 shapes: [level])
+                                 shapes: [level, opposite])
             }
         case .maBounce(let s):
             let e = MABounceStrategy.evaluate(bars, settings: s, allowShort: allowShort)
