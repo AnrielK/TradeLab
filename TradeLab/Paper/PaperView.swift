@@ -26,6 +26,8 @@ struct PaperView: View {
                 historySection
             }
             .navigationTitle("Demo účet")
+            .navigationDestination(for: UUID.self) { id in PaperPositionDetailView(positionID: id) }
+            .navigationDestination(for: String.self) { SymbolDetailView(symbol: $0) }
             .refreshable { await run() }
             .task { await paper.runIfStale(watchlist: model.watchlist, scanner: model.scanner) }
             .toolbar {
@@ -118,7 +120,7 @@ struct PaperView: View {
                 Text("Žádné otevřené pozice.").foregroundStyle(.secondary)
             }
             ForEach(paper.account.positions) { p in
-                NavigationLink(value: p.symbol) {
+                NavigationLink(value: p.id) {
                     PaperPositionRow(position: p)
                 }
                 .swipeActions {
@@ -129,7 +131,6 @@ struct PaperView: View {
                 }
             }
         }
-        .navigationDestination(for: String.self) { SymbolDetailView(symbol: $0) }
     }
 
     private var historySection: some View {
@@ -183,5 +184,105 @@ struct PaperPositionRow: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         }
+    }
+}
+
+/// Detail otevřené pozice: graf se vstupem, stopem a cílem, čísla obchodu, úprava stopu / cíle, zavření.
+struct PaperPositionDetailView: View {
+    let positionID: UUID
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var stopText = ""
+    @State private var targetText = ""
+
+    private var position: PaperPosition? { model.paper.account.positions.first { $0.id == positionID } }
+
+    var body: some View {
+        if let p = position {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(p.unrealizedPnL.signedUSD)
+                            .font(.largeTitle.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.pnl(p.unrealizedPnL))
+                        Text("\(p.returnPct.signedPercent) · \(p.side > 0 ? "Long" : "Short") \(Int(p.shares)) ks · \(p.source)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    EmbeddedTVChart(symbol: p.symbol, priceLines: lines(p))
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                }
+
+                Section("Obchod") {
+                    LabeledContent("Vstup", value: "\(p.entryPrice.usd) · \(p.entryDate.formatted(date: .abbreviated, time: .shortened))")
+                    LabeledContent("Aktuální cena", value: p.lastPrice.usd)
+                    LabeledContent("Hodnota pozice", value: abs(p.marketValue).usd)
+                    if let stop = p.stop {
+                        LabeledContent("Stop", value: "\(stop.usd) (\(((stop / p.entryPrice - 1) * Double(p.side)).signedPercent))")
+                        LabeledContent("Riziko", value: (Double(p.side) * (stop - p.entryPrice) * p.shares).signedUSDWhole)
+                    }
+                    if let target = p.target {
+                        LabeledContent("Cíl", value: "\(target.usd) (\(((target / p.entryPrice - 1) * Double(p.side)).signedPercent))")
+                    }
+                    if let stop = p.stop, let target = p.target, abs(p.entryPrice - stop) > 0 {
+                        LabeledContent("R:R", value: (abs(target - p.entryPrice) / abs(p.entryPrice - stop)).fixed(1))
+                    }
+                }
+
+                Section {
+                    LabeledContent("Stop") {
+                        TextField("bez stopu", text: $stopText)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    LabeledContent("Cíl") {
+                        TextField("bez cíle", text: $targetText)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    Button("Uložit stop a cíl") {
+                        model.paper.updateLevels(p.id, stop: Self.number(stopText), target: Self.number(targetText))
+                    }
+                } header: {
+                    Text("Upravit")
+                } footer: {
+                    Text("Stop a cíl se kontrolují při vyhodnocení demo účtu.")
+                }
+
+                Section {
+                    Button("Zavřít pozici za aktuální cenu", role: .destructive) {
+                        Task {
+                            await model.paper.close(p)
+                            dismiss()
+                        }
+                    }
+                    NavigationLink("Detail tickeru \(p.symbol)", value: p.symbol)
+                }
+            }
+            .navigationTitle(p.symbol)
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                stopText = p.stop.map { $0.fixed(2) } ?? ""
+                targetText = p.target.map { $0.fixed(2) } ?? ""
+            }
+        } else {
+            ContentUnavailableView("Pozice je zavřená", systemImage: "checkmark.circle",
+                                   description: Text("Najdeš ji v historii demo účtu."))
+        }
+    }
+
+    private func lines(_ p: PaperPosition) -> [ChartPriceLine] {
+        var result = [ChartPriceLine(price: p.entryPrice, label: "Vstup " + p.entryPrice.fixed(2), color: .blue)]
+        if let stop = p.stop { result.append(ChartPriceLine(price: stop, label: "Stop " + stop.fixed(2), color: .red)) }
+        if let target = p.target {
+            result.append(ChartPriceLine(price: target, label: "Cíl " + target.fixed(2), color: .green))
+        }
+        return result
+    }
+
+    static func number(_ text: String) -> Double? {
+        Double(text.replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "\u{00a0}", with: "")
+            .trimmingCharacters(in: .whitespaces))
     }
 }

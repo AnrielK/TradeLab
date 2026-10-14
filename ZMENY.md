@@ -1,5 +1,12 @@
 # Změny
 
+## 0.24.1 – 2026-10-14
+
+- Demo účet: oprava – otevřené pozice se zobrazovaly jako jeden řádek a swipe ukázal tlačítka „Zavřít“
+  vedle sebe pro všechny pozice najednou. Teď má každá pozice vlastní řádek a vlastní swipe.
+- Klepnutí na pozici otevře její detail: zisk / ztráta, graf s čarami vstupu, stopu a cíle, vstup, aktuální
+  cena, hodnota, riziko, R:R, úprava stopu a cíle, zavření za aktuální cenu a odkaz na detail tickeru.
+
 ## 0.24.0 – 2026-10-14
 
 - **Demo účet** (nová záložka Demo): virtuálních 10 000 USD pro živé testování strategií.

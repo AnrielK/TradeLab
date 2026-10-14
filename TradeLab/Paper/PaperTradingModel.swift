@@ -77,6 +77,13 @@ final class PaperTradingModel {
         }
     }
 
+    func updateLevels(_ id: UUID, stop: Double?, target: Double?) {
+        guard let i = account.positions.firstIndex(where: { $0.id == id }) else { return }
+        account.positions[i].stop = stop
+        account.positions[i].target = target
+        note("Upraven stop / cíl \(account.positions[i].symbol)")
+    }
+
     func close(_ position: PaperPosition) async {
         let price = (try? await client.quote(symbol: position.symbol).price) ?? position.lastPrice
         if let trade = account.close(position.id, price: price, date: Date(), reason: "ručně") {
