@@ -27,6 +27,7 @@
 		462B393F161FF2568B8A70AB /* ChartAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */; };
 		49694428DE8971D64AEBE35F /* EmbeddedTVChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */; };
 		4A4547BF7B10B98E8DB8333C /* TeamPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E5C5D0B4C3051791AEC203 /* TeamPresets.swift */; };
+		4A70DF72AADA417485371C4A /* SetupChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EE3543AF00B96C91F4F3AE4 /* SetupChart.swift */; };
 		4BD13FD5BB6043321AEC942E /* SetupWatchlistSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA195AE9992D5EACDB1CC35 /* SetupWatchlistSection.swift */; };
 		50360633952B4F0D17BDA17E /* Timeframes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B9AED544068FF2144CBE54 /* Timeframes.swift */; };
 		534DE2598616E79D939D085D /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09174238CB29C8080FAB8F36 /* GlassStyle.swift */; };
@@ -86,6 +87,7 @@
 		86E5C5D0B4C3051791AEC203 /* TeamPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamPresets.swift; sourceTree = "<group>"; };
 		8711145D01EDB5141FDAE19C /* OptionsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionsHomeView.swift; sourceTree = "<group>"; };
 		8CE0967A923111497EB0C2DB /* ChainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainStore.swift; sourceTree = "<group>"; };
+		8EE3543AF00B96C91F4F3AE4 /* SetupChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupChart.swift; sourceTree = "<group>"; };
 		930FA76F9F77D09197BFCE67 /* TVChartScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVChartScreen.swift; sourceTree = "<group>"; };
 		99D2E5DBA0F82B5502B5A847 /* MarketView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketView.swift; sourceTree = "<group>"; };
 		9B615CCFC96EE77EFD9C1E12 /* ChainTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainTableView.swift; sourceTree = "<group>"; };
@@ -151,6 +153,7 @@
 			children = (
 				F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */,
 				99D2E5DBA0F82B5502B5A847 /* MarketView.swift */,
+				8EE3543AF00B96C91F4F3AE4 /* SetupChart.swift */,
 				27B16483E61C8724ED6FE4D9 /* SetupScannerModel.swift */,
 				EAA195AE9992D5EACDB1CC35 /* SetupWatchlistSection.swift */,
 				40A5D6FCC7B49543F8C25459 /* SymbolDetailView.swift */,
@@ -372,6 +375,7 @@
 				E8282CA5F05353CEB48DF4DF /* QuantConnectExport.swift in Sources */,
 				35034C3BC7FA945F73EF97B5 /* QuantConnectExportSheet.swift in Sources */,
 				1B3E121354A9AD5C915DF498 /* QuantConnectTemplates.swift in Sources */,
+				4A70DF72AADA417485371C4A /* SetupChart.swift in Sources */,
 				FCEFD9D1997894A1BDF857D4 /* SetupScannerModel.swift in Sources */,
 				4BD13FD5BB6043321AEC942E /* SetupWatchlistSection.swift in Sources */,
 				61EA44B983B4A14EBBCFFAD0 /* SymbolDetailView.swift in Sources */,
@@ -440,7 +444,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.21.0;
+				MARKETING_VERSION = 0.22.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -506,7 +510,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.21.0;
+				MARKETING_VERSION = 0.22.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
