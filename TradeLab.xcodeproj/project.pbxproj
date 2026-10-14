@@ -10,6 +10,7 @@
 		020D1482E852785CE1BC6A12 /* TicketBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9227781F4C154CE935A5481 /* TicketBar.swift */; };
 		04C5848B3D50256C07C5A762 /* TVChartScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 930FA76F9F77D09197BFCE67 /* TVChartScreen.swift */; };
 		0547DE0BEBDB7D1D37E75374 /* ChartRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E52D921CC604C2655B84436 /* ChartRenderer.swift */; };
+		0D07E3DFF207D8F7C5BED47B /* PaperTradingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC435A7A7938FFB246925A57 /* PaperTradingModel.swift */; };
 		1050444E950ACA066A76429F /* TeamModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 606189AC4CDFF6BFD8376EC2 /* TeamModel.swift */; };
 		10E25232E0591DEB26CC8F50 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEDCD822B79CEC56631D5B80 /* KeychainStore.swift */; };
 		13BF54E46B248E4871F8BFB8 /* ChartCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70172DD98FA84E8BD0322407 /* ChartCore.swift */; };
@@ -40,6 +41,7 @@
 		70822FCD9338785904F62787 /* DrawTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF049801FEAA80187F0633F /* DrawTools.swift */; };
 		714906E198FADF82FEA56B41 /* MarketData in Frameworks */ = {isa = PBXBuildFile; productRef = 3123C9E9AB2F23002425C68A /* MarketData */; };
 		75417E8B6FFB56991F730365 /* Backtest in Frameworks */ = {isa = PBXBuildFile; productRef = 46251014114CA53FCEEEE51E /* Backtest */; };
+		938BA07990F54F970A146990 /* PaperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B289E00AB462A3B5F3DA4D72 /* PaperView.swift */; };
 		9501384FB800091BF03B5C03 /* IndicatorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12704F2F690463CC4BD95B7E /* IndicatorEngine.swift */; };
 		95D2984A590F00942E065C7B /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ABB7A2C520AE08A0127DC9C /* AppModel.swift */; };
 		9AE3E3A3CD9D748A66615B8C /* NativeChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DDEF1791B4B63EF7BE1DF6E /* NativeChartView.swift */; };
@@ -98,6 +100,7 @@
 		A01C5379BE4BD2E89BEA72F6 /* VolumeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeProfile.swift; sourceTree = "<group>"; };
 		A863CEEF685D39E91D1549C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		ADF049801FEAA80187F0633F /* DrawTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawTools.swift; sourceTree = "<group>"; };
+		B289E00AB462A3B5F3DA4D72 /* PaperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperView.swift; sourceTree = "<group>"; };
 		BC1D63A20FF951C1A9192A9C /* QuantConnectTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuantConnectTemplates.swift; sourceTree = "<group>"; };
 		C9A40BBA048511D7109879E8 /* SymbolResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolResolver.swift; sourceTree = "<group>"; };
 		D5549C95496CD8F1C059C877 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
@@ -108,6 +111,7 @@
 		E150A5AE3B96B9B924188524 /* AgentTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTools.swift; sourceTree = "<group>"; };
 		EAA195AE9992D5EACDB1CC35 /* SetupWatchlistSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupWatchlistSection.swift; sourceTree = "<group>"; };
 		EB28772DCBD2CF18EA826F5B /* BacktestTradeChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacktestTradeChart.swift; sourceTree = "<group>"; };
+		EC435A7A7938FFB246925A57 /* PaperTradingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperTradingModel.swift; sourceTree = "<group>"; };
 		F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTVChart.swift; sourceTree = "<group>"; };
 		FD84F5C2C40851ACAE4DF4A4 /* ChartViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartViewModel.swift; sourceTree = "<group>"; };
 		FDF6B48124325C9894C0AAD9 /* MarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownText.swift; sourceTree = "<group>"; };
@@ -174,6 +178,7 @@
 				B1A9CBBFFC82FF505CA1A394 /* Backtest */,
 				3654223FF7D47553E07EC091 /* Market */,
 				EDB42301B83A9F4737141E84 /* Options */,
+				961F796CE6CDC44425C0D04E /* Paper */,
 				1FF6BF88A312087F7500F8E6 /* Resources */,
 				DEEEF380BFC2BF71F41933A8 /* Shared */,
 				E06F6B0907E6D414CABF22C5 /* TVChart */,
@@ -196,6 +201,15 @@
 				3778FB31437AD0B081004530 /* TradeLabApp.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		961F796CE6CDC44425C0D04E /* Paper */ = {
+			isa = PBXGroup;
+			children = (
+				EC435A7A7938FFB246925A57 /* PaperTradingModel.swift */,
+				B289E00AB462A3B5F3DA4D72 /* PaperView.swift */,
+			);
+			path = Paper;
 			sourceTree = "<group>";
 		};
 		9DA797640B44530B21B9433F = {
@@ -379,6 +393,8 @@
 				D8214997B6DD392C3DAEA7FC /* MarketView.swift in Sources */,
 				9AE3E3A3CD9D748A66615B8C /* NativeChartView.swift in Sources */,
 				6578F1A65AED6A535BB1E5DB /* OptionsHomeView.swift in Sources */,
+				0D07E3DFF207D8F7C5BED47B /* PaperTradingModel.swift in Sources */,
+				938BA07990F54F970A146990 /* PaperView.swift in Sources */,
 				695E38F2148F025E8913DCB1 /* PayoffWorkspaceView.swift in Sources */,
 				E8282CA5F05353CEB48DF4DF /* QuantConnectExport.swift in Sources */,
 				35034C3BC7FA945F73EF97B5 /* QuantConnectExportSheet.swift in Sources */,
@@ -452,7 +468,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.23.1;
+				MARKETING_VERSION = 0.24.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -518,7 +534,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.23.1;
+				MARKETING_VERSION = 0.24.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
