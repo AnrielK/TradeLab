@@ -23,6 +23,7 @@
 		32A3992120C503F3018A0E63 /* SymbolResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9A40BBA048511D7109879E8 /* SymbolResolver.swift */; };
 		35034C3BC7FA945F73EF97B5 /* QuantConnectExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43FBE1A5EB79CBBEDEC290D2 /* QuantConnectExportSheet.swift */; };
 		377FB1AD918FE9267D35BE78 /* AgentTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = E150A5AE3B96B9B924188524 /* AgentTools.swift */; };
+		3E7F2B973EA446760533626C /* BacktestTVChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9872E19C9704F916E41A9147 /* BacktestTVChart.swift */; };
 		4327D4CC4142E12AF634C0B2 /* BacktestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85326634DBAF1DF87DDB5A18 /* BacktestView.swift */; };
 		462B393F161FF2568B8A70AB /* ChartAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A1A2CC7CF2D07AB465146C /* ChartAnnotations.swift */; };
 		49694428DE8971D64AEBE35F /* EmbeddedTVChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9F851B6B03D800781B5EBA4 /* EmbeddedTVChart.swift */; };
@@ -90,6 +91,7 @@
 		8CE0967A923111497EB0C2DB /* ChainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainStore.swift; sourceTree = "<group>"; };
 		8EE3543AF00B96C91F4F3AE4 /* SetupChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupChart.swift; sourceTree = "<group>"; };
 		930FA76F9F77D09197BFCE67 /* TVChartScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVChartScreen.swift; sourceTree = "<group>"; };
+		9872E19C9704F916E41A9147 /* BacktestTVChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacktestTVChart.swift; sourceTree = "<group>"; };
 		99D2E5DBA0F82B5502B5A847 /* MarketView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketView.swift; sourceTree = "<group>"; };
 		9B615CCFC96EE77EFD9C1E12 /* ChainTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainTableView.swift; sourceTree = "<group>"; };
 		9E52D921CC604C2655B84436 /* ChartRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartRenderer.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 			children = (
 				7E2E16E839D633E6E527DABD /* BacktestData.swift */,
 				EB28772DCBD2CF18EA826F5B /* BacktestTradeChart.swift */,
+				9872E19C9704F916E41A9147 /* BacktestTVChart.swift */,
 				85326634DBAF1DF87DDB5A18 /* BacktestView.swift */,
 				6E4DB1284D7F61B64217C910 /* QuantConnectExport.swift */,
 				43FBE1A5EB79CBBEDEC290D2 /* QuantConnectExportSheet.swift */,
@@ -354,6 +357,7 @@
 				A660ECB7406D2F2F8DE6CB30 /* AppInfo.swift in Sources */,
 				95D2984A590F00942E065C7B /* AppModel.swift in Sources */,
 				9BE57D7D5C23700E47566AA6 /* BacktestData.swift in Sources */,
+				3E7F2B973EA446760533626C /* BacktestTVChart.swift in Sources */,
 				FBD96EFBFC505F10BCA1432F /* BacktestTradeChart.swift in Sources */,
 				4327D4CC4142E12AF634C0B2 /* BacktestView.swift in Sources */,
 				2D6B93D01BB0CE7E723A86BD /* ChainStore.swift in Sources */,
@@ -448,7 +452,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.23.0;
+				MARKETING_VERSION = 0.23.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -514,7 +518,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.23.0;
+				MARKETING_VERSION = 0.23.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
