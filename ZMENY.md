@@ -1,5 +1,19 @@
 # Změny
 
+## 0.24.0 – 2026-10-14
+
+- **Demo účet** (nová záložka Demo): virtuálních 10 000 USD pro živé testování strategií.
+  Při otevření záložky, návratu do aplikace (nejvýš jednou za 15 minut) nebo stažením dolů se pozice
+  přecení aktuální cenou a zavřou na stopu / cíli strategie; pak se projdou tickery skeneru a čerstvé vstupy
+  Breakoutu, Odrazu od KP a Trendlinie (z uzavřených denních svíček, nejvýš 2 svíčky staré) se otevřou za
+  aktuální cenu se stopem a cílem strategie. Velikost pozice podle rizika ke stopu (1 % účtu, nejvýš 20 %
+  účtu na pozici, nejvýš 8 pozic), long i short, každý signál jen jednou. Ručně: swipe „Demo“ u řádku
+  watchlistu setupů, zavření swipem u pozice. Přehled účtu, otevřené pozice, události a historie; reset účtu.
+- Obchody z backtestu se kreslí jen do grafu backtestu (vlastní úložiště) – už nejsou vidět v detailu
+  tickeru ani v běžném grafu; staré kresby se při dalším backtestu uklidí.
+- Backtest převezme vybraný ticker: otevřený detail na Trhu nebo ticker z Opcí. Když není vybraný žádný,
+  pole tickeru je prázdné.
+
 ## 0.23.1 – 2026-10-14
 
 - **Graf obchodů v Backtestu** má vlastní období: historie o 10 % delší než backtest (celé období je vidět

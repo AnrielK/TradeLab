@@ -759,7 +759,9 @@ final class ChartViewModel {
 
     /// Klíč je jen podle symbolu — kresby se ukládají v čase, takže mají
     /// platit napříč všemi rozlišeními.
-    private var drawingsKey: String { "drawings::\(symbol)" }
+    private var drawingsKey: String { "\(drawingsNamespace)::\(symbol)" }
+    /// Úložiště kreseb: „drawings“ = běžný graf, „backtestChart“ = graf obchodů z backtestu (odděleně).
+    var drawingsNamespace = "drawings"
 
     /// Znovu načte kresby z úložiště (agent je mezitím mohl změnit).
     func reloadDrawingsFromStorage() {

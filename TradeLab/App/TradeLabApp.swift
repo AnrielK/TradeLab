@@ -18,6 +18,7 @@ struct TradeLabApp: App {
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var model = model
@@ -31,8 +32,16 @@ struct RootView: View {
             BacktestView()
                 .tabItem { Label("Backtest", systemImage: "testtube.2") }
                 .tag(AppTab.backtest)
+            PaperView()
+                .tabItem { Label("Demo", systemImage: "banknote") }
+                .tag(AppTab.paper)
         }
         .task { await model.refreshRiskFreeRate() }
+        // Demo účet: pozice a nové signály se vyhodnotí po návratu do aplikace (nejvýš jednou za 15 min).
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await model.paper.runIfStale(watchlist: model.watchlist, scanner: model.scanner) }
+        }
         .sheet(isPresented: $model.showAgent) {
             AgentView()
                 .presentationDetents([.large])

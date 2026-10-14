@@ -27,6 +27,8 @@ struct TVChartScreen: View {
     var initialSymbol: String? = nil
     /// Interval při otevření (např. „1D“, „1W“, „240“) – jinak poslední použitý.
     var initialResolution: String? = nil
+    /// Úložiště kreseb (graf backtestu má vlastní).
+    var drawingsNamespace: String = "drawings"
 
     @State private var vm = ChartViewModel()
     @State private var wheel: WheelSelection?
@@ -65,6 +67,8 @@ struct TVChartScreen: View {
             .padding(.top, 4)
         }
         .onAppear {
+            vm.drawingsNamespace = drawingsNamespace
+            if drawingsNamespace != "drawings" { vm.persistsSession = false }
             if let initialSymbol, !initialSymbol.isEmpty {
                 let current = vm.symbol.split(separator: ":").last.map(String.init) ?? vm.symbol
                 if current.uppercased() != initialSymbol.uppercased() {

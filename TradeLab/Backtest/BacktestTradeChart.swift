@@ -88,16 +88,21 @@ enum BacktestTradeChart {
         replace(tv, with: [])
     }
 
-    /// Nahradí kresby z minulého backtestu (podle uložených id), ostatní kresby nechá.
+    /// Kresby backtestu mají vlastní úložiště – v detailu tickeru ani v běžném grafu nejsou vidět.
+    static let namespace = "backtestChart"
+
     private static func replace(_ tvSymbol: String, with drawings: [Drawing]) {
         let defaults = UserDefaults.standard
+        // Úklid po starších verzích, které kreslily do běžného grafu.
         let old = Set((defaults.stringArray(forKey: idsKey(tvSymbol)) ?? []).compactMap(UUID.init(uuidString:)))
-        var all = ChartAnnotations.load(tvSymbol).filter { !old.contains($0.id) }
-        all += drawings
-        if let data = try? JSONEncoder().encode(all) {
-            defaults.set(data, forKey: ChartAnnotations.key(tvSymbol))
+        if !old.isEmpty {
+            let kept = ChartAnnotations.load(tvSymbol).filter { !old.contains($0.id) }
+            if let data = try? JSONEncoder().encode(kept) { defaults.set(data, forKey: ChartAnnotations.key(tvSymbol)) }
+            defaults.removeObject(forKey: idsKey(tvSymbol))
         }
-        defaults.set(drawings.map(\.id.uuidString), forKey: idsKey(tvSymbol))
+        if let data = try? JSONEncoder().encode(drawings) {
+            defaults.set(data, forKey: "\(namespace)::\(tvSymbol)")
+        }
         NotificationCenter.default.post(name: .chartDrawingsChanged, object: tvSymbol)
     }
 

@@ -13,6 +13,7 @@ Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a o
   pravděpodobnost zisku, Greeks celé pozice; panel „Hodnoty v bodě“ (teoretická hodnota a P/L nohou, greeks pro vybranou cenu, den a IV).
 - **Graf TradingView** – převzatý TVChart (real-time data, indikátory, kreslení) na celou obrazovku.
 - **Watchlist setupů** – skener strategií Breakout/Breakdown, Odraz od KP a Trendlinie (včetně hledání trojúhelníků) na likvidních akciích: čerstvé vstupy i kandidáti v konsolidaci těsně u hladiny, s hladinou, stopem, cílem a návrhem spreadu podle volatility a likvidity opcí.
+- **Demo účet** – virtuálních 10 000 USD, strategie obchodují naživo na denních svíčkách (vstupy ze skeneru, stop a cíl strategie, velikost podle rizika).
 - **Backtest** – strategie Trendlinie a trojúhelník (průraz trojúhelníku, odraz od / průraz trendline), Odraz od klouzavých průměrů 20/50/100/200 (reverzní svíčkový pattern, ATR stop, Fibonacci cíl 1,5–3 R) a Breakout/Breakdown (3 vstupy: těsně před průrazem, po průrazu, pullback PNR; filtr týdenního grafu, denních KP a PSAR; stop ATR, cíl Fibonacci) a buy & hold na datech z Yahoo nebo TradingView (1D–1H), metriky, křivka kapitálu vs. SPY, drawdown, obchody. Export strategie jako Python skript pro QuantConnect (free plán, copy & paste).
 - **Agent** – chat s Claude, ChatGPT nebo Gemini (vlastní API klíč v Keychainu), který si sám volá nástroje aplikace:
   ceny, statistiky historie, opční řetězce, ocenění, analýzu strategií z reálných kontraktů a backtest.

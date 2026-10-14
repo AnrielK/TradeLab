@@ -7,6 +7,7 @@ enum AppTab: Hashable {
     case market
     case options
     case backtest
+    case paper
 }
 
 @MainActor
@@ -15,7 +16,22 @@ final class AppModel {
     let client = YahooFinanceClient.shared
     let chainStore: ChainStore
 
-    var selectedTab: AppTab = .market
+    var selectedTab: AppTab = .market {
+        didSet { if oldValue != selectedTab { previousTab = oldValue } }
+    }
+    /// Záložka, ze které uživatel přišel (pro předvyplnění tickeru v Backtestu).
+    private(set) var previousTab: AppTab = .market
+    /// Navigace na záložce Trh – poslední prvek je otevřený detail tickeru.
+    var marketPath: [String] = []
+
+    /// Vybraný ticker: otevřený detail na Trhu, nebo ticker záložky Opce. `nil` = nic vybraného.
+    var selectedTicker: String? {
+        switch previousTab {
+        case .market: return marketPath.last
+        case .options: return optionsSymbol
+        default: return nil
+        }
+    }
     /// Agent otevřený jako vysouvací okno nad libovolnou záložkou.
     var showAgent = false
 
@@ -24,6 +40,8 @@ final class AppModel {
     var quotes: [String: QuoteSnapshot] = [:]
     /// Skener opčních setupů (watchlist na záložce Trh).
     let scanner = SetupScannerModel()
+    /// Demo účet pro živé testování strategií.
+    let paper = PaperTradingModel()
 
     // Sazba pro ocenění
     var riskFreeRate: Double = 0.04

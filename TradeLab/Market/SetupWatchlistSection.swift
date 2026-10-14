@@ -40,6 +40,14 @@ struct SetupWatchlistSection: View {
                         .tint(.blue)
                 }
                 .swipeActions(edge: .leading) {
+                    Button("Demo", systemImage: "banknote") {
+                        let hit = result.hit
+                        Task {
+                            await model.paper.open(symbol: hit.symbol, side: hit.direction, stop: hit.stop,
+                                                   target: hit.target, source: hit.title + " (ručně)")
+                        }
+                    }
+                    .tint(.green)
                     if !model.watchlist.contains(result.hit.symbol) {
                         Button("Sledovat", systemImage: "star") { model.addToWatchlist(result.hit.symbol) }
                             .tint(.orange)

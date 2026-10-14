@@ -38,6 +38,7 @@ struct BacktestTVChart: View {
         vm.indicatorsEnabled = false
         vm.persistsSession = false
         vm.showsLegend = false
+        vm.drawingsNamespace = BacktestTradeChart.namespace
         return vm
     }
 
@@ -88,7 +89,8 @@ struct BacktestTVChart: View {
             if shown { vm.disconnect() } else { vm.connect() }
         }
         .fullScreenCover(isPresented: $showFullScreen) {
-            TVChartScreen(initialSymbol: symbol)
+            TVChartScreen(initialSymbol: symbol, initialResolution: candles.resolution,
+                          drawingsNamespace: BacktestTradeChart.namespace)
         }
     }
 

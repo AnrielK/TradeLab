@@ -258,8 +258,10 @@ struct BacktestView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { AgentToolbarButton() }
             }
-            .onAppear {
-                if bt.symbol.isEmpty { bt.symbol = model.optionsSymbol }
+            // Ticker vybraný na Trhu (otevřený detail) nebo na Opcích; jinak prázdné pole.
+            .onAppear { bt.symbol = model.selectedTicker ?? "" }
+            .onChange(of: model.selectedTab) { _, tab in
+                if tab == .backtest { bt.symbol = model.selectedTicker ?? "" }
             }
         }
     }

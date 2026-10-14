@@ -8,7 +8,8 @@ struct MarketView: View {
     @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
-        NavigationStack {
+        @Bindable var model = model
+        NavigationStack(path: $model.marketPath) {
             List {
                 if !query.isEmpty {
                     Section("Výsledky hledání") {
