@@ -984,6 +984,10 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
         self.credit_tp, self.credit_stop = {{CREDIT_TP}}, {{CREDIT_STOP}}
         self.debit_tp, self.debit_stop = {{DEBIT_TP}}, {{DEBIT_STOP}}
         self.exit_dte = {{EXIT_DTE}}
+        # Výstup podle strategie: opce kopírují akciové obchody, před expirací se přerolují.
+        self.follow = {{FOLLOW}}
+        self.entry_signal = None   # nový vstup strategie, na který se čeká
+        self.roll_signal = None
 
         self.position = None
         self.blocked = None
@@ -992,7 +996,10 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
 
     def on_daily(self, bar):
         week = tuple(bar.time.isocalendar()[:2])
-        self.target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close, week))
+        new_target = self.signal.update(Bar(bar.open, bar.high, bar.low, bar.close, week))
+        if new_target != self.target:
+            self.entry_signal = new_target
+        self.target = new_target
         self.closes.append(bar.close)
         if len(self.closes) > 21:
             rets = [math.log(self.closes[k] / self.closes[k - 1]) for k in range(len(self.closes) - 20, len(self.closes))]
@@ -1030,13 +1037,16 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
         if self.position is not None:
             self.manage()
         if self.position is None:
-            if self.blocked is not None and self.target != self.blocked:
-                self.blocked = None
+            if self.entry_signal is not None and self.entry_signal != self.target:
+                self.entry_signal = None
+            wanted = self.entry_signal is not None or self.roll_signal == self.target
             rank = self.vol_rank()
-            if self.blocked is None and rank is not None and chain is not None:
+            if wanted and rank is not None and chain is not None:
                 play = self.choose(self.target, rank)
                 if play:
                     self.open(play, chain, rank)
+                    self.entry_signal = None
+            self.roll_signal = None
 
     def mid(self, symbol):
         sec = self.securities[symbol]
@@ -1050,7 +1060,12 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
         pnl = value - p["premium"]
         days_left = (p["expiry"].date() - self.time.date()).days
         reason = None
-        if p["credit"]:
+        if self.target != p["signal"]:
+            reason = "signal"
+        elif self.follow:
+            if days_left <= self.exit_dte:
+                reason = "roll"
+        elif p["credit"]:
             credit = -p["premium"]
             if pnl >= credit * self.credit_tp:
                 reason = "cil"
@@ -1063,12 +1078,10 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
                 reason = "stop"
         if reason is None and days_left <= self.exit_dte:
             reason = "cas"
-        if reason is None and self.target != p["signal"]:
-            reason = "signal"
         if reason:
             for sym, side in p["legs"]:
                 self.liquidate(sym, tag=reason)
-            self.blocked = p["signal"] if reason == "stop" else None
+            self.roll_signal = p["signal"] if reason == "roll" else None
             self.position = None
 
     def open(self, play, chain, rank):

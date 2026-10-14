@@ -269,6 +269,7 @@ extension OptionsBacktest {
         var signal: Int
         var iv: Double
         var rank: Double
+        var isRoll = false
         /// Kotace nohou po dnech.
         var quotes: [String: [String: HistoricalOptionQuote]]
         var lastQuotes: [String: HistoricalOptionQuote]
@@ -291,7 +292,7 @@ extension OptionsBacktest {
             throw HistoricalOptionsError.noData("Málo dat podkladu.")
         }
 
-        let signals = config.signal.targets(bars: bars, allowShort: true)
+        let signals = config.signal.targets(bars: bars, allowShort: config.allowBearish)
         let years = max(last.date.timeIntervalSince(first.date) / (365.25 * 86_400), 1 / 365)
         let hv = rollingVolatility(bars.map(\.close), window: 20, periodsPerYear: Double(n) / years)
         let rankWindow = max(Int((Double(n) / years).rounded()), 20)
@@ -314,8 +315,9 @@ extension OptionsBacktest {
         var points = [EquityPoint(date: first.date, equity: equity, drawdown: 0, position: 0)]
         var trades: [OptionTrade] = []
         var position: HistoricalPosition? = nil
-        var blockedSignal: Int? = nil
-        var pending: (play: OptionPlay, signal: Int, rank: Double)? = nil
+        var rollSignal: Int? = nil
+        var waitingEntry: Int? = nil     // vstup strategie, na který ještě chybí volatilita
+        var pending: (play: OptionPlay, signal: Int, rank: Double, roll: Bool)? = nil
         var skipped = 0
         var lastFailure: Error? = nil
 
@@ -336,6 +338,7 @@ extension OptionsBacktest {
                                                         futureDays: Array(tradingDays[i...]),
                                                         equity: equity, signal: plan.signal, rank: plan.rank,
                                                         config: config, source: source, fill: fill)
+                    position?.isRoll = plan.roll
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
@@ -364,8 +367,12 @@ extension OptionsBacktest {
                 marked = current.equityAtEntry - current.entryCosts + pnlPerShare * 100 * current.contracts
 
                 var reason: String? = nil
-                if expired {
+                if signals[i] != current.signal {
+                    reason = config.followStrategy ? "výstup strategie" : "změna signálu"
+                } else if expired {
                     reason = "expirace"
+                } else if config.followStrategy {
+                    if daysLeft <= Double(config.exitDaysToExpiry) { reason = "rolování" }
                 } else if current.play.isCredit {
                     let credit = -current.entryPremium
                     if pnlPerShare >= credit * config.creditTakeProfit { reason = "cíl zisku" }
@@ -376,7 +383,6 @@ extension OptionsBacktest {
                     else if -pnlPerShare >= debit * config.debitStop { reason = "stop" }
                 }
                 if reason == nil, daysLeft <= Double(config.exitDaysToExpiry) { reason = "čas" }
-                if reason == nil, signals[i] != current.signal { reason = "změna signálu" }
 
                 if let reason {
                     let exitValue: Double = expired ? value : current.legs.reduce(0) { total, leg in
@@ -395,8 +401,9 @@ extension OptionsBacktest {
                         entrySpot: current.entrySpot, exitSpot: bar.close, entryPremium: current.entryPremium,
                         exitValue: exitValue, contracts: current.contracts,
                         maxLoss: current.maxLossPerShare * 100 * current.contracts, pnl: pnl, exitReason: reason,
-                        impliedVol: current.iv, volRank: current.rank))
-                    blockedSignal = reason == "stop" ? current.signal : nil
+                        impliedVol: current.iv, volRank: current.rank, isRoll: current.isRoll))
+                    rollSignal = config.followStrategy && (reason == "rolování" || reason == "expirace")
+                        && signals[i] == current.signal ? current.signal : nil
                     position = nil
                 } else {
                     position = current
@@ -404,11 +411,16 @@ extension OptionsBacktest {
             }
 
             if position == nil, i < n - 1 {
-                if let blocked = blockedSignal, signals[i] != blocked { blockedSignal = nil }
-                if blockedSignal == nil, let r = rank(at: i), let play = choose(signal: signals[i], rank: r, config: config) {
-                    pending = (play, signals[i], r)
+                if signals[i] != (i > 1 ? signals[i - 1] : 0) { waitingEntry = signals[i] }
+                if waitingEntry != signals[i] { waitingEntry = nil }
+                let isRoll = rollSignal != nil && rollSignal == signals[i]
+                if waitingEntry != nil || isRoll, let r = rank(at: i),
+                   let play = choose(signal: signals[i], rank: r, config: config) {
+                    pending = (play, signals[i], r, isRoll && waitingEntry == nil)
+                    waitingEntry = nil
                 }
             }
+            if position == nil { rollSignal = nil }
 
             peak = max(peak, marked)
             let exposure = position.map { $0.play.direction == 0 ? 1 : $0.play.direction } ?? 0
@@ -425,7 +437,7 @@ extension OptionsBacktest {
                 expiration: HistoricalDay.date(current.expiration) ?? last.date, entrySpot: current.entrySpot,
                 exitSpot: last.close, entryPremium: current.entryPremium, exitValue: value, contracts: current.contracts,
                 maxLoss: current.maxLossPerShare * 100 * current.contracts, pnl: pnl, exitReason: "otevřený",
-                impliedVol: current.iv, volRank: current.rank))
+                impliedVol: current.iv, volRank: current.rank, isRoll: current.isRoll))
         }
 
         if trades.isEmpty, let lastFailure { throw lastFailure }

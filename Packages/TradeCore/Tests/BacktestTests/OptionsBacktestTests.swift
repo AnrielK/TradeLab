@@ -74,3 +74,23 @@ final class OptionsBacktestTests: XCTestCase {
         XCTAssertFalse(result.playCounts.isEmpty)
     }
 }
+
+final class OptionsMatchStockTests: XCTestCase {
+    /// Opce s výstupem podle strategie mají stejné obchody jako akcie (navíc jen přerolování před expirací).
+    func testOptionTradesFollowStockTrades() {
+        let loose = BreakoutSettings(weeklyFilter: false, dailyFilter: false, requireMACross: false)
+        for seed: UInt64 in [1, 9, 14] {
+            for allowShort in [false, true] {
+                let bars = BreakoutTests.series(seed: seed)
+                let strategy = BacktestStrategy.breakout(loose)
+                let stock = BacktestEngine.run(bars: bars, config: BacktestConfig(strategy: strategy, allowShort: allowShort))
+                let options = OptionsBacktest.run(bars: bars, config: OptionsBacktestConfig(signal: strategy,
+                                                                                         allowBearish: allowShort))
+                XCTAssertEqual(options.strategyTradeCount, stock.trades.count, "seed \(seed) short \(allowShort)")
+                let stockEntries = stock.trades.map(\.entryDate)
+                let optionEntries = options.trades.filter { !$0.isRoll }.map(\.entryDate)
+                XCTAssertEqual(optionEntries, stockEntries, "seed \(seed) short \(allowShort)")
+            }
+        }
+    }
+}

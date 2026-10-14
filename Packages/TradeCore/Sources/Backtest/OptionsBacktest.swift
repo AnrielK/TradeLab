@@ -71,6 +71,9 @@ public struct OptionsBacktestConfig: Hashable, Sendable {
     public var debitStop: Double
     /// Zavřít, když zbývá méně dní do expirace.
     public var exitDaysToExpiry: Int
+    /// Výstup podle strategie: opce se drží přesně jako akciový obchod (stop a cíl strategie),
+    /// bez vlastního cíle a stopu na prémii; před expirací se pozice přeroluje.
+    public var followStrategy: Bool
     /// Poplatek za kontrakt a nohu (USD) a skluz jako zlomek ceny nohy.
     public var commission: Double
     public var slippage: Double
@@ -82,7 +85,7 @@ public struct OptionsBacktestConfig: Hashable, Sendable {
                 widthPct: Double = 0.05, ivMultiplier: Double = 1.1, highVolRank: Double = 50,
                 riskPerTrade: Double = 0.05, creditTakeProfit: Double = 0.5, debitTakeProfit: Double = 1.0,
                 creditStop: Double = 2.0, debitStop: Double = 0.5, exitDaysToExpiry: Int = 7,
-                commission: Double = 0.65, slippage: Double = 0.03, riskFreeRate: Double = 0.04,
+                followStrategy: Bool = true, commission: Double = 0.65, slippage: Double = 0.03, riskFreeRate: Double = 0.04,
                 initialCapital: Double = 10_000) {
         self.signal = signal
         self.selection = selection
@@ -98,6 +101,7 @@ public struct OptionsBacktestConfig: Hashable, Sendable {
         self.creditStop = creditStop
         self.debitStop = debitStop
         self.exitDaysToExpiry = exitDaysToExpiry
+        self.followStrategy = followStrategy
         self.commission = commission
         self.slippage = slippage
         self.riskFreeRate = riskFreeRate
@@ -141,6 +145,8 @@ public struct OptionTrade: Identifiable, Hashable, Sendable {
     public var exitReason: String
     public var impliedVol: Double
     public var volRank: Double
+    /// Přerolování pozice před expirací v rámci stejného obchodu strategie.
+    public var isRoll: Bool = false
 
     public var returnOnRisk: Double { maxLoss > 0 ? pnl / maxLoss : 0 }
     public var legsText: String { legs.map(\.label).joined(separator: " / ") }
@@ -157,6 +163,10 @@ public struct OptionsBacktestResult: Sendable {
     public var pricing: String = "Simulace: Black-Scholes, IV z historické volatility"
     /// Kolikrát se nepodařilo otevřít pozici (chybějící kotace).
     public var skippedEntries: Int = 0
+
+    /// Obchody strategie (bez přerolování stejné pozice před expirací) – odpovídá počtu akciových obchodů.
+    public var strategyTradeCount: Int { trades.filter { !$0.isRoll }.count }
+    public var rollCount: Int { trades.filter(\.isRoll).count }
 
     public struct PlaySummary: Identifiable, Hashable, Sendable {
         public var play: OptionPlay
@@ -197,6 +207,7 @@ public enum OptionsBacktest {
         var signal: Int
         var iv: Double
         var rank: Double
+        var isRoll = false
     }
 
     public static func run(bars: [BacktestBar], config: OptionsBacktestConfig) -> OptionsBacktestResult {
@@ -209,7 +220,7 @@ public enum OptionsBacktest {
                                          buyAndHold: hold.buyAndHold, buyAndHoldMetrics: hold.buyAndHoldMetrics)
         }
 
-        let signals = config.signal.targets(bars: bars, allowShort: true)
+        let signals = config.signal.targets(bars: bars, allowShort: config.allowBearish)
         let years = max(last.date.timeIntervalSince(first.date) / (365.25 * 86_400), 1 / 365)
         let barsPerYear = Double(n) / years
         let hv = rollingVolatility(bars.map(\.close), window: 20, periodsPerYear: barsPerYear)
@@ -220,8 +231,9 @@ public enum OptionsBacktest {
         var points = [EquityPoint(date: first.date, equity: equity, drawdown: 0, position: 0)]
         var trades: [OptionTrade] = []
         var position: Position? = nil
-        var blockedSignal: Int? = nil    // po stopu se čeká na změnu signálu
-        var pending: (play: OptionPlay, signal: Int, rank: Double)? = nil
+        var rollSignal: Int? = nil       // pozice zavřená kvůli expiraci, obchod strategie pořád trvá
+        var waitingEntry: Int? = nil     // vstup strategie, na který ještě chybí volatilita
+        var pending: (play: OptionPlay, signal: Int, rank: Double, roll: Bool)? = nil
 
         for i in 1..<n {
             let bar = bars[i]
@@ -232,6 +244,7 @@ public enum OptionsBacktest {
                 let openIV = max((hv[i - 1] ?? 0.25) * config.ivMultiplier, 0.05)
                 position = open(plan.play, spot: bar.open, date: bar.date, iv: openIV, equity: equity,
                                 signal: plan.signal, rank: plan.rank, config: config)
+                position?.isRoll = plan.roll
             }
             pending = nil
 
@@ -244,8 +257,12 @@ public enum OptionsBacktest {
                 marked = current.equityAtEntry - current.entryCosts + pnlPerShare * 100 * current.contracts
 
                 var reason: String? = nil
-                if daysLeft <= 0 {
+                if signals[i] != current.signal {
+                    reason = config.followStrategy ? "výstup strategie" : "změna signálu"
+                } else if daysLeft <= 0 {
                     reason = "expirace"
+                } else if config.followStrategy {
+                    if daysLeft <= Double(config.exitDaysToExpiry) { reason = "rolování" }
                 } else if current.play.isCredit {
                     let credit = -current.entryPremium
                     if pnlPerShare >= credit * config.creditTakeProfit { reason = "cíl zisku" }
@@ -256,7 +273,6 @@ public enum OptionsBacktest {
                     else if -pnlPerShare >= debit * config.debitStop { reason = "stop" }
                 }
                 if reason == nil, daysLeft <= Double(config.exitDaysToExpiry) { reason = "čas" }
-                if reason == nil, signals[i] != current.signal { reason = "změna signálu" }
 
                 if let reason {
                     // Výstup se skluzem proti nám a poplatky.
@@ -272,20 +288,28 @@ public enum OptionsBacktest {
                         exitDate: bar.date, expiration: current.expiration, entrySpot: current.entrySpot,
                         exitSpot: bar.close, entryPremium: current.entryPremium, exitValue: exitValue,
                         contracts: current.contracts, maxLoss: current.maxLossPerShare * 100 * current.contracts,
-                        pnl: pnl, exitReason: reason, impliedVol: current.iv, volRank: current.rank))
-                    blockedSignal = reason == "stop" ? current.signal : nil
+                        pnl: pnl, exitReason: reason, impliedVol: current.iv, volRank: current.rank,
+                        isRoll: current.isRoll))
+                    // Před expirací se pozice přeroluje, pokud obchod strategie pořád trvá.
+                    rollSignal = config.followStrategy && (reason == "rolování" || reason == "expirace")
+                        && signals[i] == current.signal ? current.signal : nil
                     position = nil
                 }
             }
 
             // 3) Plán na další svíčku.
+            // Nová pozice jen při novém vstupu strategie (změna signálu), nebo při přerolování.
             if position == nil, i < n - 1 {
-                if let blocked = blockedSignal, signals[i] != blocked { blockedSignal = nil }
-                if blockedSignal == nil, let rank = volRank(hv, at: i, window: rankWindow),
+                if signals[i] != (i > 1 ? signals[i - 1] : 0) { waitingEntry = signals[i] }
+                if waitingEntry != signals[i] { waitingEntry = nil }
+                let isRoll = rollSignal != nil && rollSignal == signals[i]
+                if waitingEntry != nil || isRoll, let rank = volRank(hv, at: i, window: rankWindow),
                    let play = choose(signal: signals[i], rank: rank, config: config) {
-                    pending = (play, signals[i], rank)
+                    pending = (play, signals[i], rank, isRoll && waitingEntry == nil)
+                    waitingEntry = nil
                 }
             }
+            if position == nil { rollSignal = nil }
 
             peak = max(peak, marked)
             let exposure = position.map { $0.play.direction == 0 ? 1 : $0.play.direction } ?? 0
@@ -303,7 +327,7 @@ public enum OptionsBacktest {
                 exitDate: nil, expiration: current.expiration, entrySpot: current.entrySpot, exitSpot: last.close,
                 entryPremium: current.entryPremium, exitValue: value, contracts: current.contracts,
                 maxLoss: current.maxLossPerShare * 100 * current.contracts, pnl: pnl, exitReason: "otevřený",
-                impliedVol: current.iv, volRank: current.rank))
+                impliedVol: current.iv, volRank: current.rank, isRoll: current.isRoll))
         }
 
         let summary = trades.map { t in

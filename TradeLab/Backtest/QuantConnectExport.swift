@@ -41,6 +41,7 @@ extension QuantConnectExport {
                 "CREDIT_TP": py(o.creditTakeProfit), "CREDIT_STOP": py(o.creditStop),
                 "DEBIT_TP": py(o.debitTakeProfit), "DEBIT_STOP": py(o.debitStop),
                 "EXIT_DTE": "\(o.exitDaysToExpiry)",
+                "FOLLOW": py(o.followStrategy),
             ]) { $1 }
         }
         for (key, value) in values {

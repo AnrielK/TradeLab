@@ -200,6 +200,7 @@ enum AgentToolbox {
                     "risk_pct": Schema.number("Max. ztráta obchodu v % kapitálu (výchozí 5)"),
                     "high_vol_rank": Schema.number("Percentil HV pro „vysokou“ volatilitu (výchozí 50)"),
                     "iv_multiplier": Schema.number("simulated: IV = HV × násobek (výchozí 1.1)"),
+                    "follow_strategy": Schema.boolean("Výstup podle strategie – opce kopírují akciové obchody (stop a cíl strategie, přerolování před expirací); false = vlastní cíl a stop na prémii (výchozí true)"),
                     "pricing": Schema.string("simulated (Black-Scholes, rychlé) nebo historical (skutečné EOD kotace z DoltHubu od 2019, pomalejší)",
                                              enum: ["simulated", "historical"]),
                 ]) { a, _ in a }, required: ["symbol", "strategy"])
@@ -856,6 +857,7 @@ enum AgentToolbox {
             ivMultiplier: input["iv_multiplier"]?.doubleValue ?? 1.1,
             highVolRank: input["high_vol_rank"]?.doubleValue ?? 50,
             riskPerTrade: (input["risk_pct"]?.doubleValue ?? 5) / 100,
+            followStrategy: input["follow_strategy"]?.boolValue ?? true,
             riskFreeRate: model.riskFreeRate)
 
         let historical = input["pricing"]?.stringValue == "historical"
@@ -908,6 +910,8 @@ enum AgentToolbox {
             "options": metrics(result.metrics),
             "buy_and_hold_underlying": metrics(result.buyAndHoldMetrics),
             "plays": .array(plays),
+            "strategy_trades": .number(Double(result.strategyTradeCount)),
+            "rolls": .number(Double(result.rollCount)),
             "last_trades": .array(lastTrades),
             "pricing": .string(result.pricing),
             "skipped_entries": .number(Double(result.skippedEntries)),

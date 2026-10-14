@@ -75,6 +75,8 @@ final class BacktestModel {
     var ivMultiplier = 1.1
     var highVolRank = 50.0
     var creditTakeProfitPct = 50.0
+    /// Opce se drží přesně jako akciový obchod strategie (stop a cíl strategie).
+    var followStrategy = true
     var creditStopMultiple = 2.0
     var debitTakeProfitPct = 100.0
     var debitStopPct = 50.0
@@ -109,7 +111,8 @@ final class BacktestModel {
             daysToExpiry: daysToExpiry, shortDelta: shortDelta, widthPct: widthPct / 100,
             ivMultiplier: ivMultiplier, highVolRank: highVolRank, riskPerTrade: riskPerTradePct / 100,
             creditTakeProfit: creditTakeProfitPct / 100, debitTakeProfit: debitTakeProfitPct / 100,
-            creditStop: creditStopMultiple, debitStop: debitStopPct / 100, riskFreeRate: riskFreeRate)
+            creditStop: creditStopMultiple, debitStop: debitStopPct / 100, followStrategy: followStrategy,
+            riskFreeRate: riskFreeRate)
     }
 
     func run(client: YahooFinanceClient, riskFreeRate: Double) async {
@@ -193,7 +196,7 @@ struct BacktestView: View {
                 if bt.instrument == .options {
                     if let result = bt.optionsResult {
                         metricsSection(name: "Opce", m: result.metrics, h: result.buyAndHoldMetrics,
-                                       footer: "\(result.pricing). Win rate a Ø obchod jsou vůči riziku obchodu." + (result.skippedEntries > 0 ? " Vynechané vstupy bez kotací: \(result.skippedEntries)." : ""))
+                                       footer: optionsFooter(result))
                         playsSection(result)
                         equitySection(equity: result.equity, hold: result.buyAndHold)
                         drawdownSection(equity: result.equity)
@@ -427,18 +430,32 @@ struct BacktestView: View {
             Stepper("Short noha: \(Int(bt.shortDelta * 100))Δ", value: $bt.shortDelta, in: 0.10...0.45, step: 0.05)
             Stepper("Šířka spreadu: \(bt.widthPct.fixed(1)) % ceny", value: $bt.widthPct, in: 1...15, step: 0.5)
             Stepper("Riziko na obchod: \(bt.riskPerTradePct.fixed(0)) % kapitálu", value: $bt.riskPerTradePct, in: 1...20, step: 1)
-            Stepper("Kredit: cíl \(Int(bt.creditTakeProfitPct)) % max. zisku", value: $bt.creditTakeProfitPct, in: 20...100, step: 10)
-            Stepper("Kredit: stop \(bt.creditStopMultiple.fixed(1))× kreditu", value: $bt.creditStopMultiple, in: 0.5...4, step: 0.5)
-            Stepper("Debet: cíl +\(Int(bt.debitTakeProfitPct)) %", value: $bt.debitTakeProfitPct, in: 20...300, step: 10)
-            Stepper("Debet: stop −\(Int(bt.debitStopPct)) %", value: $bt.debitStopPct, in: 20...100, step: 10)
+            Toggle("Výstup podle strategie (stop a cíl strategie)", isOn: $bt.followStrategy)
+            if !bt.followStrategy {
+                Stepper("Kredit: cíl \(Int(bt.creditTakeProfitPct)) % max. zisku", value: $bt.creditTakeProfitPct, in: 20...100, step: 10)
+                Stepper("Kredit: stop \(bt.creditStopMultiple.fixed(1))× kreditu", value: $bt.creditStopMultiple, in: 0.5...4, step: 0.5)
+                Stepper("Debet: cíl +\(Int(bt.debitTakeProfitPct)) %", value: $bt.debitTakeProfitPct, in: 20...300, step: 10)
+                Stepper("Debet: stop −\(Int(bt.debitStopPct)) %", value: $bt.debitStopPct, in: 20...100, step: 10)
+            }
             if bt.optionsPricing == .simulated {
                 Stepper("IV = HV × \(bt.ivMultiplier.fixed(1))", value: $bt.ivMultiplier, in: 0.7...1.6, step: 0.1)
             }
         } header: {
             Text("Opční strategie")
         } footer: {
-            Text("Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok. Výstup: cíl, stop, 7 dní před expirací nebo při změně signálu. Po stopu se čeká na nový signál.")
+            Text(bt.followStrategy
+                 ? "Opce kopírují obchody strategie: otevřou se při vstupu a zavřou při výstupu strategie (její stop nebo cíl), stejně jako akcie. Když se blíží expirace (7 dní) a obchod trvá, pozice se přeroluje do nové expirace. Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok."
+                 : "Vlastní výstup opcí: cíl a stop na prémii, 7 dní před expirací nebo při výstupu strategie. Po výstupu se čeká na nový vstup strategie, takže obchodů není víc než u akcií. Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok.")
         }
+    }
+
+    private func optionsFooter(_ result: OptionsBacktestResult) -> String {
+        var text = "\(result.pricing). Obchody strategie: \(result.strategyTradeCount)"
+        if result.rollCount > 0 { text += " (+ \(result.rollCount) přerolování před expirací)" }
+        text += ". Win rate a Ø obchod jsou vůči riziku opčního obchodu (max. ztráta \(bt.riskPerTradePct.fixed(0)) % kapitálu), "
+        text += "akcie obchodují celým kapitálem – výnos se proto liší, i když jsou vstupy a výstupy stejné."
+        if result.skippedEntries > 0 { text += " Vynechané vstupy bez kotací: \(result.skippedEntries)." }
+        return text
     }
 
     private func playsSection(_ result: OptionsBacktestResult) -> some View {
@@ -482,7 +499,7 @@ struct BacktestView: View {
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(Color.pnl(trade.pnl))
                     }
-                    Text("\(trade.entryDate.formatted(date: .numeric, time: .omitted)) → \(trade.exitDate?.formatted(date: .numeric, time: .omitted) ?? "otevřený") · \(trade.exitReason) · \(trade.entryPremium < 0 ? "kredit" : "debet") \(abs(trade.entryPremium).fixed(2)) · IV \(trade.impliedVol.percent) · HV rank \(Int(trade.volRank)) · RoR \(trade.returnOnRisk.signedPercent)")
+                    Text((trade.isRoll ? "přerolováno · " : "") + "\(trade.entryDate.formatted(date: .numeric, time: .omitted)) → \(trade.exitDate?.formatted(date: .numeric, time: .omitted) ?? "otevřený") · \(trade.exitReason) · \(trade.entryPremium < 0 ? "kredit" : "debet") \(abs(trade.entryPremium).fixed(2)) · IV \(trade.impliedVol.percent) · HV rank \(Int(trade.volRank)) · RoR \(trade.returnOnRisk.signedPercent)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

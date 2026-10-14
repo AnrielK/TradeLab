@@ -1,5 +1,19 @@
 # Změny
 
+## 0.22.1 – 2026-10-14
+
+- **Opční backtest kopíruje obchody strategie.** Dřív měl jiný počet obchodů než akciový:
+  signál se počítal vždy i se shorty (short obsadil strategii a zablokoval další long, i když byly medvědí
+  strategie vypnuté), po vlastním cíli nebo stopu na prémii se pozice znovu otevřela, dokud signál trval,
+  a opce měly vlastní cíl a stop místo stopu a cíle strategie.
+- Nově (výchozí „Výstup podle strategie“): opce se otevře při vstupu strategie a zavře při jejím výstupu,
+  stejně jako akcie; když se blíží expirace a obchod trvá, pozice se přeroluje (v seznamu označeno).
+  Pod výsledkem je počet obchodů strategie a přerolování. Původní výstup na prémii jde zapnout,
+  ani pak se ale znovu nevstupuje bez nového signálu.
+- Výnos opcí se od akcií dál liší: opční obchod riskuje jen 5 % kapitálu, akcie obchodují celým kapitálem,
+  a spready mají omezený zisk a časový rozpad.
+- Totéž v historickém opčním backtestu, u agenta (`follow_strategy`) i v exportu do QuantConnectu.
+
 ## 0.22.0 – 2026-10-14
 
 - **Strategie v grafu**: detail tickeru sám zakreslí do grafu, co strategie vidí – u Breakoutu rezistenci
