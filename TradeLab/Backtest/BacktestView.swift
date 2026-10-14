@@ -77,6 +77,7 @@ final class BacktestModel {
     var creditTakeProfitPct = 50.0
     /// Opce se drží přesně jako akciový obchod strategie (stop a cíl strategie).
     var followStrategy = true
+    var rollBeforeExpiry = false
     var creditStopMultiple = 2.0
     var debitTakeProfitPct = 100.0
     var debitStopPct = 50.0
@@ -89,6 +90,9 @@ final class BacktestModel {
 
     var result: BacktestResult? = nil
     var benchmark: [CurvePoint] = []
+    /// Ticker posledního běhu (pro graf obchodů) a stav zakreslení.
+    var chartSymbol: String = ""
+    var chartStatus: String? = nil
     var dataLabel: String = ""
     var isRunning = false
     var errorMessage: String? = nil
@@ -112,7 +116,7 @@ final class BacktestModel {
             ivMultiplier: ivMultiplier, highVolRank: highVolRank, riskPerTrade: riskPerTradePct / 100,
             creditTakeProfit: creditTakeProfitPct / 100, debitTakeProfit: debitTakeProfitPct / 100,
             creditStop: creditStopMultiple, debitStop: debitStopPct / 100, followStrategy: followStrategy,
-            riskFreeRate: riskFreeRate)
+            rollBeforeExpiry: rollBeforeExpiry, riskFreeRate: riskFreeRate)
     }
 
     func run(client: YahooFinanceClient, riskFreeRate: Double) async {
@@ -154,6 +158,10 @@ final class BacktestModel {
                 }.value
             }
             dataLabel = series.label
+            chartSymbol = ticker
+            if UserDefaults.standard.object(forKey: BacktestTradeChart.enabledKey) as? Bool ?? true {
+                await drawTrades(bars: bars, client: client)
+            }
 
             benchmark = []
             if compareSPY, ticker != "SPY",
@@ -167,6 +175,38 @@ final class BacktestModel {
             errorMessage = error.localizedDescription
         }
     }
+
+    /// Obchody posledního běhu jako kresby do grafu TVChart.
+    func drawTrades(bars: [BacktestBar], client: YahooFinanceClient) async {
+        let items: [BacktestTradeChart.Item]
+        if instrument == .options, let r = optionsResult {
+            items = r.trades.map { t in
+                BacktestTradeChart.Item(side: t.play.direction == 0 ? 1 : t.play.direction, entryDate: t.entryDate,
+                                        entryPrice: t.entrySpot, exitDate: t.exitDate, exitPrice: t.exitSpot,
+                                        result: t.pnl.signedUSDWhole, won: t.pnl > 0,
+                                        label: t.play.name + (t.isRoll ? " (přerolováno)" : ""))
+            }
+        } else if let r = result {
+            items = r.trades.map { t in
+                BacktestTradeChart.Item(side: t.side, entryDate: t.entryDate, entryPrice: t.entryPrice,
+                                        exitDate: t.exitDate, exitPrice: t.exitPrice,
+                                        result: t.returnPct.signedPercent, won: t.returnPct > 0, label: nil)
+            }
+        } else {
+            return
+        }
+        guard !chartSymbol.isEmpty else { return }
+        lastBars = bars
+        do {
+            let count = try await BacktestTradeChart.draw(symbol: chartSymbol, bars: bars, strategy: strategy,
+                                                          allowShort: allowShort, items: items, client: client)
+            chartStatus = count == 0 ? "Žádné obchody k zakreslení." : "Zakresleno obchodů: \(count)."
+        } catch {
+            chartStatus = "Graf obchodů se nepodařilo připravit: \(error.localizedDescription)"
+        }
+    }
+
+    var lastBars: [BacktestBar] = []
 
     /// Ceny upravené o dividendy (poměr adjClose / close), ať výnos odpovídá skutečnosti.
     static func backtestBars(_ bars: [PriceBar]) -> [BacktestBar] {
@@ -200,12 +240,14 @@ struct BacktestView: View {
                         playsSection(result)
                         equitySection(equity: result.equity, hold: result.buyAndHold)
                         drawdownSection(equity: result.equity)
+                        tradeChartSection
                         optionTradesSection(result)
                     }
                 } else if let result = bt.result {
                     metricsSection(result)
                     equitySection(result)
                     drawdownSection(result)
+                    tradeChartSection
                     tradesSection(result)
                 }
             }
@@ -431,6 +473,9 @@ struct BacktestView: View {
             Stepper("Šířka spreadu: \(bt.widthPct.fixed(1)) % ceny", value: $bt.widthPct, in: 1...15, step: 0.5)
             Stepper("Riziko na obchod: \(bt.riskPerTradePct.fixed(0)) % kapitálu", value: $bt.riskPerTradePct, in: 1...20, step: 1)
             Toggle("Výstup podle strategie (stop a cíl strategie)", isOn: $bt.followStrategy)
+            if bt.followStrategy {
+                Toggle("Přerolovat před expirací", isOn: $bt.rollBeforeExpiry)
+            }
             if !bt.followStrategy {
                 Stepper("Kredit: cíl \(Int(bt.creditTakeProfitPct)) % max. zisku", value: $bt.creditTakeProfitPct, in: 20...100, step: 10)
                 Stepper("Kredit: stop \(bt.creditStopMultiple.fixed(1))× kreditu", value: $bt.creditStopMultiple, in: 0.5...4, step: 0.5)
@@ -444,8 +489,35 @@ struct BacktestView: View {
             Text("Opční strategie")
         } footer: {
             Text(bt.followStrategy
-                 ? "Opce kopírují obchody strategie: otevřou se při vstupu a zavřou při výstupu strategie (její stop nebo cíl), stejně jako akcie. Když se blíží expirace (7 dní) a obchod trvá, pozice se přeroluje do nové expirace. Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok."
-                 : "Vlastní výstup opcí: cíl a stop na prémii, 7 dní před expirací nebo při výstupu strategie. Po výstupu se čeká na nový vstup strategie, takže obchodů není víc než u akcií. Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok.")
+                 ? "Opce kopírují obchody strategie: otevřou se při vstupu a zavřou při výstupu strategie (její stop nebo cíl), stejně jako akcie. Každý signál se obchoduje jen jednou – když se pozice zavře dřív (7 dní před expirací), do trvajícího signálu se znovu nevstupuje; zapnuté přerolování ji místo toho přesune do nové expirace. Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok."
+                 : "Vlastní výstup opcí: cíl a stop na prémii, 7 dní před expirací nebo při výstupu strategie. Každý signál se obchoduje jen jednou – po zavření se do trvajícího signálu znovu nevstupuje. Volatilita = realizovaná volatilita 20 svíček, „vysoká“ podle percentilu za poslední rok.")
+        }
+    }
+
+    @AppStorage(BacktestTradeChart.enabledKey) private var drawTradesInChart = true
+
+    private var tradeChartSection: some View {
+        Section {
+            Toggle("Zakreslit obchody do grafu", isOn: $drawTradesInChart)
+            if !bt.chartSymbol.isEmpty {
+                EmbeddedTVChart(symbol: bt.chartSymbol)
+                    .id(bt.chartSymbol)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+            }
+        } header: {
+            Text("Graf obchodů")
+        } footer: {
+            Text((bt.chartStatus.map { $0 + " " } ?? "") + "Zelená zóna vstup → cíl, červená vstup → stop, čárkovaně cesta k výstupu; ▲/▼ otevření, ✕ zavření s výsledkem. Linie strategie (hladina, trendline, průměr) ke každému vstupu. Kresby jsou i ve velkém grafu a nahradí se dalším backtestem.")
+        }
+        .onChange(of: drawTradesInChart) { _, on in
+            Task {
+                if on {
+                    await bt.drawTrades(bars: bt.lastBars, client: model.client)
+                } else {
+                    await BacktestTradeChart.clear(symbol: bt.chartSymbol)
+                    bt.chartStatus = nil
+                }
+            }
         }
     }
 

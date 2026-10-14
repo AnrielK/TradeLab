@@ -372,7 +372,7 @@ extension OptionsBacktest {
                 } else if expired {
                     reason = "expirace"
                 } else if config.followStrategy {
-                    if daysLeft <= Double(config.exitDaysToExpiry) { reason = "rolování" }
+                    if daysLeft <= Double(config.exitDaysToExpiry) { reason = config.rollBeforeExpiry ? "rolování" : "čas" }
                 } else if current.play.isCredit {
                     let credit = -current.entryPremium
                     if pnlPerShare >= credit * config.creditTakeProfit { reason = "cíl zisku" }
@@ -402,7 +402,7 @@ extension OptionsBacktest {
                         exitValue: exitValue, contracts: current.contracts,
                         maxLoss: current.maxLossPerShare * 100 * current.contracts, pnl: pnl, exitReason: reason,
                         impliedVol: current.iv, volRank: current.rank, isRoll: current.isRoll))
-                    rollSignal = config.followStrategy && (reason == "rolování" || reason == "expirace")
+                    rollSignal = config.followStrategy && config.rollBeforeExpiry && (reason == "rolování" || reason == "expirace")
                         && signals[i] == current.signal ? current.signal : nil
                     position = nil
                 } else {

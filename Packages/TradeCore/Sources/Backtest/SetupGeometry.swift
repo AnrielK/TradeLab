@@ -158,3 +158,62 @@ public enum SetupGeometry {
                             entry: nil, stop: nil, target: nil)
     }
 }
+
+/// Plán obchodu strategie pro graf backtestu: stop, cíl a linie, ze kterých vstup vznikl.
+public struct TradePlan: Hashable, Sendable {
+    /// Svíčka signálu (obchod se otevře na otevření další svíčky).
+    public var signalIndex: Int
+    public var direction: Int
+    public var title: String
+    public var stop: Double
+    public var target: Double
+    public var shapes: [SetupShape]
+}
+
+extension SetupGeometry {
+    /// Plány všech vstupů strategie (podle svíčky signálu). Buy & hold nemá žádné.
+    public static func tradePlans(for strategy: BacktestStrategy, bars: [BacktestBar], allowShort: Bool) -> [TradePlan] {
+        guard bars.count > 30 else { return [] }
+        func segment(_ role: SetupShape.Role, _ label: String, from a: Int, _ pa: Double, to b: Int, _ pb: Double) -> SetupShape {
+            SetupShape(role: role, label: label, startDate: bars[max(0, a)].date, startPrice: pa,
+                       endDate: bars[min(b, bars.count - 1)].date, endPrice: pb, isHorizontal: false)
+        }
+        switch strategy {
+        case .buyAndHold:
+            return []
+        case .breakout(let s):
+            let e = BreakoutStrategy.evaluate(bars, settings: s, allowShort: allowShort)
+            return e.signals.map { sig in
+                let role: SetupShape.Role = sig.direction > 0 ? .resistance : .support
+                let level = segment(role, sig.direction > 0 ? "R" : "S", from: sig.index - s.lookback, sig.level,
+                                    to: sig.index, sig.level)
+                return TradePlan(signalIndex: sig.index, direction: sig.direction,
+                                 title: sig.entry.name(direction: sig.direction), stop: sig.stop, target: sig.target,
+                                 shapes: [level])
+            }
+        case .maBounce(let s):
+            let e = MABounceStrategy.evaluate(bars, settings: s, allowShort: allowShort)
+            return e.signals.map { sig in
+                let window = Array(bars[max(0, sig.index - 260)...sig.index])
+                return TradePlan(signalIndex: sig.index, direction: sig.direction, title: "Odraz od KP \(sig.period)",
+                                 stop: sig.stop, target: sig.target,
+                                 shapes: movingAverage(window, period: sig.period, span: 40))
+            }
+        case .trendline(let s):
+            let e = TrendlineStrategy.evaluate(bars, settings: s, allowShort: allowShort)
+            return e.signals.map { sig in
+                let support = sig.entry == .bounce ? sig.direction > 0 : sig.direction < 0
+                var shapes = [segment(support ? .supportLine : .resistanceLine, "TL", from: sig.line.startIndex,
+                                      sig.line.startPrice, to: sig.index, sig.line.value(at: sig.index))]
+                if let other = sig.otherLine {
+                    shapes.append(segment(sig.direction > 0 ? .supportLine : .resistanceLine, "TL",
+                                          from: other.startIndex, other.startPrice, to: sig.index,
+                                          other.value(at: sig.index)))
+                }
+                return TradePlan(signalIndex: sig.index, direction: sig.direction,
+                                 title: sig.entry.name(direction: sig.direction), stop: sig.stop, target: sig.target,
+                                 shapes: shapes)
+            }
+        }
+    }
+}

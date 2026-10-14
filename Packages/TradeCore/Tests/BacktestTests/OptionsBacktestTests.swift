@@ -94,3 +94,17 @@ final class OptionsMatchStockTests: XCTestCase {
         }
     }
 }
+
+final class OptionsSignalOnceTests: XCTestCase {
+    /// Trvalý signál (buy & hold) se obchoduje jen jednou: po zavření před expirací se znovu nevstupuje.
+    func testSignalTradedOnce() {
+        let bars = BreakoutTests.series(seed: 2)
+        let once = OptionsBacktest.run(bars: bars, config: OptionsBacktestConfig(signal: .buyAndHold))
+        XCTAssertEqual(once.trades.count, 1)
+        XCTAssertEqual(once.rollCount, 0)
+        let rolled = OptionsBacktest.run(bars: bars, config: OptionsBacktestConfig(signal: .buyAndHold,
+                                                                                rollBeforeExpiry: true))
+        XCTAssertGreaterThan(rolled.trades.count, 1)
+        XCTAssertEqual(rolled.strategyTradeCount, 1)
+    }
+}

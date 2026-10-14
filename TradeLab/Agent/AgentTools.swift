@@ -200,6 +200,7 @@ enum AgentToolbox {
                     "risk_pct": Schema.number("Max. ztráta obchodu v % kapitálu (výchozí 5)"),
                     "high_vol_rank": Schema.number("Percentil HV pro „vysokou“ volatilitu (výchozí 50)"),
                     "iv_multiplier": Schema.number("simulated: IV = HV × násobek (výchozí 1.1)"),
+                    "roll": Schema.boolean("follow_strategy: přerolovat před expirací, dokud obchod strategie trvá (výchozí false = každý signál jen jednou)"),
                     "follow_strategy": Schema.boolean("Výstup podle strategie – opce kopírují akciové obchody (stop a cíl strategie, přerolování před expirací); false = vlastní cíl a stop na prémii (výchozí true)"),
                     "pricing": Schema.string("simulated (Black-Scholes, rychlé) nebo historical (skutečné EOD kotace z DoltHubu od 2019, pomalejší)",
                                              enum: ["simulated", "historical"]),
@@ -858,6 +859,7 @@ enum AgentToolbox {
             highVolRank: input["high_vol_rank"]?.doubleValue ?? 50,
             riskPerTrade: (input["risk_pct"]?.doubleValue ?? 5) / 100,
             followStrategy: input["follow_strategy"]?.boolValue ?? true,
+            rollBeforeExpiry: input["roll"]?.boolValue ?? false,
             riskFreeRate: model.riskFreeRate)
 
         let historical = input["pricing"]?.stringValue == "historical"

@@ -986,6 +986,7 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
         self.exit_dte = {{EXIT_DTE}}
         # Výstup podle strategie: opce kopírují akciové obchody, před expirací se přerolují.
         self.follow = {{FOLLOW}}
+        self.roll = {{ROLL}}
         self.entry_signal = None   # nový vstup strategie, na který se čeká
         self.roll_signal = None
 
@@ -1064,7 +1065,7 @@ class TradeLabOptionsAlgorithm(QCAlgorithm):
             reason = "signal"
         elif self.follow:
             if days_left <= self.exit_dte:
-                reason = "roll"
+                reason = "roll" if self.roll else "cas"
         elif p["credit"]:
             credit = -p["premium"]
             if pnl >= credit * self.credit_tp:

@@ -74,6 +74,9 @@ public struct OptionsBacktestConfig: Hashable, Sendable {
     /// Výstup podle strategie: opce se drží přesně jako akciový obchod (stop a cíl strategie),
     /// bez vlastního cíle a stopu na prémii; před expirací se pozice přeroluje.
     public var followStrategy: Bool
+    /// Před expirací přerolovat do nové expirace, dokud obchod strategie trvá. Vypnuto = každý signál
+    /// se obchoduje jen jednou: po zavření se do trvajícího signálu znovu nevstupuje.
+    public var rollBeforeExpiry: Bool
     /// Poplatek za kontrakt a nohu (USD) a skluz jako zlomek ceny nohy.
     public var commission: Double
     public var slippage: Double
@@ -85,7 +88,7 @@ public struct OptionsBacktestConfig: Hashable, Sendable {
                 widthPct: Double = 0.05, ivMultiplier: Double = 1.1, highVolRank: Double = 50,
                 riskPerTrade: Double = 0.05, creditTakeProfit: Double = 0.5, debitTakeProfit: Double = 1.0,
                 creditStop: Double = 2.0, debitStop: Double = 0.5, exitDaysToExpiry: Int = 7,
-                followStrategy: Bool = true, commission: Double = 0.65, slippage: Double = 0.03, riskFreeRate: Double = 0.04,
+                followStrategy: Bool = true, rollBeforeExpiry: Bool = false, commission: Double = 0.65, slippage: Double = 0.03, riskFreeRate: Double = 0.04,
                 initialCapital: Double = 10_000) {
         self.signal = signal
         self.selection = selection
@@ -102,6 +105,7 @@ public struct OptionsBacktestConfig: Hashable, Sendable {
         self.debitStop = debitStop
         self.exitDaysToExpiry = exitDaysToExpiry
         self.followStrategy = followStrategy
+        self.rollBeforeExpiry = rollBeforeExpiry
         self.commission = commission
         self.slippage = slippage
         self.riskFreeRate = riskFreeRate
@@ -262,7 +266,7 @@ public enum OptionsBacktest {
                 } else if daysLeft <= 0 {
                     reason = "expirace"
                 } else if config.followStrategy {
-                    if daysLeft <= Double(config.exitDaysToExpiry) { reason = "rolování" }
+                    if daysLeft <= Double(config.exitDaysToExpiry) { reason = config.rollBeforeExpiry ? "rolování" : "čas" }
                 } else if current.play.isCredit {
                     let credit = -current.entryPremium
                     if pnlPerShare >= credit * config.creditTakeProfit { reason = "cíl zisku" }
@@ -291,7 +295,7 @@ public enum OptionsBacktest {
                         pnl: pnl, exitReason: reason, impliedVol: current.iv, volRank: current.rank,
                         isRoll: current.isRoll))
                     // Před expirací se pozice přeroluje, pokud obchod strategie pořád trvá.
-                    rollSignal = config.followStrategy && (reason == "rolování" || reason == "expirace")
+                    rollSignal = config.followStrategy && config.rollBeforeExpiry && (reason == "rolování" || reason == "expirace")
                         && signals[i] == current.signal ? current.signal : nil
                     position = nil
                 }

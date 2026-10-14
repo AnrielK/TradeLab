@@ -1,5 +1,16 @@
 # Změny
 
+## 0.23.0 – 2026-10-14
+
+- **Opce: každý signál jen jednou.** Po zavření opční pozice (výstup strategie, 7 dní před expirací,
+  u vlastního výstupu i cíl nebo stop na prémii) se do trvajícího signálu znovu nevstupuje – další obchod
+  až při novém vstupu strategie. Přerolování před expirací je volitelné (výchozí vypnuto).
+- **Graf obchodů v Backtestu**: pod výsledky je graf TVChart s obchody – zelená zóna vstup → cíl,
+  červená vstup → stop, čárkovaná cesta k výstupu, ▲/▼ otevření s typem vstupu a ✕ zavření s výsledkem;
+  ke každému vstupu linie strategie (hladina konsolidace, trendline / trojúhelník, průměr). Funguje pro akcie
+  i opce, kresby jsou i ve velkém grafu a další backtest je nahradí (ruční kresby zůstanou). Ceny upravené
+  o dividendy se pro graf přepočtou, aby seděly na svíčky. Přepínač „Zakreslit obchody do grafu“.
+
 ## 0.22.1 – 2026-10-14
 
 - **Opční backtest kopíruje obchody strategie.** Dřív měl jiný počet obchodů než akciový:
