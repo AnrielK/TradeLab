@@ -29,11 +29,20 @@ struct TVChartScreen: View {
     var initialResolution: String? = nil
     /// Úložiště kreseb (graf backtestu má vlastní).
     var drawingsNamespace: String = "drawings"
+    /// Vodorovné čáry z TradeLabu (OI úrovně, pozice) – platí jen pro `initialSymbol`.
+    var priceLines: [ChartPriceLine] = []
 
     @State private var vm = ChartViewModel()
     @State private var wheel: WheelSelection?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
+
+    /// Čáry jen když graf ukazuje ticker, ke kterému patří.
+    private var linesForCurrentSymbol: [ChartPriceLine] {
+        guard let initialSymbol, !priceLines.isEmpty else { return [] }
+        let current = vm.symbol.split(separator: ":").last.map(String.init) ?? vm.symbol
+        return current.uppercased() == initialSymbol.uppercased() ? priceLines : []
+    }
 
     var body: some View {
         ZStack {
@@ -76,8 +85,11 @@ struct TVChartScreen: View {
                 }
             }
             if let initialResolution { vm.resolution = initialResolution }
+            vm.priceLines = linesForCurrentSymbol
             vm.connect()
         }
+        .onChange(of: vm.symbol) { _, _ in vm.priceLines = linesForCurrentSymbol }
+        .onChange(of: priceLines) { _, _ in vm.priceLines = linesForCurrentSymbol }
         .onReceive(NotificationCenter.default.publisher(for: .chartDrawingsChanged)) { _ in
             vm.reloadDrawingsFromStorage()
         }

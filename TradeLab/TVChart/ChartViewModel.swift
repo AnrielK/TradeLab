@@ -320,7 +320,7 @@ final class ChartViewModel {
             }
         }
         // čáry opční pozice se musí vejít taky
-        for line in priceLines where line.price > 0 {
+        for line in priceLines where line.price > 0 && line.fitsInScale {
             lo = Swift.min(lo, line.price)
             hi = Swift.max(hi, line.price)
         }
@@ -856,6 +856,8 @@ struct ChartPriceLine: Hashable, Identifiable {
     var label: String
     var color: Color
     var dashed: Bool = true
+    /// Má se čára vejít do svislého měřítka? (OI úrovně daleko od ceny graf nezmačkají.)
+    var fitsInScale: Bool = true
 
     var id: String { "\(label)@\(price)" }
 }

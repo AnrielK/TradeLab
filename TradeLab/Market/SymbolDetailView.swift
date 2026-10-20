@@ -37,8 +37,8 @@ struct SymbolDetailView: View {
                     }
                 }
 
-                // Graf z TVChart (bez indikátorů) se striky a break-even aktuální pozice.
-                EmbeddedTVChart(symbol: symbol, priceLines: positionLines)
+                // Graf z TVChart (bez indikátorů) se striky a break-even aktuální pozice a OI úrovněmi (načtenými v Opce → OI).
+                EmbeddedTVChart(symbol: symbol, priceLines: positionLines + model.chainStore.openInterestLines(for: symbol))
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
             }
 

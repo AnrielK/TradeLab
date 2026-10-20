@@ -52,7 +52,7 @@ enum DetailChartSpan: String, CaseIterable, Identifiable {
 
 /// Graf z TVChart vložený do detailu tickeru:
 /// bez indikátorů, svíčky / linka, období 1D–Vše, čáry opční pozice.
-/// Tlačítko zvětšení otevře plný graf s indikátory a všemi intervaly (bez čar pozice).
+/// Tlačítko zvětšení otevře plný graf s indikátory, všemi intervaly a stejnými čarami.
 struct EmbeddedTVChart: View {
     let symbol: String
     var priceLines: [ChartPriceLine] = []
@@ -139,7 +139,7 @@ struct EmbeddedTVChart: View {
             if shown { vm.disconnect() } else { vm.connect() }
         }
         .fullScreenCover(isPresented: $showFullScreen) {
-            TVChartScreen(initialSymbol: symbol)
+            TVChartScreen(initialSymbol: symbol, priceLines: priceLines)
         }
     }
 

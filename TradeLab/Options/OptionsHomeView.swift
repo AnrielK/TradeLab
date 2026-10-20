@@ -48,7 +48,8 @@ struct OptionsHomeView: View {
                 }
             }
             .fullScreenCover(isPresented: $showTradingViewChart) {
-                TVChartScreen(initialSymbol: model.optionsSymbol)
+                TVChartScreen(initialSymbol: model.optionsSymbol,
+                              priceLines: model.chainStore.openInterestLines(for: model.optionsSymbol))
             }
             .task(id: model.optionsSymbol) {
                 await model.chainStore.load(symbol: model.optionsSymbol, rate: model.riskFreeRate)

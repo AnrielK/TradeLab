@@ -10,6 +10,7 @@ struct OpenInterestView: View {
     @AppStorage("oi.horizon") private var horizon = 100
     @AppStorage("oi.weighting") private var weightingRaw = OpenInterestWeighting.gamma.rawValue
     @AppStorage("oi.range") private var rangePercent = 15
+    @AppStorage(ChainStore.showOnChartKey) private var showOnChart = true
 
     private static let horizons = [30, 60, 100]
     private static let ranges = [10, 15, 25]
@@ -38,6 +39,7 @@ struct OpenInterestView: View {
                     levelCards(profile)
                     chart(profile)
                     topList(profile)
+                    howTo
                     footnote(profile)
                 } else if store.oiProgress == nil {
                     ContentUnavailableView("Žádná data", systemImage: "chart.bar.xaxis",
@@ -66,6 +68,10 @@ struct OpenInterestView: View {
                 }
             }
             .pickerStyle(.segmented)
+
+            Toggle("Úrovně v grafu (call/put wall, gamma flip, max pain)", isOn: $showOnChart)
+                .font(.caption)
+                .tint(ChainTheme.sigma)
 
             HStack {
                 Picker("Horizont", selection: $horizon) {
@@ -215,6 +221,24 @@ struct OpenInterestView: View {
         .foregroundStyle(.secondary)
     }
 
+    private var howTo: some View {
+        DisclosureGroup("Jak to použít") {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("• **Cena nad gamma flipem** (kladné GEX): dealeři zajišťují proti pohybu – trh má sklon k range mezi put a call wall. Hodí se prodej prémie (iron condor, kreditní spready) s krátkými striky za walls.")
+                Text("• **Cena pod gamma flipem** (záporné GEX): zajištění pohyby zesiluje, volatilita roste. Spíš debetní strategie, menší pozice, širší stopy; průraz put wall může zrychlit.")
+                Text("• **Call / put wall** = pravděpodobný odpor / support a cíl. Cíle breakoutu dávej těsně pod call wall, stop za put wall. Čistý průraz wall s objemem bývá silný signál (dealeři pak kupují s trhem).")
+                Text("• **Max pain** táhne cenu hlavně v posledních dnech před měsíční expirací – pro krátké pozice do expirace, jinak slabý signál.")
+                Text("• Úrovně jsou z denních dat; ber je jako kontext k hladinám skeneru, ne jako samostatný vstup.")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.top, 4)
+        }
+        .font(.subheadline.weight(.semibold))
+        .padding(12)
+        .background(ChainTheme.row, in: .rect(cornerRadius: 12))
+    }
+
     // MARK: - Pomocné
 
     private func legendDot(_ color: Color, _ text: String) -> some View {
@@ -269,5 +293,37 @@ private struct LevelCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(ChainTheme.row, in: .rect(cornerRadius: 10))
+    }
+}
+
+extension ChainStore {
+    static let showOnChartKey = "oi.showOnChart"
+
+    /// OI úrovně jako čáry do grafu – jen když je profil načtený pro tento ticker a zobrazení je zapnuté.
+    /// Čáry se nepočítají do měřítka grafu, takže vzdálené úrovně graf nezmačkají.
+    func openInterestLines(for symbol: String) -> [ChartPriceLine] {
+        let defaults = UserDefaults.standard
+        let show = defaults.object(forKey: Self.showOnChartKey) as? Bool ?? true
+        guard show, let profile = oiProfile, profile.symbol.uppercased() == symbol.uppercased() else { return [] }
+        let weighting = defaults.string(forKey: "oi.weighting").flatMap(OpenInterestWeighting.init(rawValue:)) ?? .gamma
+        var lines: [ChartPriceLine] = []
+        if let wall = profile.callWall(weighting) {
+            lines.append(ChartPriceLine(price: wall.price, label: "Call wall " + wall.price.strikeLabel,
+                                        color: ChainTheme.up, fitsInScale: false))
+        }
+        if let wall = profile.putWall(weighting) {
+            lines.append(ChartPriceLine(price: wall.price, label: "Put wall " + wall.price.strikeLabel,
+                                        color: ChainTheme.down, fitsInScale: false))
+        }
+        if let flip = oiGammaFlip {
+            lines.append(ChartPriceLine(price: flip, label: "γ flip " + flip.fixed(2),
+                                        color: ChainTheme.itm, fitsInScale: false))
+        }
+        if let pain = oiMaxPain {
+            lines.append(ChartPriceLine(price: pain.strike,
+                                        label: "Max pain " + pain.strike.strikeLabel + " (" + pain.expiration.shortExpiryLabel + ")",
+                                        color: ChainTheme.sigma, fitsInScale: false))
+        }
+        return lines
     }
 }

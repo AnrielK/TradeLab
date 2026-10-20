@@ -1,5 +1,14 @@
 # Změny
 
+## 0.26.0 – 2026-10-20
+
+- **OI úrovně v grafu**: call wall (zelená), put wall (červená), gamma flip (žlutá) a max pain (modrá) se kreslí
+  jako čáry do grafu z Opce → Graf, do grafu v detailu tickeru i do jeho zvětšené verze – vždy jen pro ticker,
+  pro který je profil načtený v Opce → OI, a podle zvoleného vážení. Čáry nemění svislé měřítko, takže
+  vzdálené úrovně graf nezmačkají. Zapíná / vypíná se přepínačem „Úrovně v grafu“ v režimu OI.
+- Režim OI má sekci „Jak to použít“ (kladné / záporné GEX, walls jako support a odpor, max pain).
+- TVChart: `ChartPriceLine.fitsInScale` a parametr `priceLines` v `TVChartScreen`.
+
 ## 0.25.0 – 2026-10-20
 
 - **Opce → OI**: nový režim vedle Tabulky a Payoffu. Sečte open interest všech expirací do 30 / 60 / 100 dní
