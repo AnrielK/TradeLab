@@ -5,6 +5,7 @@ import OptionsMath
 enum OptionsMode: String, CaseIterable, Identifiable {
     case table = "Tabulka"
     case curve = "Payoff"
+    case openInterest = "OI"
 
     var id: String { rawValue }
 }
@@ -25,6 +26,8 @@ struct OptionsHomeView: View {
                     ChainTableView(mode: $mode)
                 case .curve:
                     PayoffWorkspaceView()
+                case .openInterest:
+                    OpenInterestView()
                 }
             }
             .navigationTitle("Opce")

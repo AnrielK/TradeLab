@@ -1,5 +1,17 @@
 # Změny
 
+## 0.25.0 – 2026-10-20
+
+- **Opce → OI**: nový režim vedle Tabulky a Payoffu. Sečte open interest všech expirací do 30 / 60 / 100 dní
+  (načítá se po 3 expiracích najednou, cache 15 minut, stažením dolů znovu) a ukáže:
+  **call wall** (největší call OI nad cenou), **put wall** (největší put OI pod cenou), **gamma flip**
+  (cena, kde celkové GEX mění znaménko) a **max pain** nejbližší měsíční expirace; graf po strikech
+  (cally doprava, puty doleva) v pásmu ±10 / 15 / 25 % kolem ceny, 8 největších úrovní a put/call poměr.
+- Vážení: prosté OI, OI/√DTE (bližší expirace mají větší váhu) nebo GEX – gamma exposure v USD na 1% pohyb
+  (předpokládá dealery long cally a short puty).
+- Agent: nový nástroj `get_open_interest_levels`; v Opčním desku ho používá analytik směru.
+- Jádro: `OpenInterestProfile`, `OptionChain.maxPain` a `YahooFinanceClient.optionChains(symbol:maxDays:)` v `MarketData` s testy.
+
 ## 0.24.1 – 2026-10-14
 
 - Demo účet: oprava – otevřené pozice se zobrazovaly jako jeden řádek a swipe ukázal tlačítka „Zavřít“

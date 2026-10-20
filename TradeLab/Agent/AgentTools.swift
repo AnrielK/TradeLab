@@ -77,6 +77,23 @@ enum AgentToolbox {
             ) { input in try await optionChain(input, model: model) },
 
             AgentTool(
+                name: "get_open_interest_levels",
+                description: """
+                Open interest sečtený přes všechny expirace do max_days dní (výchozí 100): call wall (největší call OI \
+                nad cenou), put wall (největší put OI pod cenou), gamma flip (cena, kde celkové GEX mění znaménko), \
+                max pain nejbližší měsíční expirace, put/call poměr a největší striky. weighting: raw = prosté OI, \
+                time = OI/√DTE, gamma = GEX v USD na 1% pohyb (předpokládá dealery long cally, short puty). \
+                OI je denní údaj a neříká, kdo je long – ber to jako pravděpodobné magnety / odpory, ne jistotu.
+                """,
+                inputSchema: Schema.object([
+                    "symbol": Schema.string("Ticker"),
+                    "max_days": Schema.integer("Horizont expirací ve dnech (výchozí 100, max 180)"),
+                    "weighting": Schema.string("Vážení úrovní (výchozí gamma)", enum: OpenInterestWeighting.allCases.map(\.rawValue)),
+                    "top": Schema.integer("Počet největších striků (výchozí 8, max 20)"),
+                ], required: ["symbol"])
+            ) { input in try await openInterestLevels(input, model: model) },
+
+            AgentTool(
                 name: "price_option",
                 description: "Black-Scholes cena a greeks evropské opce. Spot zadej přímo, nebo ticker a vezme se aktuální cena. Sazba výchozí z ^IRX.",
                 inputSchema: Schema.object([
@@ -489,6 +506,54 @@ enum AgentToolbox {
             "summary": summaryJSON(chain.summary(rate: rate)),
             "strikes": .array(rows),
             "note": "IV a delta jsou dopočtené z mid ceny (Black-Scholes). Mimo obchodní hodiny mohou být kotace zastaralé.",
+        ])
+    }
+
+    static func openInterestLevels(_ input: JSONValue, model: AppModel) async throws -> String {
+        let s = try symbol(input)
+        let maxDays = Double(min(max(input["max_days"]?.intValue ?? 100, 1), 180))
+        let weighting = input["weighting"]?.stringValue.flatMap(OpenInterestWeighting.init(rawValue:)) ?? .gamma
+        let top = min(max(input["top"]?.intValue ?? 8, 1), 20)
+        let rate = model.riskFreeRate
+        let chains = try await model.client.optionChains(symbol: s, maxDays: maxDays)
+        let monthly = chains.first { ExpirationCalendar.isMonthly($0.expiration) } ?? chains.first
+        let (profile, flip, pain) = await Task.detached(priority: .userInitiated) {
+            let profile = OpenInterestProfile(chains: chains, maxDays: maxDays, rate: rate)
+            return (profile, profile.gammaFlip(), monthly?.maxPain)
+        }.value
+        guard !profile.strikes.isEmpty else { throw ToolError("\(s) nemá do \(Int(maxDays)) dní opce s open interest.") }
+
+        func level(_ l: OpenInterestLevel?) -> JSONValue {
+            guard let l else { return .null }
+            return ["price": num(l.price), "value": num(l.value, 0),
+                    "distance_pct": pct(profile.spot > 0 ? l.price / profile.spot - 1 : nil)]
+        }
+        return output([
+            "symbol": .string(s),
+            "underlying_price": num(profile.spot),
+            "weighting": .string(weighting.rawValue),
+            "value_unit": .string(weighting == .gamma ? "USD GEX na 1% pohyb" : weighting == .time ? "OI/√DTE" : "kontrakty"),
+            "expirations": .number(Double(profile.expirations.count)),
+            "first_expiration": profile.expirations.first.map { d -> JSONValue in .string(day(d)) } ?? .null,
+            "last_expiration": profile.expirations.last.map { d -> JSONValue in .string(day(d)) } ?? .null,
+            "call_oi": .number(Double(profile.totalCallOpenInterest)),
+            "put_oi": .number(Double(profile.totalPutOpenInterest)),
+            "put_call_ratio": num(profile.putCallRatio),
+            "total_gex": num(profile.totalGamma, 0),
+            "call_wall": level(profile.callWall(weighting)),
+            "put_wall": level(profile.putWall(weighting)),
+            "gamma_flip": num(flip),
+            "max_pain": pain.map { p -> JSONValue in ["expiration": .string(day(p.expiration)), "strike": num(p.strike)] } ?? .null,
+            "top_strikes": .array(profile.topLevels(top, weighting: weighting).map { l -> JSONValue in
+                let row = profile.strikes.first { $0.strike == l.price }
+                return [
+                    "strike": num(l.price),
+                    "distance_pct": pct(profile.spot > 0 ? l.price / profile.spot - 1 : nil),
+                    "call_oi": .number(Double(row?.callOpenInterest ?? 0)),
+                    "put_oi": .number(Double(row?.putOpenInterest ?? 0)),
+                    "value": num(l.value, 0),
+                ]
+            }),
         ])
     }
 

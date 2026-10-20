@@ -19,6 +19,15 @@ final class ChainStore {
     var isLoadingSymbol = false
     var errorMessage: String? = nil
 
+    // Open interest přes expirace
+    var oiProfile: OpenInterestProfile? = nil
+    /// Max pain nejbližší měsíční expirace v profilu.
+    var oiMaxPain: MaxPain? = nil
+    var oiGammaFlip: Double? = nil
+    /// Načteno / celkem expirací při načítání profilu.
+    var oiProgress: (done: Int, total: Int)? = nil
+    private var oiTask: Task<Void, Never>? = nil
+
     private var loadedAt: [Date: Date] = [:]
     private var prefetchTask: Task<Void, Never>? = nil
 
@@ -95,6 +104,56 @@ final class ChainStore {
         }
     }
 
+    /// Načte všechny expirace do `maxDays` dní (po 3 najednou) a sečte z nich open interest.
+    /// Řetězce mladší než 15 minut se berou z cache – OI se mění jen jednou denně.
+    func loadOpenInterest(maxDays: Double, rate: Double, force: Bool = false) async {
+        if !force, let profile = oiProfile, profile.symbol == symbol, profile.maxDays == maxDays,
+           Date().timeIntervalSince(profile.computedAt) < 900 { return }
+        oiTask?.cancel()
+        let symbol = self.symbol
+        let task = Task { [weak self] in
+            guard let self else { return }
+            let now = Date()
+            let dates = self.expirations.filter {
+                let d = OptionChain.daysToExpiry($0, from: now)
+                return d > 0 && d <= maxDays
+            }
+            guard !dates.isEmpty else {
+                self.oiProfile = nil
+                self.oiProgress = nil
+                return
+            }
+            self.oiProgress = (0, dates.count)
+            let age: TimeInterval = force ? 0 : 900
+            var index = 0
+            while index < dates.count {
+                guard !Task.isCancelled, self.symbol == symbol else { return }
+                let batch = Array(dates[index..<min(index + 3, dates.count)])
+                index += batch.count
+                await withTaskGroup(of: Void.self) { group in
+                    for date in batch {
+                        group.addTask { _ = await self.chain(for: date, rate: rate, maxAge: age) }
+                    }
+                }
+                self.oiProgress = (index, dates.count)
+            }
+            guard !Task.isCancelled, self.symbol == symbol else { return }
+            let chains = dates.compactMap { self.chains[$0] }
+            let monthly = chains.first { ExpirationCalendar.isMonthly($0.expiration) } ?? chains.first
+            let computed = await Task.detached(priority: .userInitiated) {
+                let profile = OpenInterestProfile(chains: chains, maxDays: maxDays, rate: rate, now: now)
+                return (profile, profile.gammaFlip(), monthly?.maxPain)
+            }.value
+            guard !Task.isCancelled, self.symbol == symbol else { return }
+            self.oiProfile = computed.0
+            self.oiGammaFlip = computed.1
+            self.oiMaxPain = computed.2
+            self.oiProgress = nil
+        }
+        oiTask = task
+        await task.value
+    }
+
     private func store(_ chain: OptionChain, key: Date, rate: Double) {
         chains[key] = chain
         loadedAt[key] = Date()
@@ -112,5 +171,10 @@ final class ChainStore {
         loadedAt = [:]
         loading = []
         errorMessage = nil
+        oiTask?.cancel()
+        oiProfile = nil
+        oiMaxPain = nil
+        oiGammaFlip = nil
+        oiProgress = nil
     }
 }

@@ -11,6 +11,8 @@ Osobní iOS aplikace (SwiftUI, iOS 26+, Liquid Glass) pro průzkum US akcií a o
 - **Strategie** (v záložce Opce) – šablony (spready, straddle, strangle, iron condor, butterfly, covered call…) postavené z reálného řetězce,
   graf P/L při expiraci i „dnes / za N dní“ s posunem IV, max. zisk/ztráta, break-even,
   pravděpodobnost zisku, Greeks celé pozice; panel „Hodnoty v bodě“ (teoretická hodnota a P/L nohou, greeks pro vybranou cenu, den a IV).
+- **OI úrovně** (v záložce Opce) – open interest sečtený přes všechny expirace do 30–100 dní: call wall, put wall,
+  gamma flip (GEX), max pain nejbližší měsíční expirace a graf po strikech; vážení prostým OI, OI/√DTE nebo GEX.
 - **Graf TradingView** – převzatý TVChart (real-time data, indikátory, kreslení) na celou obrazovku.
 - **Watchlist setupů** – skener strategií Breakout/Breakdown, Odraz od KP a Trendlinie (včetně hledání trojúhelníků) na likvidních akciích: čerstvé vstupy i kandidáti v konsolidaci těsně u hladiny, s hladinou, stopem, cílem a návrhem spreadu podle volatility a likvidity opcí.
 - **Demo účet** – virtuálních 10 000 USD, strategie obchodují naživo na denních svíčkách (vstupy ze skeneru, stop a cíl strategie, velikost podle rizika).

@@ -86,10 +86,10 @@ enum TeamPresets {
                 TeamRole(
                     id: "direction", name: "Analytik směru", icon: "arrow.up.right",
                     instructions: """
-                    Urči směrový sklon a klíčové hladiny (SMA, 52týdenní extrémy, RSI, MACD) a jak velký pohyb je \
-                    realistický do 30–45 dní. Zohledni názor uživatele, pokud ho uvedl.
+                    Urči směrový sklon a klíčové hladiny (SMA, 52týdenní extrémy, RSI, MACD, call/put wall a gamma flip \
+                    z open interest) a jak velký pohyb je realistický do 30–45 dní. Zohledni názor uživatele, pokud ho uvedl.
                     """,
-                    tools: ["get_quote", "get_price_history", "find_levels"], maxTurns: 6),
+                    tools: ["get_quote", "get_price_history", "find_levels", "get_open_interest_levels"], maxTurns: 6),
             ]),
             TeamStage([
                 TeamRole(
